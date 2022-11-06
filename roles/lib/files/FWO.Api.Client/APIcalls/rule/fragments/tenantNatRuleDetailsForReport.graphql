@@ -1,4 +1,4 @@
-fragment natRuleDetails on rule {
+fragment natRuleDetails on view_tenant_rules {
   ...ruleDetails
   translate: ruleByXlateRule {
     rule_src

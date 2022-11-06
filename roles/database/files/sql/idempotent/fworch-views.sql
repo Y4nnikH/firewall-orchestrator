@@ -455,6 +455,10 @@ CREATE OR REPLACE VIEW view_import_status_table AS
 -- tenant views
 ---------------------------------------------------------------------------------------------
 
+-- we need this view to be able to set tenant ip filtering specific permissions
+CREATE OR REPLACE VIEW view_tenant_rules AS
+	SELECT * FROM rule;
+
 /*
 -- get all rules of a tenant
 CREATE OR REPLACE VIEW view_tenant_rules AS 

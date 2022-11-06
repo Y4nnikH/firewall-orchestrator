@@ -1,4 +1,4 @@
-fragment ruleDetails on rule {
+fragment ruleDetails on view_tenant_rules {
   rule_id
   rule_uid
   rule_action

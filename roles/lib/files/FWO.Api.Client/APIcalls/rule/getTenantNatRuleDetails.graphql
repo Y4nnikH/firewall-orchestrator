@@ -20,7 +20,7 @@ query listNatRulesDetails(
     ) {
       dev_id
       dev_name
-      rules(
+      rules: tenant_rules(
         limit: $limit
         offset: $offset
         where: {

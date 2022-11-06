@@ -98,7 +98,7 @@ $function$;
 
 
 -- does not use any views
-CREATE OR REPLACE FUNCTION get_rule_froms_for_tenant(rule rule, hasura_session json)
+CREATE OR REPLACE FUNCTION get_rule_froms_for_tenant(rule view_tenant_rules, hasura_session json)
 RETURNS SETOF rule_from AS $$
     DECLARE t_id integer;
     rule_to_obj RECORD;
@@ -146,7 +146,7 @@ RETURNS SETOF rule_from AS $$
 $$ LANGUAGE 'plpgsql' STABLE;
 
 
-CREATE OR REPLACE FUNCTION get_rule_tos_for_tenant(rule rule, hasura_session json)
+CREATE OR REPLACE FUNCTION get_rule_tos_for_tenant(rule view_tenant_rules, hasura_session json)
 RETURNS SETOF rule_to AS $$
     DECLARE t_id integer;
     rule_from_obj RECORD;

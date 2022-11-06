@@ -279,7 +279,7 @@ namespace FWO.Report.Filter
                                     {{
                                         id: dev_id
                                         name: dev_name
-                                        rules(
+                                        {(tenantFiltering ? "rules: tenant_rules" : "rules")}(
                                             limit: $limit 
                                             offset: $offset
                                             where: {{  access_rule: {{_eq: true}} {(tenantFiltering ? "get_rule_froms_for_tenant: {}" : "")} {query.ruleWhereStatement} }} 
@@ -352,7 +352,7 @@ namespace FWO.Report.Filter
                                     {{
                                         id: dev_id
                                         name: dev_name
-                                        rules(
+                                        {(tenantFiltering ? "rules: tenant_rules" : "rules")}(
                                             limit: $limit 
                                             offset: $offset
                                             where: {{  nat_rule: {{_eq: true}}, ruleByXlateRule: {{}} {(tenantFiltering ? "get_rule_froms_for_tenant: {}" : "")} {query.ruleWhereStatement} }} 

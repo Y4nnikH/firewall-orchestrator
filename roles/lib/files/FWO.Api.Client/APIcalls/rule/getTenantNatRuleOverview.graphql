@@ -16,7 +16,7 @@ query getNatRulesOverview($mgmId: [Int!], $device_id: [Int!]) {
     ) {
       dev_id
       dev_name
-      rules(
+      rules: tenant_rules(
         where: {
           nat_rule: { _eq: true }
           active: { _eq: true }
