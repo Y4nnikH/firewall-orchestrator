@@ -21,7 +21,10 @@ fragment ruleDetails on rule {
   access_rule
   nat_rule
   xlate_rule  
-  rule_froms: get_rule_froms_for_tenant(where: {object:{obj_create:{_lte:$relevantImportId}, obj_last_seen:{_gte:$relevantImportId}}}) {
+  rule_froms: get_rule_froms_for_tenant(
+    args: {sim_tenant_id: $sim_tenant_id}
+    where: {object:{obj_create:{_lte:$relevantImportId}, obj_last_seen:{_gte:$relevantImportId}}}
+  ) {
     usr {
       ...userDetails
     }
@@ -33,7 +36,10 @@ fragment ruleDetails on rule {
     zone_name
     zone_id
   }
-  rule_tos: get_rule_tos_for_tenant(where: {object:{obj_create:{_lte:$relevantImportId}, obj_last_seen:{_gte:$relevantImportId}}}) {
+  rule_tos: get_rule_tos_for_tenant(
+    args: {sim_tenant_id: $sim_tenant_id}
+    where: {object:{obj_create:{_lte:$relevantImportId}, obj_last_seen:{_gte:$relevantImportId}}}
+  ) {
     usr {
       ...userDetails
     }

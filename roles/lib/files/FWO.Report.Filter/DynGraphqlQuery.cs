@@ -221,6 +221,9 @@ namespace FWO.Report.Filter
 
             query.ruleWhereStatement += "}] ";
 
+            if (tenantFiltering)
+                query.QueryParameters.Add("$sim_tenant_id: Int ");
+            
             string paramString = string.Join(" ", query.QueryParameters.ToArray());
             
             switch (reportType)
@@ -282,7 +285,7 @@ namespace FWO.Report.Filter
                                         rules(
                                             limit: $limit 
                                             offset: $offset
-                                            where: {{  access_rule: {{_eq: true}} {(tenantFiltering ? "get_rule_froms_for_tenant: {}" : "")} {query.ruleWhereStatement} }} 
+                                            where: {{  access_rule: {{_eq: true}} {(tenantFiltering ? "" /* "get_rule_froms_for_tenant: {}" -> doesnt work, need arg but cant add here (cannot use this filtering technique at all with current approach) */ : "" )} {query.ruleWhereStatement} }} 
                                             order_by: {{ rule_num_numeric: asc }} )
                                             {{
                                                 mgm_id: mgm_id
@@ -355,7 +358,7 @@ namespace FWO.Report.Filter
                                         rules(
                                             limit: $limit 
                                             offset: $offset
-                                            where: {{  nat_rule: {{_eq: true}}, ruleByXlateRule: {{}} {(tenantFiltering ? "get_rule_froms_for_tenant: {}" : "")} {query.ruleWhereStatement} }} 
+                                            where: {{  nat_rule: {{_eq: true}}, ruleByXlateRule: {{}} {(tenantFiltering ? "" : "")} {query.ruleWhereStatement} }} 
                                             order_by: {{ rule_num_numeric: asc }} )
                                             {{
                                                 mgm_id: mgm_id

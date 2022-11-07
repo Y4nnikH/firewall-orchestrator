@@ -7,6 +7,7 @@ query listNatRulesDetails(
   $ruleSrcIp: [cidr!]
   $limit: Int
   $offset: Int
+  $sim_tenant_id: Int
 ) {
   management(
     where: { mgm_id: { _in: $management_id } }
@@ -29,7 +30,7 @@ query listNatRulesDetails(
           active: { _eq: true }
           rule_src: { _in: $ruleSrcName }
           nat_rule: { _eq: true }
-          get_rule_froms_for_tenant: { object: { obj_ip: { _in: $ruleSrcIp } } }
+          rule_froms: { object: { obj_ip: { _in: $ruleSrcIp } } }
         }
         order_by: { rule_num_numeric: asc }
       ) {

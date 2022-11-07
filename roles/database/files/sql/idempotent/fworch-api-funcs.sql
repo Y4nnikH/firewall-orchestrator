@@ -143,7 +143,7 @@ $$ LANGUAGE 'plpgsql' STABLE;
 
 
 -- does not use any views
-CREATE OR REPLACE FUNCTION get_rule_froms_for_tenant(rule rule, hasura_session json)
+CREATE OR REPLACE FUNCTION get_rule_froms_for_tenant(rule rule, sim_tenant_id integer, hasura_session json)
 RETURNS SETOF rule_from AS $$
     DECLARE t_id integer;
     rule_to_obj RECORD;
@@ -152,10 +152,14 @@ RETURNS SETOF rule_from AS $$
     BEGIN
         t_id := (hasura_session ->> 'x-hasura-tenant-id')::integer;
 
+        IF t_id = 1 AND sim_tenant_id IS NOT NULL AND sim_tenant_id > 0 THEN
+            t_id = sim_tenant_id;
+        END IF;
+
         IF t_id IS NULL THEN
             RAISE EXCEPTION 'No tenant id found in hasura session'; --> only happens when using auth via x-hasura-admin-secret (no tenant id is set)
         ELSIF t_id = 1 THEN
-            show_all := true;
+            show_all := true;                                       --> function should not be used in this case but rule_froms accessed directly instead
         ELSE
             FOR rule_to_obj IN
                 SELECT rt.*, tenant_network.tenant_id
@@ -185,13 +189,13 @@ RETURNS SETOF rule_from AS $$
                     LEFT JOIN object ON (objgrp_flat.objgrp_flat_member_id=object.obj_id)
                     LEFT JOIN tenant_network ON
                         (obj_ip>>=tenant_net_ip OR obj_ip<<=tenant_net_ip)
-                WHERE rule_id = rule.rule_id AND tenant_id = t_id; --OR tenant_id IS NULL ?
+                WHERE rule_id = rule.rule_id AND tenant_id = t_id;
         END IF;
     END;
 $$ LANGUAGE 'plpgsql' STABLE;
 
 
-CREATE OR REPLACE FUNCTION get_rule_tos_for_tenant(rule rule, hasura_session json)
+CREATE OR REPLACE FUNCTION get_rule_tos_for_tenant(rule rule, sim_tenant_id integer, hasura_session json)
 RETURNS SETOF rule_to AS $$
     DECLARE t_id integer;
     rule_from_obj RECORD;
@@ -200,10 +204,14 @@ RETURNS SETOF rule_to AS $$
     BEGIN
         t_id := (hasura_session ->> 'x-hasura-tenant-id')::integer;
 
+        IF t_id = 1 AND sim_tenant_id IS NOT NULL AND sim_tenant_id > 0 THEN
+            t_id = sim_tenant_id;
+        END IF;
+
         IF t_id IS NULL THEN
             RAISE EXCEPTION 'No tenant id found in hasura session'; --> only happens when using auth via x-hasura-admin-secret (no tenant id is set)
         ELSIF t_id = 1 THEN
-            show_all := true;
+            show_all := true;                                       --> function should not be used in this case but rule_tos accessed directly instead
         ELSE
             FOR rule_from_obj IN
                 SELECT rf.*, tenant_network.tenant_id
@@ -232,7 +240,7 @@ RETURNS SETOF rule_to AS $$
                     LEFT JOIN object ON (objgrp_flat.objgrp_flat_member_id=object.obj_id)
                     LEFT JOIN tenant_network ON
                         (obj_ip>>=tenant_net_ip OR obj_ip<<=tenant_net_ip)
-                WHERE rule_id = rule.rule_id AND tenant_id = t_id; --OR tenant_id IS NULL ?
+                WHERE rule_id = rule.rule_id AND tenant_id = t_id; 
         END IF;
     END;
 $$ LANGUAGE 'plpgsql' STABLE;

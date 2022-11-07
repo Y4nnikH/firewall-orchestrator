@@ -5,7 +5,7 @@ query listRulesOverview(
   $rule_src_ip: [cidr!]
   $limit: Int
   $offset: Int
-  $tenant_filtering: Boolean
+  $sim_tenant_id: Int
 ) {
   management(
     where: { mgm_id: { _in: $management_id } }

@@ -10,7 +10,7 @@ fragment natRuleDetails on rule {
     rule_svc
     rule_svc_refs
     rule_svc_neg
-    rule_froms: get_rule_froms_for_tenant {
+    rule_froms: get_rule_froms_for_tenant(sim_tenant_id: $tenant_id)) {
       usr {
         ...userDetails
       }
