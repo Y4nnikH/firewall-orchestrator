@@ -216,7 +216,7 @@
 </div>
 
 @* ==== RIGHT SIDEBAR ==== *@
-<RightSidebar @bind-Width="sidebarRightWidth" Tabset="rsbTabset" AnchorNavToRSB="anchorNavToRSB" CurrentReport="currentReport" CurrentReportTime="actTimeFilter.ReportTime" @bind-SelectedRules="selectedItemsRuleReportTable" ManagementsReport="managementsReport"/>
+<RightSidebar @bind-Width="sidebarRightWidth" Tabset="rsbTabset" AnchorNavToRSB="anchorNavToRSB" CurrentReport="currentReport" CurrentReportTime="actTimeFilter.IsShortcut ? DateTime.Now : actTimeFilter.ReportTime" @bind-SelectedRules="selectedItemsRuleReportTable" ManagementsReport="managementsReport"/>
 <AnchorNavToRSB @ref="anchorNavToRSB" TabSet="rsbTabset" />
 
 @* ==== POPUPS ==== *@
