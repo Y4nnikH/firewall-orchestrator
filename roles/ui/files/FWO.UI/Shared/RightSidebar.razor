@@ -4,6 +4,7 @@
 @using FWO.Api.Client
 @using FWO.Api.Client.Queries
 @using FWO.Report
+@using FWO.Report.Filter;
 @using FWO.Ui.Data
 
 @inject ApiConnection Connection
@@ -82,6 +83,9 @@
     public ReportBase? CurrentReport { get; set; }
 
     [Parameter]
+    public DateTime? CurrentReportTime { get; set; }
+
+    [Parameter]
     public List<Rule> SelectedRules { get; set; } = new List<Rule>();
 
     [Parameter]
@@ -130,9 +134,16 @@
             switch (rsbTab)
             {
                 case RsbTab.all:
+                    
+                    string time = (CurrentReportTime != null ? CurrentReportTime.Value.ToString(DynGraphqlQuery.fullTimeFormat) : DateTime.Now.ToString(DynGraphqlQuery.fullTimeFormat));
+                    @* ImpIdQueryVariables["mgmIds"] = Query.RelevantManagementIds;
+                    Management[] relevantImportIds = await apiConnection.SendQueryAsync<Management[]>(ReportQueries.getRelevantImportIdsAtTime, ImpIdQueryVariables);
+                    long? relevantImportId = relevantImportIds.Where(m => m.Id == id).Select(m => m.RelevantImportId).FirstOrDefault(); *@
+
                     queryVars = new Dictionary<string, object>()
                     {
                         { "management_id", (int) id },
+                        { "time", time },
                         { "limit", userConfig.ElementsPerFetch },
                         { "offset", 0 }
                     };

@@ -1,6 +1,6 @@
 query getNetworkServiceDetails(
   $management_id: [Int!]
-  $time: String
+  $time: timestamp
   $svc_name: [String!]
   $svc_port: [Int!]
   $limit: Int
@@ -13,7 +13,8 @@ query getNetworkServiceDetails(
       limit: $limit
       offset: $offset
       where: {
-        active: { _eq: true }
+        import_control: {start_time: {_lte: $time}}
+        importControlBySvcLastSeen: {stop_time: {_gte: $time}}
         svc_name: { _in: $svc_name }
         svc_port: { _in: $svc_port }
       }

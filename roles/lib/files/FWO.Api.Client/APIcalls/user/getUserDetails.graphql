@@ -1,6 +1,6 @@
 query listUsers(
   $management_id: [Int!]
-  $time: String
+  $time: timestamp
   $user_name: [String!]
   $limit: Int
   $offset: Int
@@ -11,7 +11,11 @@ query listUsers(
     userObjects: usrs(
       limit: $limit
       offset: $offset
-      where: { active: { _eq: true }, user_name: { _in: $user_name } }
+      where: {
+        import_control: {start_time: {_lte: $time}}
+        importControlByUserLastSeen: {stop_time: {_gte: $time}}
+        user_name: { _in: $user_name } 
+      }
       order_by: { user_name: asc }
     ) {
       ...userDetails
