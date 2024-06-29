@@ -21,7 +21,7 @@ namespace FWO.Api.Data
         public string Uid { get; set; } = "";
 
         [JsonProperty("zone"), JsonPropertyName("zone")]
-        public NetworkZone Zone { get; set; } = new NetworkZone(){};
+        public NetworkZone Zone { get; set; } = new ();
 
         [JsonProperty("active"), JsonPropertyName("active")]
         public bool Active { get; set; }
@@ -30,13 +30,13 @@ namespace FWO.Api.Data
         public int Create { get; set; }
 
         [JsonProperty("obj_create_time"), JsonPropertyName("obj_create_time")]
-        public TimeWrapper CreateTime { get; set; } = new TimeWrapper(){};
+        public TimeWrapper CreateTime { get; set; } = new ();
 
         [JsonProperty("obj_last_seen"), JsonPropertyName("obj_last_seen")]
         public int LastSeen { get; set; }
 
         [JsonProperty("type"), JsonPropertyName("type")]
-        public NetworkObjectType Type { get; set; } = new NetworkObjectType(){};
+        public NetworkObjectType Type { get; set; } = new ();
 
         [JsonProperty("obj_comment"), JsonPropertyName("obj_comment")]
         public string Comment { get; set; } = "";
@@ -48,10 +48,13 @@ namespace FWO.Api.Data
         public string MemberRefs { get; set; } = "";
 
         [JsonProperty("objgrps"), JsonPropertyName("objgrps")]
-        public Group<NetworkObject>[] ObjectGroups { get; set; } = new Group<NetworkObject>[]{};
+        public Group<NetworkObject>[] ObjectGroups { get; set; } = [];
 
         [JsonProperty("objgrp_flats"), JsonPropertyName("objgrp_flats")]
-        public GroupFlat<NetworkObject>[] ObjectGroupFlats { get; set; } = new GroupFlat<NetworkObject>[]{};
+        public GroupFlat<NetworkObject>[] ObjectGroupFlats { get; set; } = [];
+
+        public long Number;
+        public bool Highlighted = false;
 
         public override bool Equals(object? obj)
         {
@@ -67,37 +70,22 @@ namespace FWO.Api.Data
             return Id.GetHashCode();
         }
 
-        //    obj_id
-        //    obj_name
-        //    obj_ip
-        //    obj_ip_end
-        //    obj_uid
-        //    zone_id <---
-        //    active
-        //    obj_create
-        //    obj_last_seen
-        //    type: stm_obj_typ {
-        //      name: obj_typ_name
-        //    }
-        //    obj_comment
-        //    obj_member_names
-        //    obj_member_refs
-        //    objgrps
-        //    {
-        //        objgrp_member_id
-        //      objectByObjgrpMemberId
-        //        {
-        //            obj_id
-        //            obj_name
-        //      }
-        //    }
-        //    objgrp_flats {
-        //      objgrp_flat_id
-        //      objectByObjgrpFlatMemberId
-        //      {
-        //          obj_id
-        //          obj_name
-        //      }
-        //    }
+        public string MemberNamesAsHtml()
+        {
+            if (MemberNames != null && MemberNames.Contains('|'))
+            {
+                return $"<td>{string.Join("<br>", MemberNames.Split('|'))}</td>";
+            }
+            else
+            {
+                return $"<td>{MemberNames}</td>";
+            }
+        }
+
+        public bool IsAnyObject()
+        {
+            return IP == "0.0.0.0/32" && IpEnd == "255.255.255.255/32" ||
+                IP == "::/128" && IpEnd == "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128";
+        }
     }
 }

@@ -42,13 +42,13 @@ namespace FWO.Api.Data
         public int Create { get; set; }
 
         [JsonProperty("svc_create_time"), JsonPropertyName("svc_create_time")]
-        public TimeWrapper CreateTime { get; set; } = new TimeWrapper(){};
+        public TimeWrapper CreateTime { get; set; } = new();
 
         [JsonProperty("svc_last_seen"), JsonPropertyName("svc_last_seen")]
         public int LastSeen { get; set; }
 
         [JsonProperty("service_type"), JsonPropertyName("service_type")]
-        public NetworkServiceType Type { get; set; } = new NetworkServiceType(){};
+        public NetworkServiceType Type { get; set; } = new();
 
         [JsonProperty("svc_comment"), JsonPropertyName("svc_comment")]
         public string Comment { get; set; } = "";
@@ -60,7 +60,7 @@ namespace FWO.Api.Data
         public int? ProtoId { get; set; }
 
         [JsonProperty("protocol_name"), JsonPropertyName("protocol_name")]
-        public NetworkProtocol Protocol { get; set; } = new NetworkProtocol(){};
+        public NetworkProtocol Protocol { get; set; } = new();
 
         [JsonProperty("svc_member_names"), JsonPropertyName("svc_member_names")]
         public string MemberNames { get; set; } = "";
@@ -69,10 +69,12 @@ namespace FWO.Api.Data
         public string MemberRefs { get; set; } = "";
 
         [JsonProperty("svcgrps"), JsonPropertyName("svcgrps")]
-        public Group<NetworkService>[] ServiceGroups { get; set; } = new Group<NetworkService>[]{};
+        public Group<NetworkService>[] ServiceGroups { get; set; } = [];
 
         [JsonProperty("svcgrp_flats"), JsonPropertyName("svcgrp_flats")]
-        public GroupFlat<NetworkService>[] ServiceGroupFlats { get; set; } = new GroupFlat<NetworkService>[]{};
+        public GroupFlat<NetworkService>[] ServiceGroupFlats { get; set; } = [];
+
+        public long Number;
 
         public override bool Equals(object? obj)
         {
@@ -88,43 +90,16 @@ namespace FWO.Api.Data
             return Id.GetHashCode();
         }
 
-        //  svc_id
-        //  svc_name
-        //  svc_uid
-        //  svc_port
-        //  svc_port_end
-        //  svc_source_port
-        //  svc_source_port_end
-        //  svc_code
-        //  svc_timeout
-        //  svc_typ_id
-        //  active
-        //  svc_create
-        //  svc_last_seen
-        //  service_type: stm_svc_typ {
-        //    name: svc_typ_name
-        //  }
-        //  svc_comment
-        //  svc_color_id
-        //  ip_proto_id
-        //  protocol_name: stm_ip_proto {
-        //    name: ip_proto_name
-        //  }
-        //  svc_member_names
-        //  svc_member_refs
-        //  svcgrps {
-        //    id: svcgrp_member_id
-        //    byId: serviceBySvcgrpMemberId {
-        //      svc_id
-        //      svc_name
-        //    }
-        //  }
-        //  svcgrp_flats {
-        //    flat_id: svcgrp_flat_id
-        //    byFlatId: serviceBySvcgrpFlatMemberId {
-        //      svc_id
-        //      svc_name
-        //    }
-        //  }
+        public string MemberNamesAsHtml()
+        {
+            if (MemberNames != null && MemberNames.Contains("|"))
+            {
+                return $"<td>{string.Join("<br>", MemberNames.Split('|'))}</td>";
+            }
+            else
+            {
+                return $"<td>{MemberNames}</td>";
+            }
+        }
     }
 }

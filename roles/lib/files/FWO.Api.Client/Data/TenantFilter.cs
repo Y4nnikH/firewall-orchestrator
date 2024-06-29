@@ -1,6 +1,5 @@
-using System.Text;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Components;
+using FWO.GlobalConstants;
 using Newtonsoft.Json;
 
 namespace FWO.Api.Data
@@ -22,9 +21,9 @@ namespace FWO.Api.Data
             TenantId = tenantFilter.TenantId;
         }
 
-        public TenantFilter(Tenant tenant)
+        public TenantFilter(Tenant? tenant)
         {
-            IsActive = tenant?.Id > 1;
+            IsActive = tenant?.Id > GlobalConst.kTenant0Id;
             TenantId = tenant?.Id ?? 0;
         }
     }

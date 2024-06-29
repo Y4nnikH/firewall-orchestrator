@@ -1,12 +1,14 @@
 ﻿@using FWO.Config.Api
+@using FWO.Middleware.Client
 
-@attribute [Authorize(Roles = "admin, auditor, requester")]
+@attribute [Authorize(Roles = $"{Roles.Admin}, {Roles.Auditor}, {Roles.Requester}")]
 
 @inject ApiConnection apiConnection
 @inject UserConfig userConfig
+@inject MiddlewareClient middlewareClient
 
 
-<PopUp Title="@(userConfig.GetText("create_ticket"))" Show="@Display" Large="true" OnClose="Close">
+<PopUp Title="@(userConfig.GetText("create_ticket"))" Show="@Display" Size=PopupSize.Large OnClose="Close">
     <Body>
         @if (Display)
         {
@@ -23,7 +25,7 @@
     </Body>
     <Footer>
         <div class="btn-group">
-            <AuthorizeView Roles="admin, requester">
+            <AuthorizeView Roles="@($"{Roles.Admin}, {Roles.Requester}")">
                 <Authorized>
                     <button type="button" class="btn btn-sm btn-danger" @onclick="() => {CreateTicket(); Close();}">@(userConfig.GetText("create_ticket"))</button>
                 </Authorized>
@@ -94,8 +96,8 @@
 
     private async Task CreateTicket()
     {
-        apiConnection.SetProperRole(authenticationStateTask!.Result.User, new List<string> { "requester", "admin"});
-        TicketCreator ticketCreator = new TicketCreator(apiConnection, userConfig);
+        apiConnection.SetProperRole(authenticationStateTask!.Result.User, new List<string> { Roles.Requester, Roles.Admin});
+        TicketCreator ticketCreator = new (apiConnection, userConfig, authenticationStateTask!.Result.User, middlewareClient);
         foreach(int devId in ruleUidsPerDevice.Keys)
         {
             await ticketCreator.CreateUnusedRuleDeleteTicket(devId, ruleUidsPerDevice[devId], commentText, DateTime.Now.AddDays(userConfig.RuleRemovalGracePeriod));

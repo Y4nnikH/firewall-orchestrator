@@ -18,13 +18,13 @@ namespace FWO.Api.Data
         public string Comment { get; set; } = "";
 
         [JsonProperty("report_template_owner"), JsonPropertyName("report_template_owner")]
-        public int Owner { get; set; }
+        public int TemplateOwningUserId { get; set; }
 
         [JsonProperty("report_filter"), JsonPropertyName("report_filter")]
         public string Filter { get; set; } = "";
         
         [JsonProperty("report_parameters"), JsonPropertyName("report_parameters")]
-        public ReportParams ReportParams { get; set; } = new ReportParams();
+        public ReportParams ReportParams { get; set; } = new();
 
         public bool Detailed = false;
 
@@ -54,19 +54,22 @@ namespace FWO.Api.Data
         public int ReportType { get; set; } = 0;
         
         [JsonProperty("device_filter"), JsonPropertyName("device_filter")]
-        public DeviceFilter DeviceFilter { get; set; } = new DeviceFilter();
+        public DeviceFilter DeviceFilter { get; set; } = new();
 
         [JsonProperty("time_filter"), JsonPropertyName("time_filter")]
-        public TimeFilter TimeFilter { get; set; } = new TimeFilter();
+        public TimeFilter TimeFilter { get; set; } = new();
 
         [JsonProperty("tenant_filter"), JsonPropertyName("tenant_filter")]
-        public TenantFilter TenantFilter { get; set; } = new TenantFilter();
+        public TenantFilter TenantFilter { get; set; } = new();
 
         [JsonProperty("recert_filter"), JsonPropertyName("recert_filter")]
-        public RecertFilter RecertFilter { get; set; } = new RecertFilter();
+        public RecertFilter RecertFilter { get; set; } = new();
 
         [JsonProperty("unused_filter"), JsonPropertyName("unused_filter")]
-        public UnusedFilter UnusedFilter { get; set; } = new UnusedFilter();
+        public UnusedFilter UnusedFilter { get; set; } = new();
+
+        [JsonProperty("modelling_filter"), JsonPropertyName("modelling_filter")]
+        public ModellingFilter ModellingFilter { get; set; } = new();
 
         public ReportParams()
         {}

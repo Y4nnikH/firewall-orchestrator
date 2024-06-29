@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using RestSharp;
 using System.Diagnostics;
-using FWO.Ui;
+
 
 // Implicitly call static constructor so background lock process is started
 // (static constructor is only called after class is used in any way)
@@ -67,7 +67,7 @@ string jwt = createJWTResponse.Data ?? throw new NullReferenceException("Receive
 apiConn.SetAuthHeader(jwt);
 
 // Get all non-confidential configuration settings and add to a global service (for all users)
-GlobalConfig globalConfig = Task.Run(async () => await GlobalConfig.ConstructAsync(jwt)).Result;
+GlobalConfig globalConfig = Task.Run(async () => await GlobalConfig.ConstructAsync(jwt, true, true)).Result;
 builder.Services.AddSingleton<GlobalConfig>(_ => globalConfig);
 
 // the user's personal config

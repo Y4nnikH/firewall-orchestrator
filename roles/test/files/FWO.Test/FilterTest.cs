@@ -2,9 +2,11 @@
 using FWO.Report.Filter.Ast;
 using FWO.Report.Filter.Exceptions;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using FWO.GlobalConstants;
 using FWO.Api.Data;
 namespace FWO.Test
 {
@@ -113,7 +115,7 @@ namespace FWO.Test
             }
             catch (SyntaxException exception)
             {
-                Assert.AreEqual("No token but one was expected", exception.Message);
+                ClassicAssert.AreEqual("No token but one was expected", exception.Message);
             }
         }
 

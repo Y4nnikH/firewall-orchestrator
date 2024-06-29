@@ -14,11 +14,31 @@ namespace FWO.Api.Data
         public string? Name { get; set; }
 
         [JsonProperty("devices"), JsonPropertyName("devices")]
-        public List<DeviceSelect> Devices { get; set; } = new List<DeviceSelect>();
+        public List<DeviceSelect> Devices { get; set; } = [];
 
         public ElementReference? UiReference { get; set; }
 
+        public bool Visible { get; set; } = true;
         public bool Selected { get; set; } = false;
+        public bool Shared { get; set; } = true;
+        public ManagementSelect Clone()
+        {
+            List<DeviceSelect> ClonedDevices = [];
+            foreach(var dev in Devices)
+            {
+                ClonedDevices.Add(new DeviceSelect(dev));
+            }
+
+			return new ManagementSelect()
+            {
+                Id = Id,
+                Name = Name,
+                Devices = ClonedDevices,
+                UiReference = UiReference,
+                Visible = Visible,
+                Selected = Selected
+            };
+        }
     }
 
     public class DeviceSelect
@@ -29,26 +49,57 @@ namespace FWO.Api.Data
         [JsonProperty("name"), JsonPropertyName("name")]
         public string? Name { get; set; }
 
+        public bool Visible { get; set; } = true;
+
         public bool Selected { get; set; } = false;
+        public bool Shared { get; set; } = true;
+        public DeviceSelect()
+        {}
+
+        public DeviceSelect(DeviceSelect dev)
+        {
+            Id = dev.Id;
+            Name = dev.Name;
+            Visible = dev.Visible;
+            Selected = dev.Selected;
+        }
     }
 
     public class DeviceFilter
     {
         [JsonProperty("management"), JsonPropertyName("management")]
-        public List<ManagementSelect> Managements { get; set; } = new List<ManagementSelect>();
+        public List<ManagementSelect> Managements { get; set; } = [];
 
+        [JsonProperty("visibleManagements"), JsonPropertyName("visibleManagements")]
+        public List<ManagementSelect> VisibleManagements { get; set; } = [];
+
+        [JsonProperty("visibleGateways"), JsonPropertyName("visibleGateways")]
+        public List<DeviceSelect> VisibleGateways { get; set; } = [];
 
         public DeviceFilter()
         {}
 
         public DeviceFilter(DeviceFilter devFilter)
         {
-            Managements = devFilter.Managements;
+            Managements = new List<ManagementSelect>(devFilter.Managements);
         }
 
+        public DeviceFilter(List<ManagementSelect> mgmSelect)
+         {
+            Managements =  new List<ManagementSelect>(mgmSelect);
+        }        
         public DeviceFilter(List<int> devIds)
         {
-            ManagementSelect dummyManagement = new ManagementSelect();
+            ManagementSelect dummyManagement = new();
+            foreach(int id in devIds)
+            {
+                dummyManagement.Devices.Add(new DeviceSelect(){Id = id});
+            }
+            Managements.Add(dummyManagement);
+        }
+        public DeviceFilter(int[] devIds)
+        {
+            ManagementSelect dummyManagement = new();
             foreach(int id in devIds)
             {
                 dummyManagement.Devices.Add(new DeviceSelect(){Id = id});
@@ -56,11 +107,25 @@ namespace FWO.Api.Data
             Managements.Add(dummyManagement);
         }
 
+        public DeviceFilter Clone()
+        {
+            List<ManagementSelect> ClonedManagements = [];
+            foreach(var mgt in Managements)
+            {
+                ClonedManagements.Add(mgt.Clone());
+            }
+
+			return new DeviceFilter()
+            {
+                Managements = ClonedManagements
+            };
+        }
+
         public bool areAllDevicesSelected()
         {
             foreach (ManagementSelect management in Managements)
                 foreach (DeviceSelect device in management.Devices)
-                    if (!device.Selected)
+                    if (!device.Selected && device.Visible)
                         return false;
             return true;
         }
@@ -78,10 +143,12 @@ namespace FWO.Api.Data
         {
             foreach (ManagementSelect management in Managements)
             {
-                management.Selected = selectAll;
+                // only select visible managements
+                management.Selected = selectAll && management.Visible;
                 foreach (DeviceSelect device in management.Devices)
                 {
-                    device.Selected = selectAll;
+                    // only select visible devices
+                    device.Selected = selectAll && device.Visible;
                 }
             }
         }
@@ -100,7 +167,7 @@ namespace FWO.Api.Data
 
         public List<int> getSelectedManagements()
         {
-            List<int> selectedMgmts = new List<int>();
+            List<int> selectedMgmts = [];
             foreach (ManagementSelect mgmt in Managements)
             {
                 if (IsSelectedManagement(mgmt))
@@ -113,7 +180,7 @@ namespace FWO.Api.Data
 
         public string listAllSelectedDevices()
         {
-            List<string> devs = new List<string>();
+            List<string> devs = [];
             foreach (ManagementSelect mgmt in Managements)
                 foreach (DeviceSelect dev in mgmt.Devices)
                     if (dev.Selected)
@@ -123,7 +190,7 @@ namespace FWO.Api.Data
 
         public static List<int> ExtractAllDevIds(Management[] managements)
         {
-            List<int> devs = new List<int>();
+            List<int> devs = [];
             foreach (Management mgmt in managements)
                 foreach (Device dev in mgmt.Devices)
                     devs.Add(dev.Id);
@@ -132,7 +199,7 @@ namespace FWO.Api.Data
 
         public static List<int> ExtractSelectedDevIds(Management[] managements)
         {
-            List<int> selectedDevs = new List<int>();
+            List<int> selectedDevs = [];
             foreach (Management mgmt in managements)
                 foreach (Device dev in mgmt.Devices)
                     if (dev.Selected)
@@ -153,7 +220,11 @@ namespace FWO.Api.Data
                         DeviceSelect? incomingDev = incomingMgt.Devices.Find(x => x.Id == device.Id);
                         if (incomingDev != null)
                         {
-                            device.Selected = incomingDev.Selected;
+                            // the next line could be the problem as it changes an object:
+                            if (device.Visible)
+                            {
+                                device.Selected = incomingDev.Selected;
+                            }
                         }
                     }
                 }
@@ -166,7 +237,9 @@ namespace FWO.Api.Data
             foreach (ManagementSelect management in Managements)
             {
                 int selectedDevicesCount = management.Devices.Where(d => d.Selected).Count();
-                management.Selected = management.Devices.Count > 0 && selectedDevicesCount == management.Devices.Count;
+                int visibleDevicesCount = management.Devices.Where(d => d.Visible).Count();
+                // Management is selected if all visible devices are selected
+                management.Selected = management.Devices.Count > 0 && selectedDevicesCount == visibleDevicesCount;
             }
         }
 
@@ -175,10 +248,16 @@ namespace FWO.Api.Data
             int counter = 0;
             foreach (ManagementSelect management in Managements)
             {
-                counter ++;
-                foreach (DeviceSelect device in management.Devices)
+                if (management.Visible)
                 {
-                    counter ++;
+                    counter++;
+                    foreach (DeviceSelect device in management.Devices)
+                    {
+                        if (device.Visible)
+                        {
+                            counter++;
+                        }
+                    }
                 }
             }
             return counter;
@@ -186,7 +265,7 @@ namespace FWO.Api.Data
 
         public override string ToString()
         {
-            StringBuilder result = new StringBuilder();
+            StringBuilder result = new();
             foreach (ManagementSelect management in Managements)
             {
                 result.Append($"{management.Name} [{string.Join(", ", management.Devices.ConvertAll(device => device.Name))}]; ");

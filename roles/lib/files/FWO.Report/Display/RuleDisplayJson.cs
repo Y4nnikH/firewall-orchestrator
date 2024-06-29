@@ -1,4 +1,5 @@
-﻿using FWO.Api.Data;
+﻿using FWO.GlobalConstants;
+using FWO.Api.Data;
 using FWO.Config.Api;
 using FWO.Report.Filter;
 
@@ -105,7 +106,7 @@ namespace FWO.Ui.Display
             if (reportType.IsResolvedReport())
             {
                 List<string> displayedLocations = new List<string>();
-                foreach (NetworkLocation networkLocation in getNetworkLocations(isSource ? rule.Froms : rule.Tos))
+                foreach (NetworkLocation networkLocation in GetNetworkLocations(isSource ? rule.Froms : rule.Tos))
                 {
                     displayedLocations.Add(Quote(DisplayNetworkLocation(networkLocation, reportType).ToString()));
                 }

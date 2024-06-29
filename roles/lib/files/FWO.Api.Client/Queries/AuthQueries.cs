@@ -7,23 +7,28 @@ namespace FWO.Api.Client.Queries
     public class AuthQueries : Queries
     {
         public static readonly string getTenantId;
-        public static readonly string getTenantById;
         public static readonly string getTenants;
         public static readonly string addTenant;
         public static readonly string updateTenant;
         public static readonly string deleteTenant;
         public static readonly string addDeviceToTenant;
-        public static readonly string deleteDeviceFromTenant;
+        public static readonly string addTenantToManagement;
+        public static readonly string addTenantToGateway;
+        public static readonly string deleteAllGatewaysOfTenant;
+        public static readonly string deleteAllManagementsOfTenant;
         public static readonly string getVisibleDeviceIdsPerTenant;
         public static readonly string getVisibleManagementIdsPerTenant;
+        public static readonly string getUnfilteredDeviceIdsPerTenant;
+        public static readonly string getUnfilteredManagementIdsPerTenant;
         public static readonly string getTenantNetworks;
         public static readonly string addTenantNetwork;
         public static readonly string deleteTenantNetwork;
 
         public static readonly string getUsers;
+        public static readonly string getUserEmails;
         public static readonly string getUserByDn;
         public static readonly string getUserByDbId;
-        public static readonly string addUser;
+        public static readonly string upsertUiUser;
         public static readonly string updateUserEmail;
         public static readonly string updateUserLanguage;
         public static readonly string updateUserLastLogin;
@@ -43,23 +48,26 @@ namespace FWO.Api.Client.Queries
             try
             {
                 getTenantId = File.ReadAllText(QueryPath + "auth/getTenantId.graphql");
-                getTenantById = File.ReadAllText(QueryPath + "auth/getTenantById.graphql");
                 getTenants = File.ReadAllText(QueryPath + "auth/getTenants.graphql");
                 addTenant = File.ReadAllText(QueryPath + "auth/addTenant.graphql");
                 updateTenant = File.ReadAllText(QueryPath + "auth/updateTenant.graphql");
                 deleteTenant = File.ReadAllText(QueryPath + "auth/deleteTenant.graphql");
                 addDeviceToTenant = File.ReadAllText(QueryPath + "auth/addDeviceToTenant.graphql");
-                deleteDeviceFromTenant = File.ReadAllText(QueryPath + "auth/deleteDeviceFromTenant.graphql");
-                getVisibleDeviceIdsPerTenant = File.ReadAllText(QueryPath + "auth/getVisibleDeviceIdsPerTenant.graphql");
-                getVisibleManagementIdsPerTenant = File.ReadAllText(QueryPath + "auth/getVisibleManagementIdsPerTenant.graphql");
+                addTenantToManagement = File.ReadAllText(QueryPath + "auth/addTenantToManagement.graphql");
+                addTenantToGateway = File.ReadAllText(QueryPath + "auth/addTenantToGateway.graphql");
+                deleteAllGatewaysOfTenant = File.ReadAllText(QueryPath + "auth/deleteAllGatewaysOfTenant.graphql");
+                deleteAllManagementsOfTenant = File.ReadAllText(QueryPath + "auth/deleteAllManagementsOfTenant.graphql");
+                getVisibleDeviceIdsPerTenant = File.ReadAllText(QueryPath + "auth/getTenantVisibleDeviceIds.graphql");
+                getVisibleManagementIdsPerTenant = File.ReadAllText(QueryPath + "auth/getTenantVisibleManagementIds.graphql");
                 getTenantNetworks = File.ReadAllText(QueryPath + "auth/getTenantNetworks.graphql");
                 addTenantNetwork = File.ReadAllText(QueryPath + "auth/addTenantNetwork.graphql");
                 deleteTenantNetwork = File.ReadAllText(QueryPath + "auth/deleteTenantNetwork.graphql");
 
                 getUsers = File.ReadAllText(QueryPath + "auth/getUsers.graphql");
+                getUserEmails = File.ReadAllText(QueryPath + "auth/getUserEmails.graphql");
                 getUserByDn = File.ReadAllText(QueryPath + "auth/getUserByDn.graphql");
                 getUserByDbId = File.ReadAllText(QueryPath + "auth/getUserByDbId.graphql");
-                addUser = File.ReadAllText(QueryPath + "auth/addUser.graphql");
+                upsertUiUser = File.ReadAllText(QueryPath + "auth/upsertUiUser.graphql");
                 updateUserEmail = File.ReadAllText(QueryPath + "auth/updateUserEmail.graphql");
                 updateUserLanguage = File.ReadAllText(QueryPath + "auth/updateUserLanguage.graphql");
                 updateUserLastLogin = File.ReadAllText(QueryPath + "auth/updateUserLastLogin.graphql");

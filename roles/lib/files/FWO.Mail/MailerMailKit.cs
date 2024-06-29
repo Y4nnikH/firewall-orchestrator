@@ -3,6 +3,8 @@
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
+using Microsoft.AspNetCore.Http;
+using FWO.Encryption;
 
 namespace FWO.Mail
 {
@@ -27,6 +29,8 @@ namespace FWO.Mail
         public string Subject { get; }
 
         public string? Body { get; }
+
+        public IFormFileCollection? Attachments { get; set;  }
 
         public MailData(
             List<string> to,
@@ -132,7 +136,31 @@ namespace FWO.Mail
                     body.HtmlBody = mailData.Body;
                 else
                     body.TextBody = mailData.Body;
-                mail.Body = body.ToMessageBody();
+
+                // Check if we got any attachments and add the to the builder for our message
+                if (mailData.Attachments != null)
+                {
+                    byte[] attachmentFileByteArray;
+                    
+                    foreach (IFormFile attachment in mailData.Attachments)
+                    {
+                        // Check if length of the file in bytes is larger than 0
+                        if (attachment.Length > 0)
+                        {
+                            // Create a new memory stream and attach attachment to mail body
+                            using (MemoryStream memoryStream = new MemoryStream())
+                            {
+                                // Copy the attachment to the stream
+                                attachment.CopyTo(memoryStream);
+                                attachmentFileByteArray = memoryStream.ToArray();
+                            }
+                            // Add the attachment from the byte array
+                            body.Attachments.Add(attachment.FileName, attachmentFileByteArray, ContentType.Parse(attachment.ContentType));
+                        }
+                    }
+                }
+
+                mail.Body = body.ToMessageBody(); // correction compared to source code
 
                 #endregion
 
@@ -172,7 +200,17 @@ namespace FWO.Mail
                 }
                 if (emailConn.User != null && emailConn.User != "")
                 {
-                    await smtp.AuthenticateAsync(emailConn.User, emailConn.Password, ct);
+                    string mainKey = AesEnc.GetMainKey();
+                    string decryptedSecret = emailConn.Password;
+                    try
+                    {
+                        decryptedSecret = AesEnc.Decrypt(emailConn.Password, mainKey);
+                    }
+                    catch (Exception)
+                    {
+                    }
+
+                    await smtp.AuthenticateAsync(emailConn.User, decryptedSecret, ct);
                 }
                 await smtp.SendAsync(mail, ct);
                 await smtp.DisconnectAsync(true, ct);

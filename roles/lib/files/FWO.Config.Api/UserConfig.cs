@@ -1,4 +1,5 @@
 ﻿using System.Text.RegularExpressions;
+using FWO.GlobalConstants;
 using FWO.Logging;
 using FWO.Config.Api.Data;
 using FWO.Api.Client;
@@ -17,7 +18,7 @@ namespace FWO.Config.Api
         private readonly GlobalConfig globalConfig;
 
         public Dictionary<string, string> Translate { get; set; }
-        public Dictionary<string, string> Overwrite { get; set; }
+        public Dictionary<string, string> Overwrite { get; set; } = [];
 
         public UiUser User { private set; get; }
 
@@ -36,47 +37,51 @@ namespace FWO.Config.Api
         public UserConfig(GlobalConfig globalConfig, ApiConnection apiConnection, UiUser user) : base(apiConnection, user.DbId)
         {
             User = user;
-            Translate = globalConfig.langDict[user.Language!];
-            Overwrite = Task.Run(async () => await GetCustomDict(user.Language!)).Result;
+            Translate = globalConfig.LangDict[user.Language!];
+            Overwrite = apiConnection != null ? Task.Run(async () => await GetCustomDict(user.Language!)).Result : globalConfig.OverDict[user.Language!];
             this.globalConfig = globalConfig;
-            globalConfig.OnChange += GlobalConfigOnChange;
+            globalConfig.OnChange += OnGlobalConfigChange;
         }
 
         public UserConfig(GlobalConfig globalConfig) : base()
         {
             User = new UiUser();
-            Translate = globalConfig.langDict[globalConfig.DefaultLanguage];
-            Overwrite = Task.Run(async () => await GetCustomDict(globalConfig.DefaultLanguage)).Result;
+            Translate = globalConfig.LangDict[globalConfig.DefaultLanguage];
             this.globalConfig = globalConfig;
-            globalConfig.OnChange += GlobalConfigOnChange;
+            globalConfig.OnChange += OnGlobalConfigChange;
         }
 
         // only for unit tests
         protected UserConfig() : base()
         {}
         
-        private void GlobalConfigOnChange(Config config, ConfigItem[] changedItems)
+        private void OnGlobalConfigChange(Config config, ConfigItem[] changedItems)
         {
             // Get properties that belong to the user config 
             IEnumerable<PropertyInfo> properties = GetType().GetProperties()
                 .Where(prop => prop.CustomAttributes.Any(attr => attr.GetType() == typeof(UserConfigDataAttribute)));
 
             // Exclude all properties from update that belong to the user config
-            ConfigItem[] relevantChangedItems = changedItems.Where(configItem =>
+            ConfigItem[] relevantChangedItems = changedItems.Where( configItem =>
                 !properties.Any(prop => ((JsonPropertyNameAttribute)prop.GetCustomAttribute(typeof(JsonPropertyNameAttribute))!).Name == configItem.Key)).ToArray();
 
-            Update(relevantChangedItems);
+            if(relevantChangedItems.Length > 0)
+            {
+                Update(relevantChangedItems);
+            }
             InvokeOnChange(this, changedItems);
         }
 
         public async Task SetUserInformation(string userDn, ApiConnection apiConnection)
         {
-            GlobalConfigOnChange(globalConfig, globalConfig.RawConfigItems);
+            OnGlobalConfigChange(globalConfig, globalConfig.RawConfigItems);
             Log.WriteDebug("Get User Data", $"Get user data from user with DN: \"{userDn}\"");
             UiUser[]? users = await apiConnection.SendQueryAsync<UiUser[]>(AuthQueries.getUserByDn, new { dn = userDn });
             if (users.Length > 0)
+            {
                 User = users[0];
-            await SetUserId(apiConnection, User.DbId);
+            }
+            await InitWithUserId(apiConnection, User.DbId, true);
 
             if (User.Language == null)
             {
@@ -88,8 +93,8 @@ namespace FWO.Config.Api
         public async Task ChangeLanguage(string languageName, ApiConnection apiConnection)
         {
             await apiConnection.SendQueryAsync<ReturnId>(AuthQueries.updateUserLanguage, new { id = User.DbId, language = languageName });
-            Translate = globalConfig.langDict[languageName];
-            Overwrite = await GetCustomDict(languageName);
+            Translate = globalConfig.LangDict[languageName];
+            Overwrite = apiConnection != null ? await GetCustomDict(languageName): globalConfig.OverDict[languageName];
             User.Language = languageName;
             InvokeOnChange(this, null);
         }
@@ -106,45 +111,142 @@ namespace FWO.Config.Api
             {
                 User.Language = languageName;
             }
-            if (globalConfig.langDict.ContainsKey(User.Language))
+            if (globalConfig.LangDict.TryGetValue(User.Language, out Dictionary<string, string>? langDict))
             {
-                Translate = globalConfig.langDict[User.Language];
-                Overwrite = Task.Run(async () => await GetCustomDict(User.Language)).Result;
+                Translate = langDict;
+                Overwrite = globalConfig.OverDict[User.Language];
             }
         }
 
         public override string GetText(string key)
         {
-            if (Overwrite.ContainsKey(key))
+            if (Overwrite != null && Overwrite.TryGetValue(key, out string? overwriteValue))
             {
-                return Convert(Overwrite[key]);
+                return Convert(overwriteValue);
             }
-            if (Translate.ContainsKey(key))
+            if (Translate != null && Translate.TryGetValue(key, out string? translateValue))
             {
-                return Convert(Translate[key]);
+                return Convert(translateValue);
             }
             else
             {
                 string defaultLanguage = globalConfig.DefaultLanguage;
                 if (defaultLanguage == "")
                 {
-                    defaultLanguage = GlobalConfig.kEnglish;
+                    defaultLanguage = GlobalConst.kEnglish;
                 }
-                if (globalConfig.langDict[defaultLanguage].ContainsKey(key))
+                if (globalConfig.LangDict[defaultLanguage].TryGetValue(key, out string? defaultLangValue))
                 {
-                    return Convert(globalConfig.langDict[defaultLanguage][key]);
+                    return Convert(defaultLangValue);
                 }
-                else if (defaultLanguage != GlobalConfig.kEnglish && globalConfig.langDict[GlobalConfig.kEnglish].ContainsKey(key))
+                else if (defaultLanguage != GlobalConst.kEnglish && globalConfig.LangDict[GlobalConst.kEnglish].TryGetValue(key, out string? englValue))
                 {
-                    return Convert(globalConfig.langDict[GlobalConfig.kEnglish][key]);
+                    return Convert(englValue);
                 }
                 else
                 {
-                    return "(undefined text)";
+                    return GlobalConst.kUndefinedText;
                 }
             }
         }
 
+        public string PureLine(string text)
+        {
+            string output = RemoveLinks(Regex.Replace(GetText(text).Trim(), @"\s", " "));
+            output = ReplaceListElems(output);
+            bool cont = true;
+            while(cont)
+            {
+                string outputOrig = output;
+                output = Regex.Replace(outputOrig, @"  ", " ");
+                if(output.Length == outputOrig.Length)
+                {
+                    cont = false;
+                }
+            }
+            return output;
+        }
+
+        public string GetApiText(string key)
+        {
+            string text = key;
+            string pattern = @"[A]\d\d\d\d";
+            Match m = Regex.Match(key, pattern);
+            if (m.Success)
+            {
+                string msg = GetText(key.Substring(0, 5));
+                if (msg != GlobalConst.kUndefinedText)
+                {
+                    text = msg;
+                }
+            }
+            return text;
+        }
+
+        public async Task<Dictionary<string, string>> GetCustomDict(string languageName)
+        {
+            Dictionary<string, string> dict = [];
+            try
+            {
+                List<UiText> uiTexts = await apiConnection.SendQueryAsync<List<UiText>>(ConfigQueries.getCustomTextsPerLanguage, new { language = languageName });
+                if (uiTexts != null)
+                {
+                    foreach (UiText text in uiTexts)
+                    {
+                        dict.Add(text.Id, text.Txt);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Log.WriteError("Read custom dictionary", $"Could not read custom dict.", exception);
+            }
+            return dict;
+        }
+
+        private static string RemoveLinks(string txtString)
+        {
+            string startLink = "<a href=\"/";
+            int begin, end;
+            int index = 0;
+            bool cont = true;
+
+            while (cont)
+            {
+                begin = txtString.IndexOf(startLink, index);
+                if (begin >= 0)
+                {
+                    end = txtString.IndexOf('>', begin + startLink.Length);
+                    if (end > 0)
+                    {
+                        txtString = txtString.Remove(begin, end - begin + 1);
+                    }
+                    else
+                    {
+                        cont = false;
+                    }
+                }
+                else
+                {
+                    cont = false;
+                }
+            }
+            txtString = Regex.Replace(txtString, "</a>", "");
+            return txtString;
+        }
+    
+        private static string ReplaceListElems(string txtString)
+        {
+            txtString = Regex.Replace(txtString, "<ol>", "");
+            txtString = Regex.Replace(txtString, "</ol>", "");
+            txtString = Regex.Replace(txtString, "<ul>", "");
+            txtString = Regex.Replace(txtString, "</ul>", "");
+            txtString = Regex.Replace(txtString, "<li>", "\r\n");
+            txtString = Regex.Replace(txtString, "</li>", "");
+            txtString = Regex.Replace(txtString, "<br>", "\r\n");
+            return txtString;
+        }
+        
         private string Convert(string rawText)
         {
             string plainText = System.Web.HttpUtility.HtmlDecode(rawText);
@@ -164,7 +266,7 @@ namespace FWO.Config.Api
                     begin = plainText.IndexOf(startLink, index);
                     if (begin >= 0)
                     {
-                        end = plainText.IndexOf("\"", begin + startLink.Length);
+                        end = plainText.IndexOf('"', begin + startLink.Length);
                         if (end > 0)
                         {
                             plainText = plainText.Insert(end, insertString);
@@ -182,40 +284,6 @@ namespace FWO.Config.Api
                 }
             }
             return plainText;
-        }
-
-        public string GetApiText(string key)
-        {
-            string text = key;
-            string pattern = @"[A]\d\d\d\d";
-            Match m = Regex.Match(key, pattern);
-            if (m.Success)
-            {
-                string msg = GetText(key.Substring(0, 5));
-                if (msg != "(undefined text)")
-                {
-                    text = msg;
-                }
-            }
-            return text;
-        }
-
-        public async Task<Dictionary<string, string>> GetCustomDict(string languageName)
-        {
-            Dictionary<string, string> dict = new();
-            try
-            {
-                UiText[] uiTexts = await apiConnection.SendQueryAsync<UiText[]>(ConfigQueries.getCustomTextsPerLanguage, new { language = languageName });
-                foreach (UiText text in uiTexts)
-                {
-                    dict.Add(text.Id, text.Txt);
-                }
-            }
-            catch (Exception exception)
-            {
-                Log.WriteError("Read custom dictionary", $"Could not read custom dict.", exception);
-            }
-            return dict;
         }
     }
 }

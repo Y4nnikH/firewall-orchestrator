@@ -347,3 +347,47 @@ adding report template format fk and permissions
 - restrictions
   - since tenant filtering is not done in the API but in the UI, the API should not be exposed to the tenants
   
+### 8.0 19.02.2024 MAIN
+- Introducing new Network Modelling module
+  - allows your organisation to define the target state of all network connection on a per-application basis (or other distributed ownerships)
+- Backend
+  - Introducing Scheduled import change notification including inline or attached change report (replacing simple import notification from import module)
+  - upgrade hasura graphql API to 2.37.0
+- UI
+  - New look and feel: Moving to vanilla bootstrap css v5.3.2 (allowing for future up to date css usage)
+  - ip based tenant filtering: introducing unfiltered_managements and devices and adding extended tenant to device mapping settings
+- Installer (breaking change!)
+  - introducing venv for newer ansible versions and thereby removing annoying ansible version handling in installer (see https://github.com/CactuseSecurity/firewall-orchestrator/blob/main/documentation/installer/basic-installation.md for details)
+- bugfixes for
+  - import log locking
+  - integration tests with credentials when installing without demo data
+  - pdf creation on debian testing plattform (trixie)
+
+# 8.1 - 10.04.2024 MAIN
+- UI: iconifying modelling UI buttons (can now use icons instead of text buttons - configurable per user)
+- Importer: first version of VMware NSX import module
+- API: adding customizing script for bulk configs via API
+- Database security: all credentials in the database are now encrypted - breaking change (for developer debugging only): add the following local file when using -e testkeys=true:
+  /etc/fworch/secrets/main_key with content "not4production..not4production.."
+- Importer fix: remove log locking from importer due to stalling importer stops
+
+# 8.2 - 30.04.2024 MAIN
+- new workflow for modelling: interface request
+  - adding all imported modelling users to local db (uiuser) - to enable email notification
+- new features for modelling
+  - display NAs in Report LSB and Export
+  - count and display members of areas in selection list  
+- upgrade to dotnet 8.0 (middleware and UI server)
+- encrypt emailPassword in config
+- fixes:
+  - demo managements (change import from deactivated to activated - does not affect test managements)
+
+# 8.3 - 25.06.2024 MAIN
+Maintenance release
+- fix misleading login error message when authorisation is missing
+- fix email credential decryption
+- start of Tufin SecureChange integration
+- remove cascading delete for used interfaces 
+- owner-filtering for new report type
+- new setting for email recipients
+- owner-import custom script improvements#

@@ -1,9 +1,4 @@
 ﻿using FWO.Report.Filter.Exceptions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FWO.Report.Filter.Ast
 {
@@ -54,14 +49,14 @@ namespace FWO.Report.Filter.Ast
         private DynGraphqlQuery ExtractRemoveFilter(DynGraphqlQuery query)
         {
             string queryVarName = AddVariable<bool>(query, "remove", Operator.Kind, semanticValue);
-            query.ruleWhereStatement += $"rule_metadatum: {{rule_to_be_removed: {{ {ExtractOperator()}: ${queryVarName} }}}}";
+            query.RuleWhereStatement += $"rule_metadatum: {{rule_to_be_removed: {{ {ExtractOperator()}: ${queryVarName} }}}}";
             return query;
         }
 
         private DynGraphqlQuery ExtractDisabledQuery(DynGraphqlQuery query)
         {
             string queryVarName = AddVariable<bool>(query, "disabled", Operator.Kind, semanticValue);
-            query.ruleWhereStatement += $"rule_disabled: {{ {ExtractOperator()}: ${queryVarName} }}";
+            query.RuleWhereStatement += $"rule_disabled: {{ {ExtractOperator()}: ${queryVarName} }}";
             return query;
         }
     }

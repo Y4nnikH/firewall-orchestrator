@@ -141,6 +141,79 @@ bugfix release:
 # 7.2.6 - 06.10.2023 DEVELOP
 - importer Checkpoint: adding network object type support for 'CpmiVsClusterNetobj' (for VSX virtual switches)
 
-# 7.3 - 22.10.2023 DEVOP
+# 7.3 - 22.10.2023 DEVELOP
 - cleanup unused database views and functions
 - first working tenant ip-based filtering
+
+# 7.3.1 - 26.10.23 DEVELOP
+- introducing unfiltered_managements and devices for tenant filtering
+- fixing missing api perms fw-admin (management)
+- rename management & device tenat_id fields to unfiltered_tenant_id
+- fixing UI device selector crashes
+
+# 7.3.2 - 09.12.2023 DEVELOP
+- Modelling first version
+
+# 7.3.3 - 08.01.2024 DEVELOP
+- Moving to vanilla bootstrap css v5.3.2
+- adding extended tenant to device mapping settings (depending on latest bootstrap version) - closes  #2280
+- fix for log locking for import process
+
+# 7.3.4 - 09.01.2024 DEVELOP
+- Scheduled import change notification
+
+# 7.3.5 - 15.01.2024 DEVELOP
+- importer log locking fix (only fixing import stopping so far)
+- import change notification:
+  - DB extensions import_control.security_relevant_changes_counter
+  - removing python import notification
+  - writing to change counter after import (inpreparation for notification enhancement)
+- importer demo tenant device mapping additions (upgrade)
+- installer: introducing venv for newer ansible versions and thereby removing version handling
+
+# 7.3.6 - 23.01.2024 DEVELOP
+- common service handling
+- fixes credentials when installing without demo data
+- fix error with pdf creation on debian testing
+
+# 8.0.1 - 20.02.2024 DEVELOP
+- iconify modelling
+- add missing config values
+
+# 8.0.2 - 11.03.2024 DEVELOP
+- first version of NSX import module
+
+# 8.0.3 - 08.04.2024 DEVELOP
+- add maintenance page during upgrade
+- sample customizing py script with sample data, closes  Installer customizable config (settings) #2275
+- remove log locking from importer due to stalling importer stops
+- credentials encryption, closes encrypt passwords and keys #1508
+  - breaking change for developer debugging: add the following local file when using -e testkeys=true:
+    /etc/fworch/secrets/main_key with content "not4production..not4production.."
+- add custom (user-defined) fields to import
+  - cp only so far, other fw types missing
+  - user-defined fields are not part of reports yet
+
+# 8.1.1 - 15.04.2024 DEVELOP
+- interface request workflow first version
+
+# 8.1.2 - 22.04.2024 DEVELOP
+- encrypt emailPassword in config
+- fix demo managements (change import from deactivated to activated - does not affect test managements)
+- upgrade to dotnet 8.0
+- adding all imported modelling users to uiuser
+
+# 8.2.1 - 03.05.2024 DEVELOP
+- fix misleading login error message when authorisation is missing
+
+# 8.2.2 - 14.05.2024 DEVELOP
+- fix email credential decryption
+- start of Tufin SecureChange integration
+
+# 8.2.3 - 26.05.2024 DEVELOP
+- remove cascading delete for used interfaces 
+- new properties field in connections
+
+# 8.2.4 - 19.06.2024 DEVELOP
+- owner-filtering for new report type
+- new setting for email recipients
