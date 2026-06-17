@@ -1,0 +1,55 @@
+name: Fast-forward main to release tag
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fast-forward-main-to-release-tag
+  cancel-in-progress: false
+
+jobs:
+  fast-forward-main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward main to release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag_name="${GITHUB_REF#refs/tags/}"
+
+          # Only stable release tags should advance main.
+          if [[ ! "$tag_name" =~ ^v?[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "Skipping tag '$tag_name' because it is not a stable release tag."
+            exit 0
+          fi
+
+          git fetch origin main --tags
+
+          tag_sha="$(git rev-list -n 1 "$GITHUB_REF")"
+          main_sha="$(git rev-parse origin/main)"
+
+          echo "Tag $tag_name resolves to $tag_sha"
+          echo "origin/main currently points to $main_sha"
+
+          if [[ "$tag_sha" == "$main_sha" ]]; then
+            echo "main already points at the tagged commit."
+            exit 0
+          fi
+
+          if ! git merge-base --is-ancestor origin/main "$tag_sha"; then
+            echo "Refusing to update main: tag '$tag_name' is not a fast-forward from origin/main."
+            exit 1
+          fi
+
+          git push origin "$tag_sha:refs/heads/main"
