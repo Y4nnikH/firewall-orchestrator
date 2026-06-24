@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   analyze:
-    name: Analyze PR
+    name: SonarQube Analyze PR
     if: ${{ contains(github.event.pull_request.labels.*.name, 'run-sonar') || contains(fromJson(vars.SONAR_TRUSTED_FORK_OWNERS || '[]'), github.event.pull_request.head.repo.owner.login) }}
     runs-on: ubuntu-latest
     env:
