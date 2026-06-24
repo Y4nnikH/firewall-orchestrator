@@ -24,7 +24,7 @@ namespace FWO.Data
         public Dictionary<string, NormalizedRule> Rules { get; set; } = [];
 
         /// <summary>
-        /// Creates a NormalizedRulebase from a Rulebase.
+        /// Creates a NormalizedRulebase from a Rulebase. add comment
         /// </summary>
         /// <param name="rulebase">The Rulebase to normalize.</param>
         /// <param name="mgmUid">The management UID.</param>
