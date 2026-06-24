@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
   pull-requests: write
 
 concurrency:
@@ -21,7 +20,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze labeled PR
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'run-sonar') }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'run-sonar') || contains(fromJson(vars.SONAR_TRUSTED_FORK_OWNERS || '[]'), github.event.pull_request.head.repo.owner.login) }}
     runs-on: ubuntu-latest
     env:
       DOTNET_ROLL_FORWARD: Major
@@ -30,18 +29,6 @@ jobs:
       SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
-      - name: Acknowledge scan request
-        if: ${{ github.event.action == 'labeled' && github.event.label.name == 'run-sonar' }}
-        uses: actions/github-script@v8
-        with:
-          script: |
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              body: `Running SonarCloud analysis for commit \`${context.payload.pull_request.head.sha}\` because the \`run-sonar\` label is present.`
-            });
-
       - name: Checkout PR head
         uses: actions/checkout@v6
         with:
@@ -93,29 +80,3 @@ jobs:
             /d:sonar.pullrequest.base="${{ github.event.pull_request.base.ref }}"
           dotnet build roles/FWO.sln --configuration Debug --no-incremental
           .sonar/scanner/dotnet-sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
-
-      - name: Comment result link
-        if: ${{ success() }}
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const dashboardUrl = `https://sonarcloud.io/dashboard?id=${process.env.SONAR_PROJECT_KEY}&pullRequest=${context.payload.pull_request.number}`;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              body: `SonarCloud analysis finished successfully for this PR: ${dashboardUrl}`
-            });
-
-      - name: Comment failure
-        if: ${{ failure() }}
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              body: `SonarCloud analysis failed for this PR. Workflow run: ${runUrl}`
-            });
