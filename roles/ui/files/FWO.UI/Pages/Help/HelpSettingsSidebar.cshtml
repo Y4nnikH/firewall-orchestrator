@@ -109,6 +109,9 @@
                 <a class="nav-link" href="/help/settings/customtexts/?lang=@($"{userConfig.GetUserLanguage()}")">
                     <span class="@Icons.Text"></span> @(userConfig.GetText("customize_texts"))
                 </a>
+                <a class="nav-link" href="/help/settings/developertools/?lang=@($"{userConfig.GetUserLanguage()}")">
+                    <span class="@Icons.Settings"></span> @(userConfig.GetText("developer_tools"))
+                </a>
                 <p></p>
                 <h5>@(userConfig.GetText("personal"))</h5>
                 <a class="nav-link" href="/help/settings/password/?lang=@($"{userConfig.GetUserLanguage()}")">

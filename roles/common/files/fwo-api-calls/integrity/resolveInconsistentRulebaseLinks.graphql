@@ -1,0 +1,5 @@
+mutation resolveInconsistentRulebaseLinks($updates: [rulebase_link_updates!]!) {
+  update_rulebase_link_many(updates: $updates) {
+    affected_rows
+  }
+}

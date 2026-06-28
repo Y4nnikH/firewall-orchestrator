@@ -1,0 +1,245 @@
+@page "/settings/developertools"
+
+@using FWO.Api.Client.Queries
+@using FWO.Basics
+@using FWO.Data
+@using FWO.Ui.Services
+
+@attribute [Authorize(Roles = $"{Roles.Admin}")]
+
+@inject ApiConnection apiConnection
+@inject UserConfig userConfig
+
+<div class="input-group">
+    <h3>@(userConfig.GetText("developer_tools"))</h3>
+    <HelpLink Page="settings/developertools" />
+</div>
+<hr />
+
+<div class="mb-4">
+    <h4>@(userConfig.GetText("database_check"))</h4>
+    <p>@(userConfig.GetText("database_check_description"))</p>
+    <button type="button" class="btn btn-sm btn-primary" disabled="@isChecking" @onclick="CheckDataIntegrity">
+        @(DisplayService.DisplayButton(userConfig, "check_data_integrity", Icons.Check))
+    </button>
+</div>
+
+@if (hasChecked)
+{
+    @if (issues.Count == 0)
+    {
+        <div class="d-flex align-items-center gap-2 text-success fw-bold mb-3">
+            <span class="bi bi-check-circle-fill"></span>
+            <span>@(userConfig.GetText("no_problems_found"))</span>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-2 text-danger fw-bold mb-3">
+            <span class="bi bi-x-circle-fill"></span>
+            <span>@($"{issues.Count} {userConfig.GetText("problems_found")}")</span>
+        </div>
+
+        <div class="mb-2">
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-secondary" @onclick="ToggleSelectAllNone">
+                    @(DisplayService.DisplayButton(userConfig, "select_all_none", Icons.Select))
+                </button>
+                <button type="button" class="btn btn-sm btn-warning" disabled="@(selectedIssues.Count == 0 || isResolving)" @onclick="ResolveInconsistencies">
+                    @(DisplayService.DisplayButton(userConfig, "resolve_inconsistencies", Icons.Cleanup))
+                </button>
+            </div>
+        </div>
+
+        <Table PageSize="0" TableClass="table table-bordered table-sm th-bg-secondary table-responsive overflow-auto sticky-header"
+               TableItem="DataIntegrityIssue" Items="issues" SelectedItems="selectedIssues"
+               RowClickAction="ToggleIssueSelection" TableRowClass="GetRowClass">
+            <Column TableItem="DataIntegrityIssue" Title="@(userConfig.GetText("integrity_table_name"))"
+                    Field="@(issue => userConfig.GetText(GetTableTextKey(issue.TableName)))" Sortable="true" Filterable="true" />
+            <Column TableItem="DataIntegrityIssue" Title="@(userConfig.GetText("integrity_row_id"))"
+                    Field="@(issue => issue.RowId)" Sortable="true" Filterable="true" />
+            <Column TableItem="DataIntegrityIssue" Title="@(userConfig.GetText("integrity_type"))"
+                    Field="@(issue => userConfig.GetText(GetTypeTextKey(issue.InconsistencyType)))" Sortable="true" Filterable="true" />
+            <Column TableItem="DataIntegrityIssue" Title="@(userConfig.GetText("integrity_details"))"
+                    Field="@(issue => issue.RowId)" Sortable="false" Filterable="false">
+                <Template>
+                    <button type="button" class="btn btn-sm btn-primary" @onclick:stopPropagation="true"
+                            @onclick="() => ShowJson(context)">
+                        @(DisplayService.DisplayButton(userConfig, "show_json", Icons.Display))
+                    </button>
+                </Template>
+            </Column>
+        </Table>
+    }
+}
+
+<PopUp Title="@(userConfig.GetText("integrity_json_popup_title"))" Show="@showJsonPopup" Size="PopupSize.Large"
+       OnClose="CloseJsonPopup">
+    <Body>
+        <pre class="mb-0">@selectedJson</pre>
+    </Body>
+    <Footer>
+        <button type="button" class="btn btn-sm btn-primary" @onclick="CloseJsonPopup">
+            @(DisplayService.DisplayButton(userConfig, "ok", Icons.Confirm))
+        </button>
+    </Footer>
+</PopUp>
+
+@code
+{
+    [CascadingParameter]
+    Action<Exception?, string, string, bool> DisplayMessageInUi { get; set; } = DefaultInit.DoNothing;
+
+    private List<DataIntegrityIssue> issues = [];
+    private List<DataIntegrityIssue> selectedIssues = [];
+    private Dictionary<long, RulebaseLinkIntegrityRow> rulebaseLinkRowsById = [];
+    private bool hasChecked;
+    private bool isChecking;
+    private bool isResolving;
+    private bool showJsonPopup;
+    private string selectedJson = "";
+
+    private async Task CheckDataIntegrity()
+    {
+        try
+        {
+            isChecking = true;
+            List<RulebaseLinkIntegrityRow> rows =
+                await apiConnection.SendQueryAsync<List<RulebaseLinkIntegrityRow>>(IntegrityQueries.getInconsistentRulebaseLinks);
+
+            issues = DeveloperToolsIntegrityHelper.BuildRulebaseLinkIssues(rows);
+            rulebaseLinkRowsById = rows.ToDictionary(row => row.Id);
+            selectedIssues = [];
+            hasChecked = true;
+        }
+        catch (Exception exception)
+        {
+            DisplayMessageInUi(exception, userConfig.GetText("developer_tools"), "", true);
+        }
+        finally
+        {
+            isChecking = false;
+        }
+    }
+
+    private async Task ResolveInconsistencies()
+    {
+        try
+        {
+            isResolving = true;
+            List<RulebaseLinkIntegrityRow> selectedRows = [.. selectedIssues
+                .Where(issue => rulebaseLinkRowsById.ContainsKey(issue.RowId))
+                .Select(issue => rulebaseLinkRowsById[issue.RowId])];
+
+            List<RulebaseLinkResolveUpdate> updates = DeveloperToolsIntegrityHelper.BuildRulebaseLinkResolveUpdates(selectedRows);
+            if (updates.Count != selectedIssues.Count)
+            {
+                DisplayMessageInUi(null, userConfig.GetText("developer_tools"),
+                    userConfig.GetText("could_not_resolve_all_refresh"), true);
+                return;
+            }
+
+            ReturnId result = await apiConnection.SendQueryAsync<ReturnId>(
+                IntegrityQueries.resolveInconsistentRulebaseLinks,
+                new
+                {
+                    updates = updates.ConvertAll(update => new
+                    {
+                        where = new
+                        {
+                            id = new { _eq = update.Id },
+                            removed = new { _is_null = true }
+                        },
+                        _set = new
+                        {
+                            removed = update.Removed
+                        }
+                    })
+                });
+
+            if (DeveloperToolsIntegrityHelper.TryRemoveResolvedIssues(issues, selectedIssues, result.AffectedRows))
+            {
+                foreach (DataIntegrityIssue issue in selectedIssues)
+                {
+                    rulebaseLinkRowsById.Remove(issue.RowId);
+                }
+                selectedIssues = [];
+                DisplayMessageInUi(null, userConfig.GetText("developer_tools"),
+                    userConfig.GetText("all_resolved_successfully"), false);
+            }
+            else
+            {
+                DisplayMessageInUi(null, userConfig.GetText("developer_tools"),
+                    userConfig.GetText("could_not_resolve_all_refresh"), true);
+            }
+        }
+        catch (Exception exception)
+        {
+            DisplayMessageInUi(exception, userConfig.GetText("developer_tools"), "", true);
+        }
+        finally
+        {
+            isResolving = false;
+        }
+    }
+
+    private void ToggleIssueSelection(DataIntegrityIssue issue)
+    {
+        DataIntegrityIssue? existing = selectedIssues.FirstOrDefault(selected => selected.RowId == issue.RowId
+            && selected.TableName == issue.TableName
+            && selected.InconsistencyType == issue.InconsistencyType);
+
+        if (existing == null)
+        {
+            selectedIssues.Add(issue);
+        }
+        else
+        {
+            selectedIssues.Remove(existing);
+        }
+    }
+
+    private void ToggleSelectAllNone()
+    {
+        selectedIssues = selectedIssues.Count == issues.Count ? [] : [.. issues];
+    }
+
+    private void ShowJson(DataIntegrityIssue issue)
+    {
+        selectedJson = issue.JsonObject;
+        showJsonPopup = true;
+    }
+
+    private void CloseJsonPopup()
+    {
+        showJsonPopup = false;
+        selectedJson = "";
+    }
+
+    private string GetRowClass(DataIntegrityIssue issue)
+    {
+        return selectedIssues.Any(selected => selected.RowId == issue.RowId
+            && selected.TableName == issue.TableName
+            && selected.InconsistencyType == issue.InconsistencyType)
+            ? "table-active"
+            : "";
+    }
+
+    private static string GetTableTextKey(IntegrityTableName tableName)
+    {
+        return tableName switch
+        {
+            IntegrityTableName.RulebaseLink => "integrity_rulebase_link",
+            _ => tableName.ToString()
+        };
+    }
+
+    private static string GetTypeTextKey(IntegrityInconsistencyType inconsistencyType)
+    {
+        return inconsistencyType switch
+        {
+            IntegrityInconsistencyType.RemoveInconsistency => "remove_inconsistency",
+            _ => inconsistencyType.ToString()
+        };
+    }
+}

@@ -1,0 +1,22 @@
+@page "/help/settings/developertools"
+@model FWO.Ui.Pages.Help.MainModel
+@{
+    Layout = "HelpLayout";
+}
+@section sidebar{
+    @{
+        await Html.RenderPartialAsync("HelpSettingsSidebar.cshtml");
+    }
+}
+@using FWO.Config.Api
+@inject UserConfig userConfig
+
+<div class="p-2">
+    <h3>@(userConfig.GetText("developer_tools"))</h3>
+    @(Html.Raw(userConfig.GetText("H5900")))
+    <ul>
+        <li>@(Html.Raw(userConfig.GetText("H5901")))</li>
+        <li>@(Html.Raw(userConfig.GetText("H5902")))</li>
+        <li>@(Html.Raw(userConfig.GetText("H5903")))</li>
+    </ul>
+</div>
