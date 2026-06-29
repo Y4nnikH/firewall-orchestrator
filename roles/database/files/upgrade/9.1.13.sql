@@ -107,6 +107,14 @@ ALTER TABLE request.state_matrix_derived_state ADD CONSTRAINT request_state_matr
 ALTER TABLE request.state_matrix_derived_state DROP CONSTRAINT IF EXISTS request_state_matrix_derived_state_derived_state_foreign_key;
 ALTER TABLE request.state_matrix_derived_state ADD CONSTRAINT request_state_matrix_derived_state_derived_state_foreign_key FOREIGN KEY (derived_state_id) REFERENCES request.state(id) ON UPDATE RESTRICT ON DELETE CASCADE;
 
+-- Legacy config data is copied only while the normalized configuration store is empty.
+-- This prevents repeated upgrades from restoring transitions or mappings deleted by users.
+DO $state_matrix_migration$
+BEGIN
+IF EXISTS (SELECT 1 FROM request.workflow_configuration) THEN
+    RETURN;
+END IF;
+
 INSERT INTO request.workflow_configuration (name, description, is_active)
 VALUES
     ('current', 'Migrated workflow state matrix configuration', TRUE),
@@ -264,3 +272,5 @@ FROM derived_state_data
 ON CONFLICT (phase_matrix_id, from_state_id) DO NOTHING;
 
 DROP TABLE IF EXISTS pg_temp.tmp_state_matrix_key;
+END;
+$state_matrix_migration$;
