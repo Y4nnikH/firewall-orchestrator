@@ -1,0 +1,147 @@
+@using FWO.Data
+
+@inject UserConfig userConfig
+@inject ApiConnection apiConnection
+
+<PopUp Title="@(userConfig.GetText("add_configuration"))" Show="@Display" Size=PopupSize.Small OnClose="ClosePopup">
+    <Body>
+        @if (Display)
+        {
+            <div class="form-group row mb-2">
+                <label class="col-sm-4 col-form-label col-form-label-sm">@(userConfig.GetText("name"))*:</label>
+                <div class="col-sm-8"><input class="form-control form-control-sm" @bind="name" /></div>
+            </div>
+            <div class="form-group row mb-2">
+                <label class="col-sm-4 col-form-label col-form-label-sm">@(userConfig.GetText("description")):</label>
+                <div class="col-sm-8"><textarea class="form-control form-control-sm" @bind="description"></textarea></div>
+            </div>
+            <div class="form-group row">
+                <label class="col-sm-4 col-form-label col-form-label-sm">@(userConfig.GetText("source_configuration")):</label>
+                <label class="col-sm-8 col-form-label col-form-label-sm">@SourceConfiguration?.Name</label>
+            </div>
+        }
+    </Body>
+    <Footer>
+        <div class="btn-group">
+            <ExecutionModeAuthorizeView Roles="@Roles.Admin">
+                <Authorized>
+                    <button type="button" class="btn btn-sm btn-primary" disabled="@(!CanSave)" @onclick="Save">
+                        @(DisplayService.DisplayButton(userConfig, "save", Icons.Save))
+                    </button>
+                </Authorized>
+                <NotAuthorized>
+                    <button type="button" class="btn btn-sm btn-primary" disabled>@(DisplayService.DisplayButton(userConfig, "save", Icons.Save))</button>
+                </NotAuthorized>
+            </ExecutionModeAuthorizeView>
+            <button type="button" class="btn btn-sm btn-secondary" @onclick="Close">@(DisplayService.DisplayButton(userConfig, "cancel", Icons.Cancel))</button>
+        </div>
+    </Footer>
+</PopUp>
+
+@code
+{
+    [CascadingParameter]
+    Action<Exception?, string, string, bool> DisplayMessageInUi { get; set; } = DefaultInit.DoNothing;
+
+    [Parameter]
+    public bool Display { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> DisplayChanged { get; set; }
+
+    [Parameter]
+    public WorkflowConfiguration? SourceConfiguration { get; set; }
+
+    [Parameter]
+    public List<WorkflowConfiguration> ExistingConfigurations { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<int> ConfigurationCreated { get; set; }
+
+    private string name = "";
+    private string? description;
+    private bool wasDisplayed;
+    private bool CanSave => SourceConfiguration != null && !string.IsNullOrWhiteSpace(name) && !ExistingConfigurations.Any(configuration => string.Equals(configuration.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnParametersSet()
+    {
+        if (Display && !wasDisplayed)
+        {
+            name = "";
+            description = null;
+        }
+        wasDisplayed = Display;
+    }
+
+    private async Task Save()
+    {
+        if (SourceConfiguration == null)
+        {
+            return;
+        }
+        try
+        {
+            List<WorkflowConfigurationPhase> phaseMappings = await apiConnection.SendQueryAsync<List<WorkflowConfigurationPhase>>(
+                RequestQueries.getWorkflowConfigurationPhaseMappings, new { configurationId = SourceConfiguration.Id });
+            List<object> mappings = phaseMappings.Select(mapping => BuildClonedPhaseMapping(mapping, name.Trim())).ToList();
+            ReturnId result = await apiConnection.SendQueryAsync<ReturnId>(RequestQueries.createWorkflowConfiguration, new
+            {
+                name = name.Trim(),
+                description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+                phaseMappings = mappings
+            });
+            await ConfigurationCreated.InvokeAsync(result.NewId);
+            await Close();
+        }
+        catch (Exception exception)
+        {
+            DisplayMessageInUi(exception, userConfig.GetText("add_configuration"), "", true);
+        }
+    }
+
+    private static object BuildClonedPhaseMapping(WorkflowConfigurationPhase mapping, string configurationName)
+    {
+        StateMatrixPhase phaseMatrix = mapping.PhaseMatrix;
+        return new
+        {
+            task_type = mapping.TaskType,
+            phase = mapping.Phase,
+            state_matrix_phase = new
+            {
+                data = new
+                {
+                    name = $"{configurationName}::{mapping.TaskType}::{mapping.Phase}",
+                    phase = phaseMatrix.Phase,
+                    active = phaseMatrix.Active,
+                    lowest_input_state = phaseMatrix.LowestInputState,
+                    lowest_start_state = phaseMatrix.LowestStartState,
+                    lowest_end_state = phaseMatrix.LowestEndState,
+                    state_matrix_derived_states = new
+                    {
+                        data = phaseMatrix.DerivedStates.Select(derivedState => new
+                        {
+                            from_state_id = derivedState.FromStateId,
+                            derived_state_id = derivedState.DerivedStateId
+                        }).ToList()
+                    },
+                    state_matrix_phase_transition_groups = new
+                    {
+                        data = phaseMatrix.TransitionGroups.Select(transitionGroup => new
+                        {
+                            transition_group_id = transitionGroup.TransitionGroupId,
+                            sort_order = transitionGroup.SortOrder
+                        }).ToList()
+                    }
+                }
+            }
+        };
+    }
+
+    private async Task Close()
+    {
+        Display = false;
+        await DisplayChanged.InvokeAsync(false);
+    }
+
+    private void ClosePopup() => _ = Close();
+}

@@ -34,7 +34,7 @@ namespace FWO.Test
 
         private sealed class TestGlobalStateMatrix : GlobalStateMatrix
         {
-            public override Task Init(ApiConnection apiConnection, WfTaskType taskType = WfTaskType.master, bool reset = false)
+            public override Task Init(ApiConnection apiConnection, WfTaskType taskType = WfTaskType.master)
             {
                 GlobalMatrix = new Dictionary<WorkflowPhases, StateMatrix>
                 {

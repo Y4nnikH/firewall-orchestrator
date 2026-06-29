@@ -182,38 +182,82 @@ namespace FWO.Services.Workflow
         [JsonProperty("config_value"), JsonPropertyName("config_value")]
         public Dictionary<WorkflowPhases, StateMatrix> GlobalMatrix { get; set; } = [];
 
+        [Newtonsoft.Json.JsonIgnore, System.Text.Json.Serialization.JsonIgnore]
+        public int ConfigurationId { get; private set; }
 
-        public virtual async Task Init(ApiConnection apiConnection, WfTaskType taskType = WfTaskType.master, bool reset = false)
+        [Newtonsoft.Json.JsonIgnore, System.Text.Json.Serialization.JsonIgnore]
+        public string ConfigurationName { get; private set; } = "";
+
+        [Newtonsoft.Json.JsonIgnore, System.Text.Json.Serialization.JsonIgnore]
+        public Dictionary<WorkflowPhases, StateMatrixPhaseBinding> PhaseBindings { get; private set; } = [];
+
+        internal Dictionary<WorkflowPhases, StateMatrix> OriginalGlobalMatrix { get; private set; } = [];
+
+        public virtual async Task Init(ApiConnection apiConnection, WfTaskType taskType = WfTaskType.master)
         {
-            string matrixKey = taskType switch
-            {
-                WfTaskType.master => "reqMasterStateMatrix",
-                WfTaskType.generic => "reqGenStateMatrix",
-                WfTaskType.access => "reqAccStateMatrix",
-                WfTaskType.rule_delete => "reqRulDelStateMatrix",
-                WfTaskType.rule_modify => "reqRulModStateMatrix",
-                WfTaskType.group_create => "reqGrpCreStateMatrix",
-                WfTaskType.group_modify => "reqGrpModStateMatrix",
-                WfTaskType.group_delete => "reqGrpDelStateMatrix",
-                WfTaskType.new_interface => "reqNewIntStateMatrix",
-                _ => throw new NotSupportedException($"Error: wrong task type:" + taskType.ToString()),
-            };
-
-            if (reset)
-            {
-                matrixKey += "Default";
-            }
-
-            List<GlobalStateMatrixHelper> confData = await apiConnection.SendQueryAsync<List<GlobalStateMatrixHelper>>(ConfigQueries.getConfigItemByKey, new { key = matrixKey });
-            GlobalStateMatrix glbStateMatrix = System.Text.Json.JsonSerializer.Deserialize<GlobalStateMatrix>(confData[0].ConfData) ?? throw new JsonException("Config data could not be parsed.");
-            GlobalMatrix = glbStateMatrix.GlobalMatrix;
+            await Load(apiConnection, taskType, null);
         }
-    }
 
-    public class GlobalStateMatrixHelper
-    {
-        [JsonProperty("config_value"), JsonPropertyName("config_value")]
-        public string ConfData = "";
+        /// <summary>
+        /// Initializes the matrix from a specifically named workflow configuration.
+        /// </summary>
+        public virtual async Task Init(ApiConnection apiConnection, WfTaskType taskType, string configurationName)
+        {
+            await Load(apiConnection, taskType, configurationName);
+        }
+
+        private async Task Load(ApiConnection apiConnection, WfTaskType taskType, string? configurationName)
+        {
+            StateMatrixConfigurationRepository repository = new();
+            StateMatrixConfigurationSnapshot snapshot = await repository.Load(apiConnection, taskType, configurationName);
+            ConfigurationId = snapshot.ConfigurationId;
+            ConfigurationName = snapshot.ConfigurationName;
+            GlobalMatrix = snapshot.Matrices;
+            PhaseBindings = snapshot.PhaseBindings;
+            OriginalGlobalMatrix = CloneMatrices(GlobalMatrix);
+        }
+
+        /// <summary>
+        /// Persists this task-type matrix into its currently bound workflow configuration.
+        /// </summary>
+        public virtual async Task Save(ApiConnection apiConnection)
+        {
+            StateMatrixConfigurationRepository repository = new();
+            await repository.Update(apiConnection, this);
+        }
+
+        internal void AcceptChanges(Dictionary<WorkflowPhases, Dictionary<(int FromStateId, int ToStateId), int>> transitionSortOrders)
+        {
+            foreach ((WorkflowPhases phase, Dictionary<(int FromStateId, int ToStateId), int> sortOrders) in transitionSortOrders)
+            {
+                PhaseBindings[phase].TransitionSortOrders.Clear();
+                foreach (((int fromStateId, int toStateId), int sortOrder) in sortOrders)
+                {
+                    PhaseBindings[phase].TransitionSortOrders[(fromStateId, toStateId)] = sortOrder;
+                }
+            }
+            OriginalGlobalMatrix = CloneMatrices(GlobalMatrix);
+        }
+
+        private static Dictionary<WorkflowPhases, StateMatrix> CloneMatrices(Dictionary<WorkflowPhases, StateMatrix> source)
+        {
+            return source.ToDictionary(
+                entry => entry.Key,
+                entry => CloneMatrix(entry.Value));
+        }
+
+        private static StateMatrix CloneMatrix(StateMatrix source)
+        {
+            return new()
+            {
+                Matrix = source.Matrix.ToDictionary(entry => entry.Key, entry => entry.Value.ToList()),
+                DerivedStates = new Dictionary<int, int>(source.DerivedStates),
+                LowestInputState = source.LowestInputState,
+                LowestStartedState = source.LowestStartedState,
+                LowestEndState = source.LowestEndState,
+                Active = source.Active
+            };
+        }
     }
 
     public class StateMatrixDict

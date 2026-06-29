@@ -980,6 +980,8 @@ INSERT INTO txt VALUES ('schedule_owner',		'German', 	'Eigent&uuml;mer');
 INSERT INTO txt VALUES ('schedule_owner',		'English', 	'Owner');
 INSERT INTO txt VALUES ('active', 			    'German',	'Aktiv');
 INSERT INTO txt VALUES ('active', 			    'English',	'Active');
+INSERT INTO txt VALUES ('set_active',          'German',   'Als aktiv setzen');
+INSERT INTO txt VALUES ('set_active',          'English',  'Set active');
 INSERT INTO txt VALUES ('inactive',             'German',   'Inaktiv');
 INSERT INTO txt VALUES ('inactive',             'English',  'Inactive');
 INSERT INTO txt VALUES ('count', 			    'German',	'Z&auml;hler');
@@ -2818,6 +2820,12 @@ INSERT INTO txt VALUES ('lowest_end_state',     'German',   'Niedrigster Ausgang
 INSERT INTO txt VALUES ('lowest_end_state',     'English',  'Lowest exit state');
 INSERT INTO txt VALUES ('derived_state',        'German',   'Abgeleiteter Status');
 INSERT INTO txt VALUES ('derived_state',        'English',  'Derived state');
+INSERT INTO txt VALUES ('derived_states',       'German',   'Abgeleitete Status');
+INSERT INTO txt VALUES ('derived_states',       'English',  'Derived states');
+INSERT INTO txt VALUES ('add_derived_state',    'German',   'Abgeleiteten Status hinzuf&uuml;gen');
+INSERT INTO txt VALUES ('add_derived_state',    'English',  'Add derived state');
+INSERT INTO txt VALUES ('edit_derived_state',   'German',   'Abgeleiteten Status bearbeiten');
+INSERT INTO txt VALUES ('edit_derived_state',   'English',  'Edit derived state');
 INSERT INTO txt VALUES ('ext_states',           'German',   'Externe Status');
 INSERT INTO txt VALUES ('ext_states',           'English',  'External states');
 INSERT INTO txt VALUES ('static_external_states','German',   'Statische externe Status');
@@ -3531,6 +3539,56 @@ INSERT INTO txt VALUES ('recert_logic',         'German', 	'Logik und Konfigurat
 INSERT INTO txt VALUES ('recert_logic', 		'English', 	'Logic and Configuration');
 INSERT INTO txt VALUES ('configuration',        'German', 	'Konfiguration');
 INSERT INTO txt VALUES ('configuration',        'English', 	'Configuration');
+INSERT INTO txt VALUES ('add_configuration',    'German',   'Konfiguration hinzuf&uuml;gen');
+INSERT INTO txt VALUES ('add_configuration',    'English',  'Add configuration');
+INSERT INTO txt VALUES ('source_configuration', 'German',   'Quellkonfiguration');
+INSERT INTO txt VALUES ('source_configuration', 'English',  'Source configuration');
+INSERT INTO txt VALUES ('delete_configuration', 'German',   'Konfiguration l&ouml;schen');
+INSERT INTO txt VALUES ('delete_configuration', 'English',  'Delete configuration');
+INSERT INTO txt VALUES ('delete_configuration_message','German', 'Inaktive Konfiguration l&ouml;schen:');
+INSERT INTO txt VALUES ('delete_configuration_message','English','Delete inactive configuration:');
+INSERT INTO txt VALUES ('active_configuration_cannot_be_deleted','German', 'Die aktive Konfiguration kann nicht gel&ouml;scht werden.');
+INSERT INTO txt VALUES ('active_configuration_cannot_be_deleted','English','The active configuration cannot be deleted.');
+INSERT INTO txt VALUES ('visibility_group',     'German',   'Sichtbarkeitsgruppe');
+INSERT INTO txt VALUES ('visibility_group',     'English',  'Visibility group');
+INSERT INTO txt VALUES ('edit_visibility_groups','German',  'Sichtbarkeitsgruppen bearbeiten');
+INSERT INTO txt VALUES ('edit_visibility_groups','English', 'Edit visibility groups');
+INSERT INTO txt VALUES ('add_visibility_group', 'German',   'Sichtbarkeitsgruppe hinzuf&uuml;gen');
+INSERT INTO txt VALUES ('add_visibility_group', 'English',  'Add visibility group');
+INSERT INTO txt VALUES ('edit_visibility_group','German',   'Sichtbarkeitsgruppe bearbeiten');
+INSERT INTO txt VALUES ('edit_visibility_group','English',  'Edit visibility group');
+INSERT INTO txt VALUES ('delete_visibility_group','German', 'Sichtbarkeitsgruppe l&ouml;schen');
+INSERT INTO txt VALUES ('delete_visibility_group','English','Delete visibility group');
+INSERT INTO txt VALUES ('delete_visibility_group_message','German', 'Sichtbarkeitsgruppe l&ouml;schen und von allen &Uuml;bergangsgruppen trennen:');
+INSERT INTO txt VALUES ('delete_visibility_group_message','English','Delete visibility group and detach it from all transition groups:');
+INSERT INTO txt VALUES ('member_dn',             'German',   'Mitglied-DN');
+INSERT INTO txt VALUES ('member_dn',             'English',  'Member DN');
+INSERT INTO txt VALUES ('transitions',           'German',   '&Uuml;berg&auml;nge');
+INSERT INTO txt VALUES ('transitions',           'English',  'Transitions');
+INSERT INTO txt VALUES ('transition_groups',     'German',   '&Uuml;bergangsgruppen');
+INSERT INTO txt VALUES ('transition_groups',     'English',  'Transition groups');
+INSERT INTO txt VALUES ('link',                  'German',   'Verkn&uuml;pfen');
+INSERT INTO txt VALUES ('link',                  'English',  'Link');
+INSERT INTO txt VALUES ('link_transition_group', 'German',   '&Uuml;bergangsgruppe verkn&uuml;pfen');
+INSERT INTO txt VALUES ('link_transition_group', 'English',  'Link transition group');
+INSERT INTO txt VALUES ('unlink_transition_group','German',  'Verkn&uuml;pfung zur &Uuml;bergangsgruppe entfernen');
+INSERT INTO txt VALUES ('unlink_transition_group','English', 'Unlink transition group');
+INSERT INTO txt VALUES ('unlink_transition_group_message','German', 'Verkn&uuml;pfung dieser Phase zur &Uuml;bergangsgruppe entfernen:');
+INSERT INTO txt VALUES ('unlink_transition_group_message','English','Remove this phase link to the transition group:');
+INSERT INTO txt VALUES ('no_transition_groups_available','German', 'Keine passenden &Uuml;bergangsgruppen verf&uuml;gbar.');
+INSERT INTO txt VALUES ('no_transition_groups_available','English','No matching transition groups available.');
+INSERT INTO txt VALUES ('matrices',              'German',   'Matrizen');
+INSERT INTO txt VALUES ('matrices',              'English',  'Matrices');
+INSERT INTO txt VALUES ('edit_transition_groups','German',  '&Uuml;bergangsgruppen bearbeiten');
+INSERT INTO txt VALUES ('edit_transition_groups','English', 'Edit transition groups');
+INSERT INTO txt VALUES ('add_transition_group',  'German',   '&Uuml;bergangsgruppe hinzuf&uuml;gen');
+INSERT INTO txt VALUES ('add_transition_group',  'English',  'Add transition group');
+INSERT INTO txt VALUES ('edit_transition_group', 'German',   '&Uuml;bergangsgruppe bearbeiten');
+INSERT INTO txt VALUES ('edit_transition_group', 'English',  'Edit transition group');
+INSERT INTO txt VALUES ('delete_transition_group','German',  '&Uuml;bergangsgruppe l&ouml;schen');
+INSERT INTO txt VALUES ('delete_transition_group','English', 'Delete transition group');
+INSERT INTO txt VALUES ('delete_transition_group_message','German', '&Uuml;bergangsgruppe mit allen &Uuml;berg&auml;ngen und Phasenzuordnungen l&ouml;schen:');
+INSERT INTO txt VALUES ('delete_transition_group_message','English','Delete transition group with all transitions and phase assignments:');
 INSERT INTO txt VALUES ('owner_import',         'German', 	'Eigent&uuml;mer-Import');
 INSERT INTO txt VALUES ('owner_import',         'English', 	'Owner Import');
 INSERT INTO txt VALUES ('import_interfaces',    'German', 	'Import-Schnittstellen');
@@ -6327,17 +6385,19 @@ INSERT INTO txt VALUES ('H5537', 'German',  'Saubere Zonen: Wenn aktiviert, werd
 INSERT INTO txt VALUES ('H5537', 'English', 'Clean zones: When enabled, tasks are bundled only if their source and destination objects can be mapped to the same network zones using the selected policy matrix. Without a selected policy or without a matrix in the policy, no clean zone match is assumed.');
 INSERT INTO txt VALUES ('H5541', 'German',  'In der Status-Matrix werden die verarbeitbaren Status pro Phase und Tasktyp festgelegt.
     Es gibt eine Master-Matrix, welche die Eigenschaften auf Ticket-Ebene beschreibt, sowie und f&uuml;r jeden Tasktyp separate Matrizen.
+    Oberhalb der Konfigurationsauswahl k&ouml;nnen Sichtbarkeitsgruppen und &Uuml;bergangsgruppen bearbeitet sowie neue Konfigurationen als Kopie der ausgew&auml;hlten Konfiguration angelegt werden. Nur inaktive Konfigurationen k&ouml;nnen gel&ouml;scht werden; nicht mehr verwendete Phasenmatrizen werden dabei ebenfalls entfernt. Mitglieder von Sichtbarkeitsgruppen k&ouml;nnen als DN eingegeben oder &uuml;ber die Benutzer- und Gruppensuche ausgew&auml;hlt werden. Beim L&ouml;schen einer Sichtbarkeitsgruppe wird ihre Zuordnung zu &Uuml;bergangsgruppen entfernt. Beim L&ouml;schen einer &Uuml;bergangsgruppe werden auch ihre &Uuml;berg&auml;nge und Phasenzuordnungen gel&ouml;scht. Genau eine Konfiguration ist aktiv und wird zur Laufzeit verwendet.
     In der Installation sind diese Matrizen bereits vorbelegt, sie k&ouml;nnen aber nahezu beliebig &uuml;berschrieben werden.
     Zu beachten ist, dass das Speichern der ge&auml;nderten Matrizen jeweils als Ganzes durch t&auml;tigen der "Speichern"-Schaltfl&auml;che erfolgt, einzelne &Auml;nderungen der Status also bei Abbruch verloren gehen.
-    Jede einzelne Matrix kann auch als Ganzes durch Bet&auml;tigen der entsprechenden Schaltfl&auml;che auf die Initialeinstellungen zur&uuml;ckgesetzt werden.
-    W&auml;hrend die bereits vorhandenen Matrizen bei Software-Upgrades nicht ber&uuml;hrt werden, kann es vorkommen, dass die Initialeinstellungen aktualisiert werden.
+    Alle Status werden zur eindeutigen Identifikation mit ihrer ID in Klammern angezeigt.
+    W&auml;hrend die bereits vorhandenen Matrizen bei Software-Upgrades nicht ber&uuml;hrt werden, kann der mitgelieferte Installationsvorschlag aktualisiert werden.
 ');
 INSERT INTO txt VALUES ('H5541', 'English', 'In the state matrix the usable states per phase and task type are defined.
     There is a master matrix, which characterizes the ticket properties, as well as separate matrices for each task type.
+    Above the configuration selector, visibility groups and transition groups can be edited and new configurations can be created as a copy of the selected configuration. Only inactive configurations can be deleted; phase matrices that are no longer used are removed as well. Visibility-group members can be entered as DNs or selected through the user and group lookup. Deleting a visibility group removes its assignment from transition groups. Deleting a transition group also deletes its transitions and phase assignments. Exactly one configuration is active and used at runtime.
     During installation these matrices are already initialized, but they can be overwritten almost arbitrarily.
     Be aware that saving of each changed matrix is always done as a whole by using the "Save" button, single changes on states are lost with cancellation inbetween.
-    Each matrix can also be reset to the default settings as a whole by using the respective button.
-    As already existing matrices are not touched with software upgrades, it may happen, that the default settings are updated.
+    All states are displayed with their ID in brackets for unambiguous identification.
+    Existing matrices are not touched by software upgrades, but the supplied installation proposal may be updated.
 ');
 INSERT INTO txt VALUES ('H5542', 'German',  'Phasen: Die f&uuml;r die Tickets bzw. den jeweiligen Tasktyp vorgesehenen Bearbeitungsphasen k&ouml;nnen durch setzen der entsprechenden H&auml;kchen in der Status-Matrix festgelegt werden (die Tabelle der Status klappt dann automatisch ein oder aus).
     Die Phasen Verifizieren und Rezertifizieren sind noch nicht implementiert, so dass eine Aktivierung hier folgenlos bleibt.
@@ -6345,19 +6405,14 @@ INSERT INTO txt VALUES ('H5542', 'German',  'Phasen: Die f&uuml;r die Tickets bz
 INSERT INTO txt VALUES ('H5542', 'English', 'Phases: The workflow phases provided for the tickets resp. each task type can be defined by setting the check mark in the respective state matrix (the table of used states then appears or disappears automatically).
     The phases Verify and Recertify are not implemented yet, an activation would have no effect.
 ');
-INSERT INTO txt VALUES ('H5543', 'German',  'Status&uuml;berg&auml;nge: F&uuml;r jeden in einer Phase vorkommenden Status muss hier festgelegt werden, in welche Status von dort beim Speichern gewechselt werden kann.
-    Diese werden dann bei den jeweiligen Aktionen in einer Liste angeboten. Ist nur der &Uuml;bergang zu genau einem Status m&ouml;glich, so wird dieser &Uuml;bergang automatisch ohne R&uuml;ckfrage ausgef&uuml;hrt.
-    (z.B. ist in der Standardkonfiguration nur der &Uuml;bergang "Requested" -&amp;gt; "In Approval" eingetragen, so dass beim bet&auml;tigen von "Genehmigung beginnen" automatisch letzterer Status gesetzt wird.)
-    Soll eine Aktion, die ein Speichern bewirkt, auch ohne Statuswechsel stattfinden k&ouml;nnen, so ist der Ausgangszustand auch in der Liste der Zielzust&auml;nde aufzunehmen.
-    Es ist darauf zu achten, dass alle vorkommenden Zielstatus der &Uuml;bergangsmatrizen auch in den Ausgangsstatus zu finden sind.
+INSERT INTO txt VALUES ('H5543', 'German',  '&Uuml;bergangsgruppen: Pro Phase werden die zugeordneten benannten &Uuml;bergangsgruppen angezeigt. Eine Gruppe enth&auml;lt ihre Status&uuml;berg&auml;nge und kann &uuml;ber eine Sichtbarkeitsgruppe eingeschr&auml;nkt werden.
+    Die &Uuml;bersicht zeigt die Anzahl der Phasenmatrizen, die eine &Uuml;bergangsgruppe verwenden; der Bearbeitungsdialog listet diese Matrizen auf. Passende vorhandene Gruppen k&ouml;nnen mit einer Phase verkn&uuml;pft und wieder von ihr getrennt werden. &Auml;nderungen an einer wiederverwendeten Gruppe gelten f&uuml;r alle Phasen, die diese Gruppe verwenden. Beim L&ouml;schen werden auch alle &Uuml;berg&auml;nge und Phasenzuordnungen der Gruppe entfernt.
 ');
-INSERT INTO txt VALUES ('H5543', 'English', 'State transitions: For each state appearing in a phase it has to be defined, to which states transitions are possible on saving.
-    These states are displayed in a list in the particular actions. If there is only the transition to exactly one state possible, this transition is performed automatically without further dialogue.
-    (E.g. in the default configuration the transition "Requested" -&amp;gt; "In Approval" is listed, so that on pushing the button "Start approval" the latter state is set automatically.)
-    If an action leading to a storage should also have the possibility to be performed without state change, the source state has to be added also to the target state list.
-    Make sure that all used target states in all transition matrices also appear in the source states.
+INSERT INTO txt VALUES ('H5543', 'English', 'Transition groups: Each phase shows its assigned named transition groups. A group contains its state transitions and can be restricted through a visibility group.
+    The overview shows the number of phase matrices using a transition group; the edit dialog lists those matrices. Matching existing groups can be linked to a phase and unlinked from it. Changes to a reused group apply to every phase using that group. Deleting a group also removes all its transitions and phase assignments.
 ');
 INSERT INTO txt VALUES ('H5544', 'German',  'Abgeleitete Status: Bei der Behandlung der abgeleiteten Status wird unterschieden zwischen der Antragstellung und den anschliessenden Phasen:
+    Pro Phase k&ouml;nnen abweichende Zuordnungen vom ermittelten Eingangsstatus zum abgeleiteten Status bearbeitet werden. Nicht aufgef&uuml;hrte Status werden unver&auml;ndert abgeleitet.
     Bei der Antragstellung wird zuerst der Status des Tickets gesetzt.
     Die Status der zugeordneten Auftr&auml;gen bekommen zun&auml;chst denselben Status wie das Ticket, sofern sie nicht schon in einem h&ouml;heren Status waren (m&ouml;glich durch R&uuml;ckzuweisungen des Tickets z.B. vom Genehmiger).
     Die Tasktyp-spezifischen Status-Matrizen legen nun anschliessend aus den abgeleiteten Status fest, welcher Status dem jeweiligen spezifischen Auftrag zugewiesen wird. Dabei k&ouml;nnen z.B. auch Phasen &uuml;bersprungen werden.
@@ -6365,6 +6420,7 @@ INSERT INTO txt VALUES ('H5544', 'German',  'Abgeleitete Status: Bei der Behandl
     Aus den Status der fachlichen Auftr&auml;ge wird dann mittels der Master-Matrix der Status f&uuml;r das Ticket abgeleitet.
 ');
 INSERT INTO txt VALUES ('H5544', 'English', 'Derived states: Regarding the handling of the derived states, it has to be distinguished between ticket creation and the subsequent phases:
+    Per phase, mappings that differ from the computed input state can be edited. States not listed are derived unchanged.
     On ticket creation, first the state of the ticket is set.
     In the next step the associated tasks get the same state as the ticket, if they do not already have a higher state (possible by back assignments of the ticket, e.g. by the approver).
     Task specific state matrices now determine the state of the single request tasks from the derived states. At this point e.g. phases can be skipped for this specific task type.

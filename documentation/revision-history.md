@@ -525,3 +525,6 @@ This PR hardens FWO installation and security-sensitive workflows. It restricts 
 
 ## 9.1.12 - 26.06.2026
 - fix missing recertifier permission for owner recertification in hasura metadata
+
+## 9.1.13 - 29.06.2026
+- move workflow state matrices to own database tables
