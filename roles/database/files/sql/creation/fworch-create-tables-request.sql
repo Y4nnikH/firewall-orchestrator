@@ -203,8 +203,7 @@ create table request.workflow_visibility_group
 (
     id SERIAL PRIMARY KEY,
     name Varchar NOT NULL UNIQUE,
-    description text,
-    is_active boolean NOT NULL DEFAULT TRUE
+    description text
 );
 
 create table request.workflow_visibility_group_member

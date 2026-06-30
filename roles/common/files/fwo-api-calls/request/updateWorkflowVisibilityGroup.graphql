@@ -1,7 +1,7 @@
-mutation updateWorkflowVisibilityGroup($id: Int!, $name: String!, $description: String, $isActive: Boolean!) {
+mutation updateWorkflowVisibilityGroup($id: Int!, $name: String!, $description: String) {
   update_visibility_group: update_request_workflow_visibility_group_by_pk(
     pk_columns: {id: $id}
-    _set: {name: $name, description: $description, is_active: $isActive}
+    _set: {name: $name, description: $description}
   ) {
     updatedId: id
   }

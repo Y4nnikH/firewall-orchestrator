@@ -12,13 +12,13 @@ namespace FWO.Test
     internal class AddWorkflowConfigurationComponentTest
     {
         [Test]
-        public void CanSave_RequiresSourceAndNonBlankUniqueName()
+        public void CanSave_RequiresNonBlankUniqueNameAndValidCreationSource()
         {
             AddWorkflowConfiguration component = new();
             SetField(component, "name", "Candidate");
             Assert.That(GetProperty<bool>(component, "CanSave"), Is.False);
 
-            SetProperty(component, nameof(AddWorkflowConfiguration.SourceConfiguration), new WorkflowConfiguration { Id = 1, Name = "Source" });
+            SetProperty(component, nameof(AddWorkflowConfiguration.StateIds), new List<int> { 1 });
             SetField(component, "name", "   ");
             Assert.That(GetProperty<bool>(component, "CanSave"), Is.False);
 
@@ -31,6 +31,14 @@ namespace FWO.Test
 
             SetField(component, "name", "Independent");
             Assert.That(GetProperty<bool>(component, "CanSave"), Is.True);
+
+            SetProperty(component, nameof(AddWorkflowConfiguration.StateIds), new List<int>());
+            SetProperty(component, nameof(AddWorkflowConfiguration.ExistingConfigurations), new List<WorkflowConfiguration>
+            {
+                new() { Id = 4, Name = "Source" }
+            });
+            SetField(component, "selectedSourceConfigurationId", 4);
+            Assert.That(GetProperty<bool>(component, "CanSave"), Is.True);
         }
 
         [Test]
@@ -39,6 +47,12 @@ namespace FWO.Test
             AddWorkflowConfiguration component = new();
             SetField(component, "name", "Old");
             SetField(component, "description", "Old description");
+            SetField(component, "selectedSourceConfigurationId", 9);
+            SetProperty(component, nameof(AddWorkflowConfiguration.ExistingConfigurations), new List<WorkflowConfiguration>
+            {
+                new() { Id = 9, Name = "Zulu" },
+                new() { Id = 3, Name = "Alpha" }
+            });
             SetProperty(component, nameof(AddWorkflowConfiguration.Display), true);
 
             Invoke(component, "OnParametersSet");
@@ -47,6 +61,8 @@ namespace FWO.Test
             {
                 Assert.That(GetField<string>(component, "name"), Is.Empty);
                 Assert.That(GetFieldValue(component, "description"), Is.Null);
+                Assert.That(GetField<int>(component, "selectedSourceConfigurationId"), Is.Zero);
+                Assert.That(GetField<List<int>>(component, "sourceConfigurationIds"), Is.EqualTo(new[] { 0, 3, 9 }));
             });
 
             SetField(component, "name", "In progress");
@@ -113,6 +129,25 @@ namespace FWO.Test
         }
 
         [Test]
+        public void BuildEmptyPhaseMappings_CreatesEveryTaskTypeAndPhase()
+        {
+            List<object> mappings = (List<object>)InvokeStatic("BuildEmptyPhaseMappings", "Blank", 6)!;
+            List<JObject> serialized = mappings.Select(JObject.FromObject).ToList();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(mappings, Has.Count.EqualTo(Enum.GetValues<WfTaskType>().Length * Enum.GetValues<WorkflowPhases>().Length));
+                Assert.That(serialized.Select(mapping => (string?)mapping["task_type"]).Distinct(),
+                    Is.EquivalentTo(Enum.GetNames<WfTaskType>()));
+                Assert.That(serialized.Select(mapping => (string?)mapping["phase"]).Distinct(),
+                    Is.EquivalentTo(Enum.GetNames<WorkflowPhases>()));
+                Assert.That(serialized.All(mapping => (bool?)mapping["state_matrix_phase"]?["data"]?["active"] == false), Is.True);
+                Assert.That(serialized.All(mapping => (int?)mapping["state_matrix_phase"]?["data"]?["lowest_input_state"] == 6), Is.True);
+                Assert.That(serialized.All(mapping => !((JArray)mapping["state_matrix_phase"]!["data"]!["state_matrix_derived_states"]!["data"]!).Any()), Is.True);
+            });
+        }
+
+        [Test]
         public async Task Save_TrimsPayloadClonesPhasesAndClosesPopup()
         {
             WorkflowConfiguration sourceConfiguration = new() { Id = 5, Name = "Source" };
@@ -127,8 +162,9 @@ namespace FWO.Test
             api.Respond(RequestQueries.createWorkflowConfiguration, new ReturnId { NewId = 91 });
             AddWorkflowConfiguration component = new();
             SetProperty(component, "apiConnection", api);
-            SetProperty(component, nameof(AddWorkflowConfiguration.SourceConfiguration), sourceConfiguration);
+            SetProperty(component, nameof(AddWorkflowConfiguration.ExistingConfigurations), new List<WorkflowConfiguration> { sourceConfiguration });
             SetProperty(component, nameof(AddWorkflowConfiguration.Display), true);
+            SetField(component, "selectedSourceConfigurationId", sourceConfiguration.Id);
             SetField(component, "name", "  New config  ");
             SetField(component, "description", "  Description  ");
 
@@ -143,6 +179,31 @@ namespace FWO.Test
                 Assert.That((string?)createVariables["description"], Is.EqualTo("Description"));
                 Assert.That((string?)createVariables["phaseMappings"]?[0]?["state_matrix_phase"]?["data"]?["name"], Is.EqualTo("New config::master::request"));
                 Assert.That(GetProperty<bool>(component, nameof(AddWorkflowConfiguration.Display)), Is.False);
+            });
+        }
+
+        [Test]
+        public async Task Save_EmptySelectionCreatesCompleteEmptyConfigurationWithoutLookup()
+        {
+            RecordingWorkflowApiConnection api = new();
+            api.Respond(RequestQueries.createWorkflowConfiguration, new ReturnId { NewId = 92 });
+            AddWorkflowConfiguration component = new();
+            SetProperty(component, "apiConnection", api);
+            SetProperty(component, nameof(AddWorkflowConfiguration.StateIds), new List<int> { 8, 4 });
+            SetProperty(component, nameof(AddWorkflowConfiguration.Display), true);
+            SetField(component, "name", "Blank");
+
+            await InvokeAsync(component, "Save");
+
+            Assert.That(api.Calls, Has.Count.EqualTo(1));
+            JObject variables = JObject.FromObject(api.Calls.Single().Variables!);
+            JArray mappings = (JArray)variables["phaseMappings"]!;
+            Assert.Multiple(() =>
+            {
+                Assert.That(api.Calls[0].Query, Is.EqualTo(RequestQueries.createWorkflowConfiguration));
+                Assert.That(mappings, Has.Count.EqualTo(Enum.GetValues<WfTaskType>().Length * Enum.GetValues<WorkflowPhases>().Length));
+                Assert.That(mappings.All(mapping => (int?)mapping["state_matrix_phase"]?["data"]?["lowest_input_state"] == 4), Is.True);
+                Assert.That(mappings.All(mapping => (bool?)mapping["state_matrix_phase"]?["data"]?["active"] == false), Is.True);
             });
         }
 

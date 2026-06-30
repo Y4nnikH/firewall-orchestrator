@@ -8,6 +8,9 @@
 @inject ApiConnection apiConnection
 @inject GlobalConfig globalConfig
 @inject UserConfig userConfig
+@inject NavigationManager navigationManager
+
+<NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
 
 @if(InitComplete && HasCompleteMatrix)
 {
@@ -27,7 +30,7 @@
                 <button type="button" class="btn btn-sm btn-warning" @onclick="OpenTransitionGroupManager">
                     @(DisplayService.DisplayButton(userConfig, "edit_transition_groups", Icons.Edit, "", Icons.Matrix))
                 </button>
-                <button type="button" class="btn btn-sm btn-success" @onclick="() => AddConfigurationMode = true">
+                <button type="button" class="btn btn-sm btn-success" @onclick="OpenAddConfiguration">
                     @(DisplayService.DisplayButton(userConfig, "add_configuration", Icons.Add))
                 </button>
             </div>
@@ -69,16 +72,19 @@
                 </ElementTemplate>
             </Dropdown>
         </div>
-        <div class="col-sm-2">
-            <ExecutionModeAuthorizeView Roles="@Roles.Admin">
-                <Authorized>
-                    <button type="button" class="btn btn-sm btn-primary" @onclick="InitSaveMatrix" @onclick:preventDefault>@(DisplayService.DisplayButton(userConfig, "save", Icons.Save))</button>
-                </Authorized>
-                <NotAuthorized>
-                    <button type="button" class="btn btn-sm btn-primary" disabled>@(DisplayService.DisplayButton(userConfig, "save", Icons.Save))</button>
-                </NotAuthorized>
-            </ExecutionModeAuthorizeView>
-        </div>
+        @if (HasUnsavedChanges)
+        {
+            <div class="col-sm-2">
+                <ExecutionModeAuthorizeView Roles="@Roles.Admin">
+                    <Authorized>
+                        <button type="button" class="btn btn-sm btn-primary" @onclick="InitSaveMatrix" @onclick:preventDefault>@(DisplayService.DisplayButton(userConfig, "save", Icons.Save))</button>
+                    </Authorized>
+                    <NotAuthorized>
+                        <button type="button" class="btn btn-sm btn-primary" disabled>@(DisplayService.DisplayButton(userConfig, "save", Icons.Save))</button>
+                    </NotAuthorized>
+                </ExecutionModeAuthorizeView>
+            </div>
+        }
     </div>
 
     @foreach (WorkflowPhases phase in Enum.GetValues(typeof(WorkflowPhases)))
@@ -259,11 +265,14 @@
         </Footer>
     </PopUp>
     <Confirm @bind-Display="SaveMatrixMode" PerformAction="SaveMatrix" Title="@(userConfig.GetText("save_settings"))" Message="@(userConfig.GetText("U5315"))" />
+    <Confirm Display="DiscardChangesMode" DisplayChanged="DiscardChangesDisplayChanged" PerformAction="ConfirmDiscardChanges"
+             AllowedRoles="@($"{Roles.Admin}, {Roles.Auditor}")" Title="@(userConfig.GetText("unsaved_changes"))"
+             Message="@(userConfig.GetText("discard_unsaved_changes"))" />
     <EditWorkflowVisibilityGroups @bind-Display="EditVisibilityGroupsMode" />
-    <EditStateMatrixTransitionGroups @bind-Display="EditTransitionGroupsMode" States="states" TransitionGroupsChanged="InitMatrix"
+    <EditStateMatrixTransitionGroups @bind-Display="EditTransitionGroupsMode" States="states" TransitionGroupsChanged="RefreshTransitionGroups"
                                      TransitionGroupIdToEdit="transitionGroupIdToEdit" />
-    <AddWorkflowConfiguration @bind-Display="AddConfigurationMode" SourceConfiguration="SelectedConfiguration"
-                              ExistingConfigurations="workflowConfigurations" ConfigurationCreated="SelectCreatedConfiguration" />
+    <AddWorkflowConfiguration @bind-Display="AddConfigurationMode" ExistingConfigurations="workflowConfigurations"
+                              StateIds="stateIds" ConfigurationCreated="SelectCreatedConfiguration" />
     <ConfirmDelete @bind-Display="DeleteConfigurationMode" PerformAction="DeleteSelectedConfiguration" AllowedRoles="@Roles.Admin"
                    Title="@userConfig.GetText("delete_configuration")" DeleteMessage="@DeleteConfigurationMessage" />
     <ConfirmDelete @bind-Display="DeleteTransitionGroupMode" PerformAction="DeleteSelectedTransitionGroup" AllowedRoles="@Roles.Admin"
@@ -309,6 +318,10 @@ else
     private bool LinkTransitionGroupMode = false;
     private bool UnlinkTransitionGroupMode = false;
     private bool EditDerivedStateMode = false;
+    private bool DiscardChangesMode = false;
+    private bool bypassNavigationGuard;
+    private Func<Task>? pendingDiscardAction;
+    private Action? pendingDiscardCancellation;
     private WorkflowPhases derivedStatePhase;
     private int? originalDerivedFromStateId;
     private int selectedDerivedFromStateId;
@@ -318,6 +331,7 @@ else
     private bool InitComplete = false;
     private bool HasCompleteMatrix => actStateMatrix.GlobalMatrix != null && Enum.GetValues<WorkflowPhases>().All(phase =>
         actStateMatrix.GlobalMatrix.TryGetValue(phase, out StateMatrix? matrix) && matrix != null);
+    private bool HasUnsavedChanges => InitComplete && actStateMatrix.HasUnsavedChanges();
 
     protected override async Task OnInitializedAsync()
     {
@@ -380,7 +394,7 @@ else
             {
                 await actStateMatrix.Init(apiConnection, actTaskType);
             }
-            transitionGroups = await apiConnection.SendQueryAsync<List<StateMatrixTransitionGroup>>(RequestQueries.getStateMatrixTransitionGroups);
+            await RefreshTransitionGroups();
         }
         catch (Exception exception)
         {
@@ -388,16 +402,35 @@ else
         }
     }
 
-    private async Task ChangeConfiguration(int configurationId)
+    private Task ChangeConfiguration(int configurationId)
     {
+        if (configurationId == selectedConfigurationId)
+        {
+            return Task.CompletedTask;
+        }
+        int previousConfigurationId = selectedConfigurationId;
         selectedConfigurationId = configurationId;
-        await InitMatrix();
+        return ExecuteOrConfirmDiscard(InitMatrix, () => selectedConfigurationId = previousConfigurationId);
     }
 
-    private async Task SelectCreatedConfiguration(int configurationId)
+    private Task SelectCreatedConfiguration(int configurationId) => ExecuteOrConfirmDiscard(async () =>
     {
         await RefreshConfigurations(configurationId);
         await InitMatrix();
+    });
+
+    private async Task OpenAddConfiguration()
+    {
+        if (!HasUnsavedChanges)
+        {
+            AddConfigurationMode = true;
+            return;
+        }
+        await ExecuteOrConfirmDiscard(async () =>
+        {
+            await InitMatrix();
+            AddConfigurationMode = true;
+        });
     }
 
     private string ConfigurationDisplayName(int configurationId)
@@ -477,10 +510,35 @@ else
             .ToList();
     }
 
-    private async Task ChangeTaskType(WfTaskType taskType)
+    private Task ChangeTaskType(WfTaskType taskType)
     {
+        if (taskType == actTaskType)
+        {
+            return Task.CompletedTask;
+        }
+        WfTaskType previousTaskType = actTaskType;
         actTaskType = taskType;
-        await InitMatrix();
+        return ExecuteOrConfirmDiscard(InitMatrix, () => actTaskType = previousTaskType);
+    }
+
+    /// <summary>
+    /// Reloads separately persisted transition groups without replacing deferred matrix edits.
+    /// </summary>
+    private async Task RefreshTransitionGroups()
+    {
+        transitionGroups = await apiConnection.SendQueryAsync<List<StateMatrixTransitionGroup>>(RequestQueries.getStateMatrixTransitionGroups);
+        foreach (StateMatrixPhaseBinding binding in actStateMatrix.PhaseBindings.Values)
+        {
+            List<int> linkedGroupIds = transitionGroups
+                .SelectMany(group => group.PhaseMatrixUsages
+                    .Where(usage => usage.PhaseMatrixId == binding.PhaseMatrixId)
+                    .Select(usage => new { group.Id, usage.SortOrder }))
+                .OrderBy(usage => usage.SortOrder)
+                .Select(usage => usage.Id)
+                .ToList();
+            binding.TransitionGroupIds.Clear();
+            binding.TransitionGroupIds.AddRange(linkedGroupIds);
+        }
     }
 
     private List<StateMatrixTransitionGroup> GetPhaseTransitionGroups(WorkflowPhases phase)
@@ -632,7 +690,7 @@ else
                 sortOrder
             });
             LinkTransitionGroupMode = false;
-            await InitMatrix();
+            await RefreshTransitionGroups();
         }
         catch (Exception exception)
         {
@@ -662,7 +720,7 @@ else
                 phaseMatrixId = binding.PhaseMatrixId,
                 transitionGroupId = transitionGroupToUnlink.Id
             });
-            await InitMatrix();
+            await RefreshTransitionGroups();
         }
         catch (Exception exception)
         {
@@ -692,7 +750,7 @@ else
         try
         {
             await apiConnection.SendQueryAsync<ReturnId>(RequestQueries.deleteStateMatrixTransitionGroup, new { id = transitionGroupToDelete.Id });
-            await InitMatrix();
+            await RefreshTransitionGroups();
         }
         catch (Exception exception)
         {
@@ -717,5 +775,65 @@ else
         {
             DisplayMessageInUi(exception, userConfig.GetText("save_settings"), "", true);
         }
+    }
+
+    private async Task ExecuteOrConfirmDiscard(Func<Task> action, Action? cancellation = null)
+    {
+        if (!HasUnsavedChanges)
+        {
+            await action();
+            return;
+        }
+        pendingDiscardAction = action;
+        pendingDiscardCancellation = cancellation;
+        DiscardChangesMode = true;
+    }
+
+    private async Task ConfirmDiscardChanges()
+    {
+        Func<Task>? action = pendingDiscardAction;
+        pendingDiscardAction = null;
+        pendingDiscardCancellation = null;
+        DiscardChangesMode = false;
+        if (action != null)
+        {
+            await action();
+        }
+    }
+
+    private Task DiscardChangesDisplayChanged(bool display)
+    {
+        DiscardChangesMode = display;
+        if (!display)
+        {
+            pendingDiscardCancellation?.Invoke();
+            pendingDiscardAction = null;
+            pendingDiscardCancellation = null;
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (bypassNavigationGuard)
+        {
+            bypassNavigationGuard = false;
+            return;
+        }
+        if (!HasUnsavedChanges)
+        {
+            return;
+        }
+        context.PreventNavigation();
+        string targetLocation = context.TargetLocation;
+        pendingDiscardAction = () =>
+        {
+            bypassNavigationGuard = true;
+            navigationManager.NavigateTo(targetLocation);
+            return Task.CompletedTask;
+        };
+        pendingDiscardCancellation = null;
+        DiscardChangesMode = true;
+        await InvokeAsync(StateHasChanged);
     }
 }

@@ -226,6 +226,24 @@ namespace FWO.Services.Workflow
             await repository.Update(apiConnection, this);
         }
 
+        /// <summary>
+        /// Determines whether deferred phase or derived-state values differ from the loaded snapshot.
+        /// Transition values are persisted separately and are intentionally ignored.
+        /// </summary>
+        public bool HasUnsavedChanges()
+        {
+            if (OriginalGlobalMatrix.Count == 0)
+            {
+                return false;
+            }
+            if (GlobalMatrix.Count != OriginalGlobalMatrix.Count)
+            {
+                return true;
+            }
+            return GlobalMatrix.Any(entry => !OriginalGlobalMatrix.TryGetValue(entry.Key, out StateMatrix? original)
+                || HasChangedDeferredValues(entry.Value, original));
+        }
+
         internal void AcceptChanges(Dictionary<WorkflowPhases, Dictionary<(int FromStateId, int ToStateId), int>> transitionSortOrders)
         {
             foreach ((WorkflowPhases phase, Dictionary<(int FromStateId, int ToStateId), int> sortOrders) in transitionSortOrders)
@@ -258,6 +276,19 @@ namespace FWO.Services.Workflow
                 Active = source.Active
             };
         }
+
+        private static bool HasChangedDeferredValues(StateMatrix current, StateMatrix original)
+        {
+            return current.Active != original.Active
+                || current.LowestInputState != original.LowestInputState
+                || current.LowestStartedState != original.LowestStartedState
+                || current.LowestEndState != original.LowestEndState
+                || !SparseDerivedStates(current).OrderBy(entry => entry.Key).SequenceEqual(
+                    SparseDerivedStates(original).OrderBy(entry => entry.Key));
+        }
+
+        private static IEnumerable<KeyValuePair<int, int>> SparseDerivedStates(StateMatrix matrix) =>
+            matrix.DerivedStates.Where(entry => entry.Key != entry.Value);
     }
 
     public class StateMatrixDict

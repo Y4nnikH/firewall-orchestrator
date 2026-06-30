@@ -17,11 +17,14 @@ namespace FWO.Test
             Assert.Multiple(() =>
             {
                 Assert.That(RequestQueries.getWorkflowVisibilityGroups, Does.Contain("query getWorkflowVisibilityGroups"));
+                Assert.That(RequestQueries.getWorkflowVisibilityGroups, Does.Not.Contain("is_active"));
                 Assert.That(RequestQueries.getStateMatrixTransitionGroups, Does.Contain("query getStateMatrixTransitionGroups"));
                 Assert.That(RequestQueries.getStateMatrixTransitionGroups, Does.Contain("state_matrix_phase_transition_groups"));
                 Assert.That(RequestQueries.getStateMatrixTransitionGroups, Does.Not.Contain("workflow_visibility_group_members"));
                 Assert.That(RequestQueries.createWorkflowConfiguration, Does.Contain("mutation createWorkflowConfiguration"));
                 Assert.That(RequestQueries.deleteWorkflowVisibilityGroup, Does.Contain("mutation deleteWorkflowVisibilityGroup"));
+                Assert.That(RequestQueries.createWorkflowVisibilityGroup, Does.Not.Contain("isActive"));
+                Assert.That(RequestQueries.updateWorkflowVisibilityGroup, Does.Not.Contain("isActive"));
                 Assert.That(RequestQueries.deleteStateMatrixTransitionGroup, Does.Contain("mutation deleteStateMatrixTransitionGroup"));
                 Assert.That(RequestQueries.linkStateMatrixTransitionGroup, Does.Contain("mutation linkStateMatrixTransitionGroup"));
                 Assert.That(RequestQueries.unlinkStateMatrixTransitionGroup, Does.Contain("mutation unlinkStateMatrixTransitionGroup"));

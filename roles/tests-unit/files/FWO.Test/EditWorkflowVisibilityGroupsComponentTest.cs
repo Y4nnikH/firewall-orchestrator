@@ -29,7 +29,6 @@ namespace FWO.Test
                 Id = 7,
                 Name = "Operators",
                 Description = "Original",
-                IsActive = false,
                 Members = [new() { VisibilityGroupId = 7, MemberDn = "cn=a" }]
             };
 
@@ -41,7 +40,7 @@ namespace FWO.Test
             Assert.Multiple(() =>
             {
                 Assert.That(clone.Id, Is.EqualTo(7));
-                Assert.That(clone.IsActive, Is.False);
+                Assert.That(clone.Description, Is.EqualTo("Original"));
                 Assert.That(source.Name, Is.EqualTo("Operators"));
                 Assert.That(source.Members.Select(member => member.MemberDn), Is.EqualTo(new[] { "cn=a" }));
             });
@@ -113,7 +112,7 @@ namespace FWO.Test
             Assert.Multiple(() =>
             {
                 Assert.That(GetField<bool>(component, "EditMode"), Is.True);
-                Assert.That(GetField<WorkflowVisibilityGroup>(component, "editGroup").IsActive, Is.True);
+                Assert.That(GetField<WorkflowVisibilityGroup>(component, "editGroup").Id, Is.Zero);
             });
 
             WorkflowVisibilityGroup source = new() { Id = 4, Name = "Source", Members = [new() { MemberDn = "cn=a" }] };
@@ -195,8 +194,7 @@ namespace FWO.Test
             {
                 Id = groupId,
                 Name = "  Group  ",
-                Description = "   ",
-                IsActive = false
+                Description = "   "
             });
             SetField(component, "originalGroup", new WorkflowVisibilityGroup { Id = groupId });
 
@@ -209,7 +207,7 @@ namespace FWO.Test
                 Assert.That(mutationCall.Query, Does.Contain(expectedOperation));
                 Assert.That((string?)variables["name"], Is.EqualTo("Group"));
                 Assert.That(variables["description"]?.Type, Is.EqualTo(JTokenType.Null));
-                Assert.That((bool?)variables["isActive"], Is.False);
+                Assert.That(variables["isActive"], Is.Null);
                 Assert.That(variables["id"] != null, Is.EqualTo(expectsId));
             });
         }

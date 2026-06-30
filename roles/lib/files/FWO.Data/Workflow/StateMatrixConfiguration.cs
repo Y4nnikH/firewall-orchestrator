@@ -150,9 +150,6 @@ namespace FWO.Data.Workflow
         [JsonProperty("description"), JsonPropertyName("description")]
         public string? Description { get; set; }
 
-        [JsonProperty("is_active"), JsonPropertyName("is_active")]
-        public bool IsActive { get; set; } = true;
-
         [JsonProperty("workflow_visibility_group_members"), JsonPropertyName("workflow_visibility_group_members")]
         public List<WorkflowVisibilityGroupMember> Members
         {

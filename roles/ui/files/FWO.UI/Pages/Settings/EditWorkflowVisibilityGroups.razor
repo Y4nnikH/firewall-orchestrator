@@ -28,11 +28,6 @@
                 </Column>
                 <Column TableItem="WorkflowVisibilityGroup" Title="@(userConfig.GetText("name"))" Field="@(group => group.Name)" Sortable="true" Filterable="true" />
                 <Column TableItem="WorkflowVisibilityGroup" Title="@(userConfig.GetText("description"))" Field="@(group => group.Description)" Sortable="true" Filterable="true" />
-                <Column TableItem="WorkflowVisibilityGroup" Title="@(userConfig.GetText("active"))" Field="@(group => group.IsActive)" Sortable="true" Filterable="true">
-                    <Template>
-                        <input type="checkbox" checked="@context.IsActive" disabled />
-                    </Template>
-                </Column>
                 <Column TableItem="WorkflowVisibilityGroup" Title="@(userConfig.GetText("members"))" Field="@(group => group.Id)" Sortable="false" Filterable="false">
                     <Template>
                         @string.Join(", ", context.Members.Select(member => member.MemberDn))
@@ -59,10 +54,6 @@
             <div class="form-group row mb-2">
                 <label class="col-sm-3 col-form-label col-form-label-sm">@(userConfig.GetText("description")):</label>
                 <div class="col-sm-9"><textarea class="form-control form-control-sm" @bind="editGroup.Description"></textarea></div>
-            </div>
-            <div class="form-group row mb-3">
-                <label class="col-sm-3 col-form-label col-form-label-sm" for="visibility-group-active">@(userConfig.GetText("active")):</label>
-                <div class="col-sm-9"><input id="visibility-group-active" type="checkbox" @bind="editGroup.IsActive" /></div>
             </div>
             <h6>@(userConfig.GetText("members"))</h6>
             <div class="input-group input-group-sm mb-2">
@@ -225,8 +216,7 @@
                 ReturnId result = await apiConnection.SendQueryAsync<ReturnId>(RequestQueries.createWorkflowVisibilityGroup, new
                 {
                     name = editGroup.Name,
-                    description = editGroup.Description,
-                    isActive = editGroup.IsActive
+                    description = editGroup.Description
                 });
                 groupId = result.NewId;
             }
@@ -236,8 +226,7 @@
                 {
                     id = groupId,
                     name = editGroup.Name,
-                    description = editGroup.Description,
-                    isActive = editGroup.IsActive
+                    description = editGroup.Description
                 });
             }
             await SaveMembers(groupId);
@@ -273,7 +262,6 @@
         Id = group.Id,
         Name = group.Name,
         Description = group.Description,
-        IsActive = group.IsActive,
         Members = group.Members.Select(member => new WorkflowVisibilityGroupMember
         {
             VisibilityGroupId = member.VisibilityGroupId,

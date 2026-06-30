@@ -168,6 +168,45 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task HasUnsavedChanges_DetectsDeferredValuesAndResetsAfterSave()
+        {
+            GlobalStateMatrix source = new()
+            {
+                GlobalMatrix = Enum.GetValues<WorkflowPhases>().ToDictionary(phase => phase, _ => new StateMatrix())
+            };
+            StateMatrixApiConnection apiConnection = new(StateMatrixConfigurationTestHelper.FromGlobalMatrix(source));
+            GlobalStateMatrix matrix = new();
+            await matrix.Init(apiConnection);
+
+            Assert.That(matrix.HasUnsavedChanges(), Is.False);
+            matrix.GlobalMatrix[WorkflowPhases.request].LowestStartedState = 12;
+            Assert.That(matrix.HasUnsavedChanges(), Is.True);
+
+            await matrix.Save(apiConnection);
+
+            Assert.That(matrix.HasUnsavedChanges(), Is.False);
+        }
+
+        [Test]
+        public async Task HasUnsavedChanges_IgnoresIdentityDerivedStatesAndTransitions()
+        {
+            GlobalStateMatrix source = new()
+            {
+                GlobalMatrix = Enum.GetValues<WorkflowPhases>().ToDictionary(phase => phase, _ => new StateMatrix())
+            };
+            GlobalStateMatrix matrix = new();
+            await matrix.Init(new StateMatrixApiConnection(StateMatrixConfigurationTestHelper.FromGlobalMatrix(source)));
+            StateMatrix requestMatrix = matrix.GlobalMatrix[WorkflowPhases.request];
+
+            requestMatrix.DerivedStates[4] = 4;
+            requestMatrix.Matrix[1] = [2];
+
+            Assert.That(matrix.HasUnsavedChanges(), Is.False);
+            requestMatrix.DerivedStates[4] = 7;
+            Assert.That(matrix.HasUnsavedChanges(), Is.True);
+        }
+
+        [Test]
         public async Task GlobalStateMatrixSave_WritesOnlyAddedAndRemovedTransitions()
         {
             GlobalStateMatrix source = new()

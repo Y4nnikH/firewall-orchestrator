@@ -3,7 +3,6 @@ query getWorkflowMatrixGroups {
     id
     name
     description
-    is_active
     workflow_visibility_group_members(order_by: {member_dn: asc}) {
       visibility_group_id
       member_dn

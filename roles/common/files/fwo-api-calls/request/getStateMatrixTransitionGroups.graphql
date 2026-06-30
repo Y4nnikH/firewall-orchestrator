@@ -9,7 +9,6 @@ query getStateMatrixTransitionGroups {
       id
       name
       description
-      is_active
     }
     state_matrix_phase_transition_groups(order_by: {phase_matrix_id: asc}) {
       phase_matrix_id
