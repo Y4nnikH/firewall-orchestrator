@@ -33,7 +33,7 @@ namespace FWO.Middleware.Server
         private string actTaskType = "";
         private List<IpProtocol> ipProtos = [];
         private List<UserGroup>? ownerGroups = [];
-
+        private bool actInternalWork = false;
 
         /// <summary>
         /// constructor for object with all data necessary for request handling
@@ -202,31 +202,48 @@ namespace FWO.Middleware.Server
         {
             int lastTaskNumber = UserConfig.ModRolloutBundleTasks && oldRequest != null && oldRequest.ExtQueryVariables != "" ?
                 GetLastTaskNumber(oldRequest.ExtQueryVariables, oldTaskNumber) : oldTaskNumber;
-            WfReqTask? nextTask = ticket.Tasks.FirstOrDefault(ta => ta.TaskNumber == lastTaskNumber + 1);
-            if (nextTask is null)
-            {
-                Log.WriteDebug("CreateNextRequest", "No more task found.");
-                return false;
-            }
-            GetExtSystemFromTask(nextTask);
 
-            int waitCycles = GetWaitCycles(nextTask.TaskType, oldRequest);
-            if (nextTask.TaskType == WfTaskType.access.ToString() || nextTask.TaskType == WfTaskType.rule_modify.ToString() || nextTask.TaskType == WfTaskType.rule_delete.ToString())
-            {
-                List<WfReqTask> bundledTasks = [];
-                List<WfReqTask> handledTasks = [nextTask];
-                BundleTasks(ticket, lastTaskNumber, nextTask, bundledTasks, handledTasks);
-                await CreateExtRequest(ticket, bundledTasks, handledTasks, waitCycles);
-            }
-            else
-            {
-                await CreateExtRequest(ticket, [nextTask], [nextTask], waitCycles);
-            }
+            bool handledTask = false;
 
-            Log.WriteInfo("CreateNextRequest", $"Created Request for ticket {ticket.Id}.");
-            return true;
+            while (true)
+            {
+                WfReqTask? nextTask = ticket.Tasks.FirstOrDefault(ta => ta.TaskNumber == lastTaskNumber + 1);
+                if (nextTask is null)
+                {
+                    Log.WriteDebug("CreateNextRequest", "No more task found.");
+                    return handledTask;
+                }
+                GetExtSystemFromTask(nextTask);
+
+                if (actInternalWork)
+                {
+                    await PromoteInternalWorkTaskToPlanning(ticket, nextTask);
+                    Log.WriteInfo("CreateNextRequest", $"Promoted internal work task {nextTask.TaskNumber} for ticket {ticket.Id} to planning.");
+
+                    handledTask = true;
+                    lastTaskNumber = nextTask.TaskNumber;
+                    oldRequest = null;
+                    ticket = await wfHandler.ResolveTicket(ticket.Id) ?? ticket;
+                    continue;
+                }
+
+                int waitCycles = GetWaitCycles(nextTask.TaskType, oldRequest);
+                if (nextTask.TaskType == WfTaskType.access.ToString() || nextTask.TaskType == WfTaskType.rule_modify.ToString() || nextTask.TaskType == WfTaskType.rule_delete.ToString())
+                {
+                    List<WfReqTask> bundledTasks = [];
+                    List<WfReqTask> handledTasks = [nextTask];
+                    BundleTasks(ticket, lastTaskNumber, nextTask, bundledTasks, handledTasks);
+                    await CreateExtRequest(ticket, bundledTasks, handledTasks, waitCycles);
+                }
+                else
+                {
+                    await CreateExtRequest(ticket, [nextTask], [nextTask], waitCycles);
+                }
+
+                Log.WriteInfo("CreateNextRequest", $"Created Request for ticket {ticket.Id}.");
+                return true;
+            }
         }
-
         private void BundleTasks(WfTicket ticket, int lastTaskNumber, WfReqTask nextTask, List<WfReqTask> bundledTasks, List<WfReqTask> handledTasks)   // ToDo check if same system?
         {
             int actTaskNumber = lastTaskNumber + 2;
@@ -305,6 +322,29 @@ namespace FWO.Middleware.Server
                 contentString.Contains("\"object_updated_status\":\"NEW\"") || contentString.Contains("object_updated_status\\u0022:\\u0022NEW\\u0022");
         }
 
+        private async Task PromoteInternalWorkTaskToPlanning(WfTicket ticket, WfReqTask task)
+        {
+            WfHandler planningHandler = new(UserConfig, ApiConnection, WorkflowPhases.planning, ownerGroups, new ComplianceRequestedRulePolicyChecker(UserConfig, ApiConnection));
+
+            if (!await planningHandler.Init())
+            {
+                throw new InvalidOperationException("Could not initialize planning workflow handler.");
+            }
+
+            WfTicket planningTicket = await planningHandler.ResolveTicket(ticket.Id) ?? throw new InvalidOperationException($"Ticket {ticket.Id} not found.");
+
+            WfReqTask planningTask = planningTicket.Tasks.FirstOrDefault(ta => ta.TaskNumber == task.TaskNumber) ?? throw new InvalidOperationException($"Task {task.TaskNumber} not found in ticket {ticket.Id}.");
+
+            StateMatrix planningMatrix = planningHandler.StateMatrix(planningTask.TaskType);
+            planningTask.StateId = planningMatrix.LowestInputState;
+
+            planningHandler.SetTicketEnv(planningTicket);
+            planningHandler.SetReqTaskEnv(planningTask);
+            await planningHandler.PromoteReqTask(planningTask);
+
+            await LogRequestTasks([planningTask], ticket.Requester?.Name, ModellingTypes.ChangeType.Request);
+        }
+
         private async Task CreateExtRequest(WfTicket ticket, List<WfReqTask> tasks, List<WfReqTask> handledTasks, int waitCycles)
         {
             string taskContent = await ConstructContent(tasks, ticket.Requester);
@@ -369,6 +409,8 @@ namespace FWO.Middleware.Server
 
         private void GetExtSystemFromTask(WfReqTask task)
         {
+            actInternalWork = false;
+
             ArgumentNullException.ThrowIfNull(task);
 
             var managementSettings = JsonSerializer.Deserialize<List<ManagementFwConfigChangeState>>(UserConfig.FwConfigChangeMgmSettings) ?? new List<ManagementFwConfigChangeState>();
@@ -383,10 +425,27 @@ namespace FWO.Middleware.Server
 
             string changeCategory = GetChangeCategory(task);    // object oder rule
 
-            if (!managementSetting.SelectedChanges.TryGetValue(changeCategory, out string? selectedSystemValue) || string.IsNullOrWhiteSpace(selectedSystemValue) || selectedSystemValue == "Disabled")
+            if (!managementSetting.SelectedChanges.TryGetValue(changeCategory, out string? selectedSystemValue) || string.IsNullOrWhiteSpace(selectedSystemValue) || selectedSystemValue == ManagementFwConfigChangeTargets.Disabled)
             {
                 throw new InvalidOperationException(
                     $"No external ticket system configured for management {task.ManagementId} and category '{changeCategory}'.");
+            }
+
+            if (selectedSystemValue == ManagementFwConfigChangeTargets.InternalWork)
+            {
+                if (changeCategory != ManagementFwConfigChangeCategories.RuleChanges)
+                {
+                    throw new InvalidOperationException("Internal work is only supported for rule changes.");
+                }
+
+                actInternalWork = true;
+                actTaskType = "";
+                actSystem = new ExternalTicketSystem
+                {
+                    Name = "Internal work",
+                    TypeId = BuiltInExternalTicketSystemTypes.GenericId
+                };
+                return;
             }
 
             if (!int.TryParse(selectedSystemValue, out int externalTicketSystemId))

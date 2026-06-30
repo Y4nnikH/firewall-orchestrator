@@ -15,6 +15,12 @@ namespace FWO.Data
         ];
     }
 
+    public static class ManagementFwConfigChangeTargets
+    {
+        public const string Disabled = "Disabled";
+        public const string InternalWork = "InternalWork";
+    }
+
     public class ManagementFwConfigChangeState
     {
         [JsonProperty(nameof(Id)), JsonPropertyName(nameof(Id))]
