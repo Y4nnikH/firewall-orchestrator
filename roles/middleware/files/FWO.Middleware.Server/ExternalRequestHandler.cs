@@ -204,6 +204,9 @@ namespace FWO.Middleware.Server
                 GetLastTaskNumber(oldRequest.ExtQueryVariables, oldTaskNumber) : oldTaskNumber;
 
             bool handledTask = false;
+            bool handledInternalWork = false;
+
+            //string? internalWorkBatchCategory = null;
 
             while (true)
             {
@@ -213,14 +216,30 @@ namespace FWO.Middleware.Server
                     Log.WriteDebug("CreateNextRequest", "No more task found.");
                     return handledTask;
                 }
+
+                if (handledInternalWork && !IsInternalWorkConfiguredForTask(nextTask))
+                {
+                    Log.WriteInfo("CreateNextRequest", $"Internal work batch for ticket {ticket.Id} created. Waiting for completion before task {nextTask.TaskNumber}.");
+                    return true;
+                }
+
                 GetExtSystemFromTask(nextTask);
+                //string changeCategory = GetChangeCategory(nextTask);
 
                 if (actInternalWork)
                 {
+                    //internalWorkBatchCategory ??= changeCategory;
+
+                    //if (changeCategory != internalWorkBatchCategory)
+                    //{
+                    //    return true;
+                    //}
+
                     await PromoteInternalWorkTaskToPlanning(ticket, nextTask);
                     Log.WriteInfo("CreateNextRequest", $"Promoted internal work task {nextTask.TaskNumber} for ticket {ticket.Id} to planning.");
 
                     handledTask = true;
+                    handledInternalWork = true;
                     lastTaskNumber = nextTask.TaskNumber;
                     oldRequest = null;
                     ticket = await wfHandler.ResolveTicket(ticket.Id) ?? ticket;
@@ -244,6 +263,103 @@ namespace FWO.Middleware.Server
                 return true;
             }
         }
+
+        private bool IsInternalWorkConfiguredForTask(WfReqTask task)
+        {
+            try
+            {
+                string changeCategory = GetChangeCategory(task);
+
+                var managementSettings = JsonSerializer.Deserialize<List<ManagementFwConfigChangeState>>(UserConfig.FwConfigChangeMgmSettings) ?? [];
+                ManagementFwConfigChangeState? managementSetting = managementSettings.FirstOrDefault(m => m.Id == task.ManagementId);
+
+                return managementSetting?.Enabled == true
+                    && managementSetting.SelectedChanges.TryGetValue(changeCategory, out string? selectedSystemValue)
+                    && selectedSystemValue == ManagementFwConfigChangeTargets.InternalWork;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsInternalWorkTask(WfReqTask task)
+        {
+            return task.GetAddInfoValue(AdditionalInfoKeys.FwConfigChangeTarget) == ManagementFwConfigChangeTargets.InternalWork;
+        }
+
+
+        /// <summary>
+        /// Continues the external request chain after an internal work request task has completed.
+        /// </summary>
+        /// <param name="ticketId">The ID of the workflow ticket that contains the internal work task.</param>
+        /// <param name="reqTaskId">The ID of the completed internal work request task.</param>
+        /// <returns>
+        /// <c>true</c> if the request chain was continued or a following task was started; otherwise <c>false</c>.
+        /// </returns>
+        public async Task<bool> ContinueAfterInternalWorkCompletion(long ticketId, long reqTaskId)
+        {
+            WfTicket? ticket = await InitAndResolve(ticketId);
+            if (ticket == null)
+            {
+                return false;
+            }
+
+            WfReqTask? changedTask = ticket.Tasks.FirstOrDefault(task => task.Id == reqTaskId);
+            if (changedTask == null || !IsInternalWorkTask(changedTask))
+            {
+                return false;
+            }
+
+            List<WfReqTask> batch = GetInternalWorkBatch(ticket, changedTask);
+            if (batch.Count == 0 || !await InternalWorkBatchIsCompleted(batch))
+            {
+                return false;
+            }
+
+            int lastInternalTaskNumber = batch.Max(task => task.TaskNumber);
+            Log.WriteInfo("Internal Work", $"Internal work batch for ticket {ticket.Id} completed through task {lastInternalTaskNumber}. Continuing external request chain.");
+
+            return await CreateNextRequest(ticket, lastInternalTaskNumber, null);
+        }
+
+        private static List<WfReqTask> GetInternalWorkBatch(WfTicket ticket, WfReqTask task)
+        {
+            List<WfReqTask> orderedTasks = [.. ticket.Tasks.OrderBy(task => task.TaskNumber)];
+            int taskIndex = orderedTasks.FindIndex(candidate => candidate.Id == task.Id);
+            if (taskIndex < 0 || !IsInternalWorkTask(orderedTasks[taskIndex]))
+            {
+                return [];
+            }
+
+            int firstIndex = taskIndex;
+            while (firstIndex > 0 && IsInternalWorkTask(orderedTasks[firstIndex - 1]))
+            {
+                firstIndex--;
+            }
+
+            int lastIndex = taskIndex;
+            while (lastIndex + 1 < orderedTasks.Count && IsInternalWorkTask(orderedTasks[lastIndex + 1]))
+            {
+                lastIndex++;
+            }
+
+            return orderedTasks.GetRange(firstIndex, lastIndex - firstIndex + 1);
+        }
+
+        private async Task<bool> InternalWorkBatchIsCompleted(List<WfReqTask> batch)
+        {
+            WfHandler implementationHandler = new(UserConfig, ApiConnection, WorkflowPhases.implementation, ownerGroups,
+                new ComplianceRequestedRulePolicyChecker(UserConfig, ApiConnection));
+
+            if (!await implementationHandler.Init())
+            {
+                throw new InvalidOperationException("Could not initialize implementation workflow handler.");
+            }
+
+            return batch.All(task => task.StateId >= implementationHandler.StateMatrix(task.TaskType).LowestEndState);
+        }
+
         private void BundleTasks(WfTicket ticket, int lastTaskNumber, WfReqTask nextTask, List<WfReqTask> bundledTasks, List<WfReqTask> handledTasks)   // ToDo check if same system?
         {
             int actTaskNumber = lastTaskNumber + 2;
@@ -340,6 +456,8 @@ namespace FWO.Middleware.Server
 
             planningHandler.SetTicketEnv(planningTicket);
             planningHandler.SetReqTaskEnv(planningTask);
+
+            await planningHandler.SetAddInfoInReqTask(planningTask, AdditionalInfoKeys.FwConfigChangeTarget, ManagementFwConfigChangeTargets.InternalWork);
             await planningHandler.PromoteReqTask(planningTask);
 
             await LogRequestTasks([planningTask], ticket.Requester?.Name, ModellingTypes.ChangeType.Request);
@@ -433,11 +551,6 @@ namespace FWO.Middleware.Server
 
             if (selectedSystemValue == ManagementFwConfigChangeTargets.InternalWork)
             {
-                if (changeCategory != ManagementFwConfigChangeCategories.RuleChanges)
-                {
-                    throw new InvalidOperationException("Internal work is only supported for rule changes.");
-                }
-
                 actInternalWork = true;
                 actTaskType = "";
                 actSystem = new ExternalTicketSystem
