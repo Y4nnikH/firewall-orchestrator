@@ -5,6 +5,7 @@ query getStateMatrixTransitionGroups {
     description
     phase
     visibility_group_id
+    exclusive
     workflow_visibility_group {
       id
       name

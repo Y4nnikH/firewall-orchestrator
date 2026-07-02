@@ -49,8 +49,11 @@ CREATE TABLE IF NOT EXISTS request.state_matrix_transition_group
     name Varchar NOT NULL UNIQUE,
     description text,
     phase Varchar,
-    visibility_group_id int
+    visibility_group_id int,
+    exclusive boolean NOT NULL DEFAULT FALSE
 );
+
+ALTER TABLE request.state_matrix_transition_group ADD COLUMN IF NOT EXISTS exclusive boolean NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS request.state_matrix_phase_transition_group
 (

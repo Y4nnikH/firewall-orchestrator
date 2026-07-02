@@ -105,6 +105,63 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task ResolveTicket_ReturnsNull_WhenVisibilityGroupDoesNotMatch()
+        {
+            TicketTestApiConn apiConn = new() { Ticket = new WfTicket { Id = 7, StateId = 10 } };
+            UserConfig userConfig = new();
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds = new Dictionary<int, List<int>>
+                {
+                    [10] = [3]
+                }
+            };
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Null);
+        }
+
+        [Test]
+        public async Task ResolveTicket_ReturnsNull_WhenUntaggedStateIsBlockedByExclusiveMembership()
+        {
+            TicketTestApiConn apiConn = new() { Ticket = new WfTicket { Id = 7, StateId = 10 } };
+            UserConfig userConfig = new();
+            userConfig.User.WorkflowVisibilityGroupIds = [7];
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                ExclusiveVisibilityGroupIds = [7]
+            };
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Null);
+        }
+
+        [Test]
+        public async Task ResolveTicket_AllowsVisibilityGroupMember()
+        {
+            TicketTestApiConn apiConn = new() { Ticket = new WfTicket { Id = 7, StateId = 10 } };
+            UserConfig userConfig = new();
+            userConfig.User.WorkflowVisibilityGroupIds = [3];
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds = new Dictionary<int, List<int>>
+                {
+                    [10] = [3]
+                }
+            };
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Not.Null);
+            Assert.That(ticket!.Id, Is.EqualTo(7));
+        }
+
+        [Test]
         public async Task HandleInjectedTicketId_ReturnsEmpty_WhenStateBeforeEnd()
         {
             TicketTestApiConn apiConn = new() { Ticket = new WfTicket { Id = 7, StateId = 5 } };

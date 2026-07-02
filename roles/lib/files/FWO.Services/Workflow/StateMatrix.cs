@@ -26,6 +26,12 @@ namespace FWO.Services.Workflow
         [JsonProperty("active"), JsonPropertyName("active")]
         public bool Active { get; set; }
 
+        [Newtonsoft.Json.JsonIgnore, System.Text.Json.Serialization.JsonIgnore]
+        public Dictionary<int, List<int>> StateVisibilityGroupIds { get; set; } = [];
+
+        [Newtonsoft.Json.JsonIgnore, System.Text.Json.Serialization.JsonIgnore]
+        public HashSet<int> ExclusiveVisibilityGroupIds { get; set; } = [];
+
         public HashSet<int> AutomaticOnlyStates { get; set; } = [];
         public Dictionary<WorkflowPhases, bool> PhaseActive = [];
         public bool IsLastActivePhase = true;
@@ -91,6 +97,43 @@ namespace FWO.Services.Workflow
             }
 
             return value.Where(stateId => !AutomaticOnlyStates.Contains(stateId)).ToList();
+        }
+
+        /// <summary>
+        /// Returns the visibility groups that protect the given state.
+        /// </summary>
+        public List<int> GetVisibilityGroupIds(int stateId)
+        {
+            return StateVisibilityGroupIds.TryGetValue(stateId, out List<int>? visibilityGroupIds)
+                ? visibilityGroupIds
+                : [];
+        }
+
+        /// <summary>
+        /// Returns true when the given visibility-group ids grant access to the state.
+        /// </summary>
+        public bool CanAccessState(int stateId, IEnumerable<int> userVisibilityGroupIds)
+        {
+            List<int> requiredGroupIds = GetVisibilityGroupIds(stateId);
+            if (requiredGroupIds.Count == 0)
+            {
+                // Untagged states stay visible unless the user belongs to an exclusive visibility group.
+                return !HasExclusiveVisibilityGroupMembership(userVisibilityGroupIds);
+            }
+
+            HashSet<int> allowedGroupIds = userVisibilityGroupIds as HashSet<int> ?? userVisibilityGroupIds.ToHashSet();
+            return requiredGroupIds.Any(allowedGroupIds.Contains);
+        }
+
+        private bool HasExclusiveVisibilityGroupMembership(IEnumerable<int> userVisibilityGroupIds)
+        {
+            if (ExclusiveVisibilityGroupIds.Count == 0)
+            {
+                return false;
+            }
+
+            HashSet<int> allowedGroupIds = userVisibilityGroupIds as HashSet<int> ?? userVisibilityGroupIds.ToHashSet();
+            return ExclusiveVisibilityGroupIds.Any(allowedGroupIds.Contains);
         }
 
         public int getDerivedStateFromSubStates(List<int> statesIn)
@@ -273,7 +316,9 @@ namespace FWO.Services.Workflow
                 LowestInputState = source.LowestInputState,
                 LowestStartedState = source.LowestStartedState,
                 LowestEndState = source.LowestEndState,
-                Active = source.Active
+                Active = source.Active,
+                StateVisibilityGroupIds = source.StateVisibilityGroupIds.ToDictionary(entry => entry.Key, entry => entry.Value.ToList()),
+                ExclusiveVisibilityGroupIds = [.. source.ExclusiveVisibilityGroupIds]
             };
         }
 

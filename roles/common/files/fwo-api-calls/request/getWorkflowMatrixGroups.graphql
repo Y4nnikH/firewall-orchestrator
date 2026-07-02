@@ -14,6 +14,7 @@ query getWorkflowMatrixGroups {
     description
     phase
     visibility_group_id
+    exclusive
     state_matrix_transitions(order_by: [{from_state_id: asc}, {sort_order: asc}]) {
       from_state_id
       to_state_id

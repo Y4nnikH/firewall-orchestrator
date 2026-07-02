@@ -67,6 +67,8 @@ namespace FWO.Services.Workflow
                 }
 
                 StateMatrixPhase phaseData = configurationPhase.PhaseMatrix;
+                Dictionary<int, HashSet<int>> stateVisibilityGroupIds = [];
+                HashSet<int> exclusiveVisibilityGroupIds = [];
                 StateMatrix matrix = new()
                 {
                     Active = phaseData.Active,
@@ -78,10 +80,21 @@ namespace FWO.Services.Workflow
 
                 foreach (StateMatrixPhaseTransitionGroup groupLink in phaseData.TransitionGroups.OrderBy(group => group.SortOrder))
                 {
+                    int? visibilityGroupId = groupLink.TransitionGroup.VisibilityGroupId;
+                    if (visibilityGroupId != null && groupLink.TransitionGroup.Exclusive)
+                    {
+                        exclusiveVisibilityGroupIds.Add(visibilityGroupId.Value);
+                    }
                     foreach (StateMatrixTransition transition in groupLink.TransitionGroup.Transitions
                         .OrderBy(transition => transition.FromStateId)
                         .ThenBy(transition => transition.SortOrder))
                     {
+                        if (visibilityGroupId != null)
+                        {
+                            AddStateVisibilityGroupId(stateVisibilityGroupIds, transition.FromStateId, visibilityGroupId.Value);
+                            AddStateVisibilityGroupId(stateVisibilityGroupIds, transition.ToStateId, visibilityGroupId.Value);
+                        }
+
                         if (!matrix.Matrix.TryGetValue(transition.FromStateId, out List<int>? targets))
                         {
                             targets = [];
@@ -93,6 +106,9 @@ namespace FWO.Services.Workflow
                         }
                     }
                 }
+
+                matrix.StateVisibilityGroupIds = stateVisibilityGroupIds.ToDictionary(entry => entry.Key, entry => entry.Value.ToList());
+                matrix.ExclusiveVisibilityGroupIds = exclusiveVisibilityGroupIds;
 
                 matrices.Add(phase, matrix);
                 bindings.Add(phase, new(
@@ -267,6 +283,17 @@ namespace FWO.Services.Workflow
         {
             return left.Matrix.Count == right.Matrix.Count && left.Matrix.All(entry =>
                 right.Matrix.TryGetValue(entry.Key, out List<int>? targets) && entry.Value.SequenceEqual(targets));
+        }
+
+        private static void AddStateVisibilityGroupId(Dictionary<int, HashSet<int>> stateVisibilityGroupIds, int stateId, int visibilityGroupId)
+        {
+            if (!stateVisibilityGroupIds.TryGetValue(stateId, out HashSet<int>? visibilityGroupIds))
+            {
+                visibilityGroupIds = [];
+                stateVisibilityGroupIds[stateId] = visibilityGroupIds;
+            }
+
+            visibilityGroupIds.Add(visibilityGroupId);
         }
     }
 

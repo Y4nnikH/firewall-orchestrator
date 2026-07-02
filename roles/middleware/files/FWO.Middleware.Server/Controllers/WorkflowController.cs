@@ -155,6 +155,7 @@ namespace FWO.Middleware.Server.Controllers
         {
             using UserConfig userConfig = UserConfig.ForGlobalSettings(globalConfig, actionApiConnection, globalConfig.DefaultLanguage);
             WfHandler wfHandler = CreateWorkflowHandler(actionApiConnection, userConfig, phase, result);
+            wfHandler.userConfig.User.WorkflowVisibilityGroupIds = GetClaimIds(User, "x-hasura-workflow-visibility-groups").ToList();
             if (!await InitWorkflowHandler(wfHandler, result))
             {
                 return result;
@@ -177,6 +178,12 @@ namespace FWO.Middleware.Server.Controllers
             if (statefulObject == null)
             {
                 SetWarning(result, $"Stateful object could not be resolved. Scope: {scope}, ObjectId: {parameters.ObjectId}, TicketId: {ticket.Id}.");
+                return result;
+            }
+
+            if (!CallerCanAccessVisibility(User, wfHandler, scope, statefulObject))
+            {
+                SetWarning(result, $"User is not authorized to access workflow visibility for scope '{scope}' and state {statefulObject.StateId}.");
                 return result;
             }
 
@@ -317,6 +324,13 @@ namespace FWO.Middleware.Server.Controllers
 
             HashSet<int> editableOwnerIds = GetClaimIds(user, "x-hasura-editable-owners");
             return editableOwnerIds.Count > 0 && ticket.Tasks.Any(task => CallerOwnsTask(task, editableOwnerIds));
+        }
+
+        private static bool CallerCanAccessVisibility(ClaimsPrincipal user, WfHandler wfHandler, WfObjectScopes scope, WfStatefulObject statefulObject)
+        {
+            StateMatrix stateMatrix = scope == WfObjectScopes.Ticket ? wfHandler.MasterStateMatrix : wfHandler.ActStateMatrix;
+            HashSet<int> visibilityGroupIds = GetClaimIds(user, "x-hasura-workflow-visibility-groups");
+            return WorkflowVisibilityHelper.CanAccessStatefulObject(statefulObject, stateMatrix, visibilityGroupIds);
         }
 
         private static bool CallerCanUseRole(ClaimsPrincipal user, string executionMode, string role)

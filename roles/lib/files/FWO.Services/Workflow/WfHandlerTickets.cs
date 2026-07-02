@@ -22,6 +22,11 @@ namespace FWO.Services.Workflow
                 ticket = await dbAcc.FetchTicket(ticketId, userConfig.ReqOwnerBased ? AllOwners.ConvertAll(x => x.Id) : null);
                 if (ticket != null)
                 {
+                    ApplyVisibilityRestrictions(ticket);
+                    if (!CanViewTicket(ticket))
+                    {
+                        return null;
+                    }
                     SetTicketEnv(ticket);
                 }
             }
@@ -64,7 +69,12 @@ namespace FWO.Services.Workflow
                     SchedulerInterval.Months => DateTime.Now.AddMonths(-cutOffPeriod),
                     _ => throw new NotSupportedException("Time interval is not supported."),
                 };
-                return await dbAcc.GetTicketsByParameters(taskType, StateMatrix(taskType).LowestInputState, StateMatrix(taskType).LowestEndState, cutOffDate);
+                List<WfTicket> tickets = await dbAcc.GetTicketsByParameters(taskType, StateMatrix(taskType).LowestInputState, StateMatrix(taskType).LowestEndState, cutOffDate);
+                return [.. tickets.Where(CanViewTicket).Select(ticket =>
+                {
+                    ApplyVisibilityRestrictions(ticket);
+                    return ticket;
+                })];
             }
             return [];
         }
@@ -74,6 +84,11 @@ namespace FWO.Services.Workflow
             if (ReloadTasks && reload && dbAcc != null)
             {
                 ticket = await dbAcc.FetchTicket(ticket.Id) ?? ticket;
+                ApplyVisibilityRestrictions(ticket);
+                if (!CanViewTicket(ticket))
+                {
+                    return;
+                }
                 TicketList[TicketList.FindIndex(x => x.Id == ticket.Id)] = ticket;
             }
             SetTicketEnv(ticket);
@@ -152,6 +167,46 @@ namespace FWO.Services.Workflow
                 DisplayMessageInUi(exception, userConfig.GetText("save_request"), "", true);
             }
             return 0;
+        }
+
+        private bool CanViewTicket(WfTicket ticket)
+        {
+            return WorkflowVisibilityHelper.CanAccessStatefulObject(ticket, MasterStateMatrix, userConfig.User.WorkflowVisibilityGroupIds);
+        }
+
+        private bool CanViewImplTask(WfImplTask implTask)
+        {
+            return WorkflowVisibilityHelper.CanAccessStatefulObject(implTask, StateMatrix(implTask.TaskType), userConfig.User.WorkflowVisibilityGroupIds);
+        }
+
+        private bool CanViewApproval(WfApproval approval, StateMatrix reqTaskMatrix)
+        {
+            return WorkflowVisibilityHelper.CanAccessStatefulObject(approval, reqTaskMatrix, userConfig.User.WorkflowVisibilityGroupIds);
+        }
+
+        private void ApplyVisibilityRestrictions(WfTicket ticket)
+        {
+            if (!CanViewTicket(ticket))
+            {
+                ticket.Tasks.Clear();
+                return;
+            }
+
+            List<WfReqTask> visibleReqTasks = [];
+            foreach (WfReqTask reqTask in ticket.Tasks)
+            {
+                StateMatrix reqTaskMatrix = StateMatrix(reqTask.TaskType);
+                if (!WorkflowVisibilityHelper.CanAccessStatefulObject(reqTask, reqTaskMatrix, userConfig.User.WorkflowVisibilityGroupIds))
+                {
+                    continue;
+                }
+
+                reqTask.ImplementationTasks = [.. reqTask.ImplementationTasks.Where(CanViewImplTask)];
+                reqTask.Approvals = [.. reqTask.Approvals.Where(approval => CanViewApproval(approval, reqTaskMatrix))];
+                visibleReqTasks.Add(reqTask);
+            }
+
+            ticket.Tasks = visibleReqTasks;
         }
 
         public async Task ConfAddCommentToTicket(string commentText)

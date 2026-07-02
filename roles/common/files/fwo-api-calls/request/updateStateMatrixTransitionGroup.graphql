@@ -4,6 +4,7 @@ mutation updateStateMatrixTransitionGroup(
   $description: String
   $phase: String
   $visibilityGroupId: Int
+  $exclusive: Boolean!
 ) {
   update_transition_group: update_request_state_matrix_transition_group_by_pk(
     pk_columns: {id: $id}
@@ -12,6 +13,7 @@ mutation updateStateMatrixTransitionGroup(
       description: $description
       phase: $phase
       visibility_group_id: $visibilityGroupId
+      exclusive: $exclusive
     }
   ) {
     updatedId: id

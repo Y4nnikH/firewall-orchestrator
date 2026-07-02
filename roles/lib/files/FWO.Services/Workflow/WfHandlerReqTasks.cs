@@ -29,6 +29,10 @@ namespace FWO.Services.Workflow
                 }
 
                 WfTicket? refreshedTicket = await dbAcc.FetchTicket(ActReqTask.TicketId, userConfig.ReqOwnerBased ? AllOwners.ConvertAll(owner => owner.Id) : null);
+                if (refreshedTicket != null)
+                {
+                    ApplyVisibilityRestrictions(refreshedTicket);
+                }
                 WfReqTask? refreshedTask = refreshedTicket?.Tasks.FirstOrDefault(task => task.Id == ActReqTask.Id);
                 if (refreshedTask == null)
                 {
@@ -86,6 +90,10 @@ namespace FWO.Services.Workflow
             try
             {
                 WfTicket? ticket = await dbAcc.FetchTicket(reqTask.TicketId, userConfig.ReqOwnerBased ? AllOwners.ConvertAll(owner => owner.Id) : null);
+                if (ticket != null)
+                {
+                    ApplyVisibilityRestrictions(ticket);
+                }
                 WfReqTask? fullReqTask = ticket?.Tasks.FirstOrDefault(task => task.Id == reqTask.Id);
                 if (ticket == null || fullReqTask == null)
                 {

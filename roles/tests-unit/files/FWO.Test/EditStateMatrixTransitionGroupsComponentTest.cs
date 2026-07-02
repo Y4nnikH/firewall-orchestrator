@@ -31,6 +31,7 @@ namespace FWO.Test
                 Description = "Description",
                 Phase = "approval",
                 VisibilityGroupId = 9,
+                Exclusive = true,
                 PhaseMatrixUsages = [new() { PhaseMatrixId = 3, SortOrder = 2 }],
                 Transitions = [new() { FromStateId = 1, ToStateId = 2, SortOrder = 4 }]
             };
@@ -44,6 +45,7 @@ namespace FWO.Test
                 Assert.That(clone.Id, Is.EqualTo(5));
                 Assert.That(clone.Phase, Is.EqualTo("approval"));
                 Assert.That(clone.VisibilityGroupId, Is.EqualTo(9));
+                Assert.That(clone.Exclusive, Is.True);
                 Assert.That(clone.PhaseMatrixUsages, Is.SameAs(source.PhaseMatrixUsages));
                 Assert.That(source.Transitions, Has.Count.EqualTo(1));
                 Assert.That(source.Transitions[0].ToStateId, Is.EqualTo(2));
@@ -215,7 +217,8 @@ namespace FWO.Test
                 Name = "  Group  ",
                 Description = "   ",
                 Phase = " request ",
-                VisibilityGroupId = 6
+                VisibilityGroupId = 6,
+                Exclusive = true
             });
             SetField(component, "originalGroup", new StateMatrixTransitionGroup { Id = groupId });
 
@@ -228,6 +231,7 @@ namespace FWO.Test
                 Assert.That(variables["description"]?.Type, Is.EqualTo(JTokenType.Null));
                 Assert.That((string?)variables["phase"], Is.EqualTo("request"));
                 Assert.That((int?)variables["visibilityGroupId"], Is.EqualTo(6));
+                Assert.That((bool?)variables["exclusive"], Is.True);
                 Assert.That(variables["id"] != null, Is.EqualTo(expectsId));
             });
         }

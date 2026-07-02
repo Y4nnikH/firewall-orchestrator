@@ -580,6 +580,56 @@ namespace FWO.Test
         }
 
         [Test]
+        public void WorkflowController_CallerCanAccessVisibility_RequiresMatchingVisibilityGroup()
+        {
+            WfHandler handler = new()
+            {
+                MasterStateMatrix = new StateMatrix
+                {
+                    StateVisibilityGroupIds = new Dictionary<int, List<int>>
+                    {
+                        [10] = [7]
+                    }
+                },
+                ActStateMatrix = new StateMatrix
+                {
+                    StateVisibilityGroupIds = new Dictionary<int, List<int>>
+                    {
+                        [20] = [8]
+                    }
+                }
+            };
+
+            bool allowed = InvokePrivateStatic<bool>(typeof(WorkflowController), "CallerCanAccessVisibility",
+                PrincipalWithRolesAndClaims([Roles.Approver], new Claim("x-hasura-workflow-visibility-groups", "{7}")), handler, WfObjectScopes.Ticket, new WfTicket { StateId = 10 });
+            bool rejected = InvokePrivateStatic<bool>(typeof(WorkflowController), "CallerCanAccessVisibility",
+                PrincipalWithRolesAndClaims([Roles.Approver], new Claim("x-hasura-workflow-visibility-groups", "{9}")), handler, WfObjectScopes.Ticket, new WfTicket { StateId = 10 });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(allowed, Is.True);
+                Assert.That(rejected, Is.False);
+            });
+        }
+
+        [Test]
+        public void WorkflowController_CallerCanAccessVisibility_DeniesUntaggedObjectsForExclusiveMembers()
+        {
+            WfHandler handler = new()
+            {
+                MasterStateMatrix = new StateMatrix
+                {
+                    ExclusiveVisibilityGroupIds = [7]
+                }
+            };
+
+            bool allowed = InvokePrivateStatic<bool>(typeof(WorkflowController), "CallerCanAccessVisibility",
+                PrincipalWithRolesAndClaims([Roles.Approver], new Claim("x-hasura-workflow-visibility-groups", "{7}")), handler, WfObjectScopes.Ticket, new WfTicket { StateId = 10 });
+
+            Assert.That(allowed, Is.False);
+        }
+
+        [Test]
         public async Task WorkflowRecipientResolver_ResolveUserDns_ReturnsDistinctDirectUserDns()
         {
             WorkflowRecipientResolver resolver = new(new RecipientResolverApiConn(), []);

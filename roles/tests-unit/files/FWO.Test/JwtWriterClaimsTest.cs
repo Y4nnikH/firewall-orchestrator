@@ -47,6 +47,21 @@ namespace FWO.Test
         }
 
         [Test]
+        public void SetClaimsAddsWorkflowVisibilityGroupClaims()
+        {
+            UiUser user = new()
+            {
+                Name = "test-user",
+                Roles = ["reporter"],
+                WorkflowVisibilityGroupIds = [2, 4, 9]
+            };
+
+            ClaimsIdentity claimsIdentity = InvokeSetClaims(user);
+
+            Assert.That(claimsIdentity.FindFirst("x-hasura-workflow-visibility-groups")?.Value, Is.EqualTo("{2,4,9}"));
+        }
+
+        [Test]
         public void SetClaimsAddsJwtIdClaim()
         {
             UiUser user = new()

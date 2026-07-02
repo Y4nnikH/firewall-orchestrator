@@ -219,7 +219,8 @@ create table request.state_matrix_transition_group
     name Varchar NOT NULL UNIQUE,
     description text,
     phase Varchar,
-    visibility_group_id int
+    visibility_group_id int,
+    exclusive boolean NOT NULL DEFAULT FALSE
 );
 
 create table request.state_matrix_phase_transition_group

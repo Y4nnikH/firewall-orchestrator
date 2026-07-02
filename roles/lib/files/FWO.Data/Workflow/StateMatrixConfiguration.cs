@@ -113,6 +113,9 @@ namespace FWO.Data.Workflow
         [JsonProperty("visibility_group_id"), JsonPropertyName("visibility_group_id")]
         public int? VisibilityGroupId { get; set; }
 
+        [JsonProperty("exclusive"), JsonPropertyName("exclusive")]
+        public bool Exclusive { get; set; }
+
         [JsonProperty("workflow_visibility_group"), JsonPropertyName("workflow_visibility_group")]
         public WorkflowVisibilityGroup? VisibilityGroup { get; set; }
 

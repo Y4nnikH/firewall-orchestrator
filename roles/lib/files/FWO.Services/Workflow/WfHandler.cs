@@ -202,6 +202,11 @@ namespace FWO.Services.Workflow
             if (fetchData)
             {
                 TicketList = await dbAcc.FetchTickets(MasterStateMatrix, ownerIds, allStates, fullTickets);
+                foreach (WfTicket ticket in TicketList.ToList())
+                {
+                    ApplyVisibilityRestrictions(ticket);
+                }
+                TicketList = [.. TicketList.Where(CanViewTicket)];
             }
             ReloadTasks = !fullTickets;
             PrioList = System.Text.Json.JsonSerializer.Deserialize<List<WfPriority>>(userConfig.ReqPriorities) ?? throw new JsonException("Config data could not be parsed.");

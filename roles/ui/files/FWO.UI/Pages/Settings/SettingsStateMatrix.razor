@@ -124,6 +124,11 @@
                             @(context.VisibilityGroup?.Name ?? "-")
                         </Template>
                     </Column>
+                    <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("exclusive"))" Field="@(group => group.Exclusive)" Sortable="true" Filterable="false">
+                        <Template>
+                            @(context.Exclusive ? userConfig.GetText("yes") : userConfig.GetText("no"))
+                        </Template>
+                    </Column>
                     <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("matrices"))" Field="@(group => group.PhaseMatrixUsageCount)" Sortable="true" Filterable="false" />
                     <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("transitions"))" Field="@(group => group.TransitionCount)" Sortable="true" Filterable="false" />
                 </Table>

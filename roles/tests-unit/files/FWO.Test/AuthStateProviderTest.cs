@@ -245,6 +245,7 @@ namespace FWO.Test
             Assert.That(userConfig.User.Roles, Is.EquivalentTo(new[] { Roles.Reporter }));
             Assert.That(userConfig.User.Ownerships, Is.EquivalentTo(new[] { 3, 7 }));
             Assert.That(userConfig.User.RecertOwnerships, Is.EquivalentTo(new[] { 9 }));
+            Assert.That(userConfig.User.WorkflowVisibilityGroupIds, Is.EquivalentTo(new[] { 2, 4 }));
         }
 
         [Test]
@@ -368,7 +369,8 @@ namespace FWO.Test
                 new Claim("x-hasura-tenant-id", TestApiConnection.TestTenantId.ToString()),
                 new Claim("x-hasura-allowed-roles", JsonSerializer.Serialize(roles)),
                 new Claim("x-hasura-editable-owners", "{ 3,7 }"),
-                new Claim("x-hasura-recertifiable-owners", "{ 9 }")
+                new Claim("x-hasura-recertifiable-owners", "{ 9 }"),
+                new Claim("x-hasura-workflow-visibility-groups", "{ 2,4 }")
             ];
         }
 

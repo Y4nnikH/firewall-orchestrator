@@ -129,6 +129,7 @@ namespace FWO.Middleware.Server
             claimsIdentity.AddClaim(new Claim("x-hasura-visible-devices", ToHasuraIdSet(visibleGatewayIds)));
             claimsIdentity.AddClaim(new Claim("x-hasura-editable-owners", $"{{ {string.Join(",", user.Ownerships)} }}"));
             claimsIdentity.AddClaim(new Claim("x-hasura-recertifiable-owners", $"{{ {string.Join(",", user.RecertOwnerships)} }}"));
+            claimsIdentity.AddClaim(new Claim("x-hasura-workflow-visibility-groups", ToHasuraIdSet(user.WorkflowVisibilityGroupIds)));
             AddRoleClaims(claimsIdentity, user);
             return claimsIdentity;
         }

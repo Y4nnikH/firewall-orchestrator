@@ -4,6 +4,7 @@ using FWO.Basics;
 using FWO.Config.Api.Data;
 using FWO.Data;
 using FWO.Data.Enums;
+using FWO.Data.Workflow;
 using FWO.Logging;
 using Newtonsoft.Json;
 using System.Reflection;
@@ -167,6 +168,7 @@ namespace FWO.Middleware.Server
                     Log.WriteDebug("User not found", $"Couldn't find {user.Name} in internal database");
                 }
                 await GetOwnershipsFromOwnerLdap(apiConnection, user);
+                await GetWorkflowVisibilityGroupIds(apiConnection, user);
             }
             catch (Exception exeption)
             {
@@ -245,6 +247,41 @@ namespace FWO.Middleware.Server
             catch (Exception exeption)
             {
                 Log.WriteError("Get ownerships", $"Ownerships could not be detemined for User {user.Name}.", exeption);
+            }
+        }
+
+        /// <summary>
+        /// Resolves workflow visibility group memberships for the given user from the database.
+        /// </summary>
+        public static async Task GetWorkflowVisibilityGroupIds(ApiConnection apiConn, UiUser user)
+        {
+            try
+            {
+                user.WorkflowVisibilityGroupIds.Clear();
+
+                List<WorkflowVisibilityGroup> visibilityGroups = await apiConn.SendQueryAsync<List<WorkflowVisibilityGroup>>(RequestQueries.getWorkflowVisibilityGroups);
+                HashSet<string> userDns = new(DistName.DnComparer)
+                {
+                    user.Dn
+                };
+                foreach (string groupDn in user.Groups ?? [])
+                {
+                    userDns.Add(groupDn);
+                }
+
+                foreach (WorkflowVisibilityGroup visibilityGroup in visibilityGroups)
+                {
+                    if (visibilityGroup.Members.Any(member => userDns.Contains(member.MemberDn)))
+                    {
+                        user.WorkflowVisibilityGroupIds.Add(visibilityGroup.Id);
+                    }
+                }
+
+                user.WorkflowVisibilityGroupIds = user.WorkflowVisibilityGroupIds.Distinct().ToList();
+            }
+            catch (Exception exeption)
+            {
+                Log.WriteError("Get workflow visibility groups", $"Workflow visibility groups could not be determined for User {user.Name}.", exeption);
             }
         }
 
