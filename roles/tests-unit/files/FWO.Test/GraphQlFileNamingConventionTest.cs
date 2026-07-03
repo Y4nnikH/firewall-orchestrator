@@ -109,8 +109,7 @@ namespace FWO.Test
             Assert.That(
                 hasMatchingOperationName,
                 Is.True,
-                $"Expected '{filePath}' to contain 'query {fileName}', 'mutation {fileName}', or 'fragment {fileName}'.");
-        }
+                $"Expected '{relativePath}' to contain 'query {fileName}', 'mutation {fileName}', 'subscription {fileName}', or 'fragment {fileName}'.");
 
         /// <summary>
         /// Resolves the repository path to the shared GraphQL API call files.
