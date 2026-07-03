@@ -14,6 +14,14 @@ namespace FWO.Test
     [TestFixture]
     internal class WfHandlerTicketsTest
     {
+        private static void SetMatrix(WfHandler handler, string taskType, StateMatrix matrix)
+        {
+            FieldInfo? field = typeof(WfHandler).GetField("stateMatrixDict", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.That(field, Is.Not.Null);
+            StateMatrixDict dict = (StateMatrixDict)(field!.GetValue(handler) ?? new StateMatrixDict());
+            dict.Matrices[taskType] = matrix;
+        }
+
         private sealed class TicketTestApiConn : SimulatedApiConnection
         {
             public WfTicket Ticket { get; set; } = new();
@@ -159,6 +167,262 @@ namespace FWO.Test
 
             Assert.That(ticket, Is.Not.Null);
             Assert.That(ticket!.Id, Is.EqualTo(7));
+        }
+
+        [Test]
+        public async Task ResolveTicket_AllowsVisibleTicketWithoutRequestTasks()
+        {
+            TicketTestApiConn apiConn = new() { Ticket = new WfTicket { Id = 7, StateId = 10 } };
+            UserConfig userConfig = new();
+            userConfig.User.WorkflowVisibilityGroupIds = [3];
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds = new Dictionary<int, List<int>>
+                {
+                    [10] = [3]
+                }
+            };
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Not.Null);
+            Assert.That(ticket!.Tasks, Is.Empty);
+        }
+
+        [Test]
+        public async Task ResolveTicket_ReturnsNull_WhenAllChildTasksBecomeInvisible()
+        {
+            TicketTestApiConn apiConn = new()
+            {
+                Ticket = new WfTicket
+                {
+                    Id = 7,
+                    StateId = 10,
+                    Tasks =
+                    [
+                        new WfReqTask
+                        {
+                            Id = 11,
+                            TaskType = WfTaskType.access.ToString(),
+                            StateId = 21
+                        }
+                    ]
+                }
+            };
+            UserConfig userConfig = new();
+            userConfig.User.WorkflowVisibilityGroupIds = [3, 7];
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [10] = [3]
+                },
+                ExclusiveVisibilityGroupIds = [7]
+            };
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [20] = [3]
+                },
+                ExclusiveVisibilityGroupIds = [7]
+            });
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Null);
+        }
+
+        [Test]
+        public async Task ResolveTicket_ReturnsNull_WhenTicketHasNoVisibleRequestTasksEvenIfStateIsVisible()
+        {
+            TicketTestApiConn apiConn = new()
+            {
+                Ticket = new WfTicket
+                {
+                    Id = 7,
+                    StateId = 10,
+                    Tasks =
+                    [
+                        new WfReqTask
+                        {
+                            Id = 11,
+                            TaskType = WfTaskType.access.ToString(),
+                            StateId = 21
+                        }
+                    ]
+                }
+            };
+            UserConfig userConfig = new();
+            userConfig.User.WorkflowVisibilityGroupIds = [3];
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [10] = [3]
+                }
+            };
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [21] = [99]
+                }
+            });
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Null);
+        }
+
+        [Test]
+        public async Task ResolveTicket_ReturnsNull_WhenApprovalTicketContainsOnlyNewInterfaceTasksForExclusiveMember()
+        {
+            TicketTestApiConn apiConn = new()
+            {
+                Ticket = new WfTicket
+                {
+                    Id = 7,
+                    StateId = 10,
+                    Tasks =
+                    [
+                        new WfReqTask
+                        {
+                            Id = 11,
+                            TaskType = WfTaskType.new_interface.ToString(),
+                            StateId = 20
+                        }
+                    ]
+                }
+            };
+            UserConfig userConfig = new();
+            userConfig.User.WorkflowVisibilityGroupIds = [3];
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.Phase = WorkflowPhases.approval;
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [10] = [3]
+                },
+                ExclusiveVisibilityGroupIds = [3]
+            };
+            SetMatrix(handler, WfTaskType.new_interface.ToString(), new StateMatrix
+            {
+                ExclusiveVisibilityGroupIds = [3]
+            });
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix());
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Null);
+        }
+
+        [Test]
+        public async Task ResolveTicket_KeepsVisibleRequestTasksAndDropsInvisibleOnes()
+        {
+            TicketTestApiConn apiConn = new()
+            {
+                Ticket = new WfTicket
+                {
+                    Id = 7,
+                    StateId = 10,
+                    Tasks =
+                    [
+                        new WfReqTask
+                        {
+                            Id = 11,
+                            TaskType = WfTaskType.access.ToString(),
+                            StateId = 21
+                        },
+                        new WfReqTask
+                        {
+                            Id = 12,
+                            TaskType = WfTaskType.new_interface.ToString(),
+                            StateId = 22
+                        }
+                    ]
+                }
+            };
+            UserConfig userConfig = new();
+            userConfig.User.WorkflowVisibilityGroupIds = [3];
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [10] = [3]
+                }
+            };
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [21] = [3]
+                }
+            });
+            SetMatrix(handler, WfTaskType.new_interface.ToString(), new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [22] = [99]
+                }
+            });
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Not.Null);
+            Assert.That(ticket!.Tasks.Select(task => task.Id), Is.EqualTo(new long[] { 11 }));
+        }
+
+        [Test]
+        public async Task SelectTicket_ReloadsVisibleTicketWithoutDroppingOwnerInvisibleOne()
+        {
+            TicketTestApiConn apiConn = new()
+            {
+                Ticket = new WfTicket
+                {
+                    Id = 7,
+                    StateId = 10,
+                    Tasks =
+                    [
+                        new WfReqTask
+                        {
+                            Id = 11,
+                            TaskType = WfTaskType.access.ToString(),
+                            StateId = 21
+                        }
+                    ]
+                }
+            };
+            UserConfig userConfig = new();
+            userConfig.User.WorkflowVisibilityGroupIds = [3];
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [10] = [3]
+                }
+            };
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [21] = [3]
+                }
+            });
+            typeof(WfHandler).GetField("ReloadTasks", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .SetValue(handler, true);
+            handler.TicketList = [new WfTicket { Id = 7, StateId = 10 }];
+
+            await handler.SelectTicket(handler.TicketList[0], ObjAction.display, true);
+
+            Assert.That(handler.ActTicket.Tasks.Select(task => task.Id).ToArray(), Is.EqualTo(new long[] { 11 }));
+            Assert.That(handler.TicketList[0].Tasks.Select(task => task.Id).ToArray(), Is.EqualTo(new long[] { 11 }));
         }
 
         [Test]

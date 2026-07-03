@@ -237,6 +237,30 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task Save_DisablesExclusiveWhenVisibilityGroupMissing()
+        {
+            RecordingWorkflowApiConnection api = new();
+            api.Respond(RequestQueries.createStateMatrixTransitionGroup, new ReturnId { NewId = 15 });
+            api.Respond(RequestQueries.getStateMatrixTransitionGroups, new List<StateMatrixTransitionGroup>());
+            api.Respond(RequestQueries.getWorkflowVisibilityGroups, new List<WorkflowVisibilityGroup>());
+            EditStateMatrixTransitionGroups component = new();
+            SetProperty(component, "apiConnection", api);
+            SetField(component, "editGroup", new StateMatrixTransitionGroup
+            {
+                Name = "Group",
+                Phase = "request",
+                VisibilityGroupId = null,
+                Exclusive = true
+            });
+            SetField(component, "originalGroup", new StateMatrixTransitionGroup());
+
+            await InvokeAsync(component, "Save");
+
+            JObject variables = JObject.FromObject(api.Calls.First(call => call.Query == RequestQueries.createStateMatrixTransitionGroup).Variables!);
+            Assert.That((bool?)variables["exclusive"], Is.False);
+        }
+
+        [Test]
         public void CloseEditor_ClearsEditMode()
         {
             EditStateMatrixTransitionGroups component = new();

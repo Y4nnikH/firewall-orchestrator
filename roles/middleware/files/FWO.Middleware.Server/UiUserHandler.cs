@@ -269,15 +269,22 @@ namespace FWO.Middleware.Server
                     userDns.Add(groupDn);
                 }
 
+                Log.WriteDebug("Get workflow visibility groups",
+                    $"User {user.Name} candidate dns: {AuthLoggingHelper.FormatResolvedGroups(userDns)}; visibility groups loaded: {visibilityGroups.Count}");
+
                 foreach (WorkflowVisibilityGroup visibilityGroup in visibilityGroups)
                 {
                     if (visibilityGroup.Members.Any(member => userDns.Contains(member.MemberDn)))
                     {
                         user.WorkflowVisibilityGroupIds.Add(visibilityGroup.Id);
+                        Log.WriteDebug("Get workflow visibility groups",
+                            $"User {user.Name} matched workflow visibility group id={visibilityGroup.Id}, name={visibilityGroup.Name}, members={AuthLoggingHelper.FormatResolvedGroups(visibilityGroup.Members.Select(member => member.MemberDn))}");
                     }
                 }
 
                 user.WorkflowVisibilityGroupIds = user.WorkflowVisibilityGroupIds.Distinct().ToList();
+                Log.WriteDebug("Get workflow visibility groups",
+                    $"User {user.Name} resolved workflow visibility group ids: [{string.Join(", ", user.WorkflowVisibilityGroupIds)}]");
             }
             catch (Exception exeption)
             {

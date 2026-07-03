@@ -38,7 +38,7 @@
                 </Column>
                 <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("exclusive"))" Field="@(group => group.Exclusive)" Sortable="true" Filterable="false">
                     <Template>
-                        @(context.Exclusive ? userConfig.GetText("yes") : userConfig.GetText("no"))
+                        @RenderExclusiveFlag(context)
                     </Template>
                 </Column>
                 <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("matrices"))" Field="@(group => group.PhaseMatrixUsageCount)" Sortable="true" Filterable="false" />
@@ -90,8 +90,7 @@
             <div class="form-group row mb-3">
                 <label class="col-sm-3 col-form-label col-form-label-sm">@(userConfig.GetText("exclusive")):</label>
                 <div class="col-sm-9 d-flex align-items-center">
-                    <input id="transition_group_exclusive" class="form-check-input me-2" type="checkbox" @bind="editGroup.Exclusive" />
-                    <label class="form-check-label" for="transition_group_exclusive">@(editGroup.Exclusive ? userConfig.GetText("yes") : userConfig.GetText("no"))</label>
+                    <input id="transition_group_exclusive" class="form-check-input me-2" type="checkbox" @bind="editGroup.Exclusive" disabled="@(!editGroup.VisibilityGroupId.HasValue)" />
                 </div>
             </div>
             <div class="form-group row mb-3">
@@ -238,6 +237,10 @@
     {
         editGroup = Clone(group);
         originalGroup = Clone(group);
+        if (!editGroup.VisibilityGroupId.HasValue)
+        {
+            editGroup.Exclusive = false;
+        }
         EditMode = true;
     }
 
@@ -276,6 +279,10 @@
             editGroup.Name = editGroup.Name.Trim();
             editGroup.Description = NormalizeOptional(editGroup.Description);
             editGroup.Phase = NormalizeOptional(editGroup.Phase);
+            if (!editGroup.VisibilityGroupId.HasValue)
+            {
+                editGroup.Exclusive = false;
+            }
             int groupId = editGroup.Id;
             if (groupId == 0)
             {
@@ -351,6 +358,13 @@
 
     private string VisibilityGroupName(int? visibilityGroupId) => visibilityGroups.FirstOrDefault(group => group.Id == visibilityGroupId)?.Name ?? "-";
 
+    private static Microsoft.AspNetCore.Components.MarkupString RenderExclusiveFlag(StateMatrixTransitionGroup group)
+    {
+        return group.VisibilityGroupId.HasValue
+            ? group.Exclusive.ShowAsHtml()
+            : new Microsoft.AspNetCore.Components.MarkupString("");
+    }
+
     /// <summary>
     /// Formats a state for selection in a transition group.
     /// </summary>
@@ -365,7 +379,7 @@
         Description = group.Description,
         Phase = group.Phase,
         VisibilityGroupId = group.VisibilityGroupId,
-        Exclusive = group.Exclusive,
+        Exclusive = group.VisibilityGroupId.HasValue && group.Exclusive,
         VisibilityGroup = group.VisibilityGroup,
         PhaseMatrixUsages = group.PhaseMatrixUsages,
         Transitions = group.Transitions.Select(transition => new StateMatrixTransition

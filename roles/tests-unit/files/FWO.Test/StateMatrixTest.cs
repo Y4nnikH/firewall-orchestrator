@@ -397,6 +397,37 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task StateMatrixInit_CopiesVisibilityGroupsFromLoadedSnapshot()
+        {
+            GlobalStateMatrix source = new()
+            {
+                GlobalMatrix = Enum.GetValues<WorkflowPhases>().ToDictionary(phase => phase, _ => new StateMatrix())
+            };
+            source.GlobalMatrix[WorkflowPhases.approval].Matrix[49] = [50];
+            source.GlobalMatrix[WorkflowPhases.approval].LowestInputState = 49;
+            source.GlobalMatrix[WorkflowPhases.approval].LowestStartedState = 50;
+            source.GlobalMatrix[WorkflowPhases.approval].LowestEndState = 60;
+
+            List<WorkflowConfiguration> configurations = StateMatrixConfigurationTestHelper.FromGlobalMatrix(source, WfTaskType.access);
+            StateMatrixTransitionGroup approvalGroup = configurations[0].Phases
+                .Single(phase => phase.Phase == WorkflowPhases.approval.ToString())
+                .PhaseMatrix
+                .TransitionGroups[0]
+                .TransitionGroup;
+            approvalGroup.VisibilityGroupId = 3;
+            approvalGroup.Exclusive = true;
+
+            StateMatrix matrix = new();
+            await matrix.Init(WorkflowPhases.approval, new StateMatrixApiConnection(configurations), [new() { Id = 49 }, new() { Id = 50 }], WfTaskType.access);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(matrix.ExclusiveVisibilityGroupIds, Does.Contain(3));
+                Assert.That(matrix.GetVisibilityGroupIds(49), Does.Contain(3));
+            });
+        }
+
+        [Test]
         public void GetDerivedStateFromSubStates_ReturnsZeroWhenEmpty()
         {
             StateMatrix matrix = new();

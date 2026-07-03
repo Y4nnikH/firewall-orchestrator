@@ -57,6 +57,8 @@ namespace FWO.Services.Workflow
             LowestStartedState = glbStateMatrix.GlobalMatrix[phase].LowestStartedState;
             LowestEndState = glbStateMatrix.GlobalMatrix[phase].LowestEndState;
             Active = glbStateMatrix.GlobalMatrix[phase].Active;
+            StateVisibilityGroupIds = glbStateMatrix.GlobalMatrix[phase].StateVisibilityGroupIds.ToDictionary(entry => entry.Key, entry => entry.Value.ToList());
+            ExclusiveVisibilityGroupIds = [.. glbStateMatrix.GlobalMatrix[phase].ExclusiveVisibilityGroupIds];
             AutomaticOnlyStates = preloadedStates.Where(state => state.AutomaticOnly).Select(state => state.Id).ToHashSet();
             ApprovalLowestEndState = glbStateMatrix.GlobalMatrix[WorkflowPhases.approval].LowestEndState;
             foreach (var phas in glbStateMatrix.GlobalMatrix)
@@ -114,26 +116,35 @@ namespace FWO.Services.Workflow
         /// </summary>
         public bool CanAccessState(int stateId, IEnumerable<int> userVisibilityGroupIds)
         {
+            return CanAccessState(stateId, userVisibilityGroupIds, ExclusiveVisibilityGroupIds);
+        }
+
+        /// <summary>
+        /// Returns true when the given visibility-group ids grant access to the state.
+        /// </summary>
+        public bool CanAccessState(int stateId, IEnumerable<int> userVisibilityGroupIds, IEnumerable<int>? exclusiveVisibilityGroupIds)
+        {
             List<int> requiredGroupIds = GetVisibilityGroupIds(stateId);
             if (requiredGroupIds.Count == 0)
             {
-                // Untagged states stay visible unless the user belongs to an exclusive visibility group.
-                return !HasExclusiveVisibilityGroupMembership(userVisibilityGroupIds);
+                // Untagged states stay visible unless the user belongs to any exclusive visibility group.
+                return !HasExclusiveVisibilityGroupMembership(userVisibilityGroupIds, exclusiveVisibilityGroupIds);
             }
 
             HashSet<int> allowedGroupIds = userVisibilityGroupIds as HashSet<int> ?? userVisibilityGroupIds.ToHashSet();
             return requiredGroupIds.Any(allowedGroupIds.Contains);
         }
 
-        private bool HasExclusiveVisibilityGroupMembership(IEnumerable<int> userVisibilityGroupIds)
+        private bool HasExclusiveVisibilityGroupMembership(IEnumerable<int> userVisibilityGroupIds, IEnumerable<int>? exclusiveVisibilityGroupIds)
         {
-            if (ExclusiveVisibilityGroupIds.Count == 0)
+            IEnumerable<int> groupsToCheck = exclusiveVisibilityGroupIds ?? ExclusiveVisibilityGroupIds;
+            if (!groupsToCheck.Any())
             {
                 return false;
             }
 
             HashSet<int> allowedGroupIds = userVisibilityGroupIds as HashSet<int> ?? userVisibilityGroupIds.ToHashSet();
-            return ExclusiveVisibilityGroupIds.Any(allowedGroupIds.Contains);
+            return groupsToCheck.Any(allowedGroupIds.Contains);
         }
 
         public int getDerivedStateFromSubStates(List<int> statesIn)

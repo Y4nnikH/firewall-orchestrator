@@ -9,7 +9,8 @@ namespace FWO.Services.Workflow
 {
     public class WfDbAccess(Action<Exception?, string, string, bool> DisplayMessageInUi, UserConfig UserConfig, ApiConnection ApiConnection, ActionHandler ActionHandler, bool AsAdmin)
     {
-        public async Task<List<WfTicket>> FetchTickets(StateMatrix stateMatrix, List<int>? ownerIds = null, bool allStates = false, bool fullTickets = false)
+        public async Task<List<WfTicket>> FetchTickets(StateMatrix stateMatrix, List<int>? ownerIds = null, bool allStates = false, bool fullTickets = false,
+            Func<WfTicket, bool>? ticketFilter = null)
         {
             List<WfTicket> tickets = [];
             try
@@ -22,7 +23,19 @@ namespace FWO.Services.Workflow
                 tickets = await ApiConnection.SendQueryAsync<List<WfTicket>>(fullTickets ? RequestQueries.getFullTickets : RequestQueries.getTickets, Variables);
                 if (UserConfig.ReqOwnerBased && !AsAdmin)
                 {
-                    tickets = await FilterWrongOwnersOut(tickets, ownerIds);
+                    tickets = await FilterWrongOwnersOut(tickets, ownerIds, ticketFilter != null);
+                }
+                if (ticketFilter != null)
+                {
+                    List<WfTicket> filteredTickets = [];
+                    foreach (WfTicket ticket in tickets)
+                    {
+                        if (ticketFilter(ticket))
+                        {
+                            filteredTickets.Add(ticket);
+                        }
+                    }
+                    tickets = filteredTickets;
                 }
                 if (fullTickets)
                 {
@@ -47,7 +60,7 @@ namespace FWO.Services.Workflow
             return tickets;
         }
 
-        public async Task<WfTicket?> FetchTicket(long ticketId, List<int>? ownerIds = null)
+        public async Task<WfTicket?> FetchTicket(long ticketId, List<int>? ownerIds = null, Func<WfTicket, bool>? ticketFilter = null)
         {
             WfTicket? ticket = null;
             try
@@ -55,7 +68,11 @@ namespace FWO.Services.Workflow
                 ticket = await GetTicket(ticketId);
                 if (UserConfig.ReqOwnerBased && !AsAdmin)
                 {
-                    ticket = (await FilterWrongOwnersOut([ticket], ownerIds)).FirstOrDefault();
+                    ticket = (await FilterWrongOwnersOut([ticket], ownerIds, ticketFilter != null)).FirstOrDefault();
+                }
+                if (ticket != null && ticketFilter != null && !ticketFilter(ticket))
+                {
+                    ticket = null;
                 }
             }
             catch (Exception exception)
@@ -65,18 +82,20 @@ namespace FWO.Services.Workflow
             return ticket;
         }
 
-        private async Task<List<WfTicket>> FilterWrongOwnersOut(List<WfTicket> ticketsIn, List<int>? ownerIds)
+        private async Task<List<WfTicket>> FilterWrongOwnersOut(List<WfTicket> ticketsIn, List<int>? ownerIds, bool keepNonOwnerVisibleTickets = false)
         {
             if (ownerIds == null || ownerIds.Count == 0)
             {
-                return [];
+                return keepNonOwnerVisibleTickets ? ticketsIn : [];
             }
             List<long> registeredTickets = (await ApiConnection.SendQueryAsync<List<TicketId>>(RequestQueries.getOwnerTicketIds, new { ownerIds })).ConvertAll(t => t.Id);
             foreach (var ticket in ticketsIn.Where(ti => !ti.IsEditableForOwner(registeredTickets, ownerIds, UserConfig.UserId)))
             {
                 ticket.Editable = false;
             }
-            return [.. ticketsIn.Where(ti => ti.IsVisibleForOwner(registeredTickets, ownerIds, UserConfig.UserId))];
+            return keepNonOwnerVisibleTickets
+                ? ticketsIn
+                : [.. ticketsIn.Where(ti => ti.IsVisibleForOwner(registeredTickets, ownerIds, UserConfig.UserId))];
         }
 
         public async Task<WfTicket> GetTicket(long id)
@@ -96,7 +115,8 @@ namespace FWO.Services.Workflow
             return ticket;
         }
 
-        public async Task<List<WfTicket>> GetTicketsByParameters(string taskType, int startState, int endState, DateTime cutOffDate)
+        public async Task<List<WfTicket>> GetTicketsByParameters(string taskType, int startState, int endState, DateTime cutOffDate,
+            Func<WfTicket, bool>? ticketFilter = null)
         {
             List<WfTicket> tickets = [];
             try
@@ -109,6 +129,18 @@ namespace FWO.Services.Workflow
                     toState = endState
                 };
                 tickets = await ApiConnection.SendQueryAsync<List<WfTicket>>(RequestQueries.getTicketsByParameters, Variables);
+                if (ticketFilter != null)
+                {
+                    List<WfTicket> filteredTickets = [];
+                    foreach (WfTicket ticket in tickets)
+                    {
+                        if (ticketFilter(ticket))
+                        {
+                            filteredTickets.Add(ticket);
+                        }
+                    }
+                    tickets = filteredTickets;
+                }
             }
             catch (Exception exception)
             {

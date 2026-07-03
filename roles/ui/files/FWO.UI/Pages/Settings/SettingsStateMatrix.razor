@@ -126,7 +126,7 @@
                     </Column>
                     <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("exclusive"))" Field="@(group => group.Exclusive)" Sortable="true" Filterable="false">
                         <Template>
-                            @(context.Exclusive ? userConfig.GetText("yes") : userConfig.GetText("no"))
+                            @RenderExclusiveFlag(context)
                         </Template>
                     </Column>
                     <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("matrices"))" Field="@(group => group.PhaseMatrixUsageCount)" Sortable="true" Filterable="false" />
@@ -586,6 +586,13 @@ else
     }
 
     private string TransitionGroupName(int transitionGroupId) => transitionGroups.FirstOrDefault(group => group.Id == transitionGroupId)?.Name ?? "";
+
+    private static Microsoft.AspNetCore.Components.MarkupString RenderExclusiveFlag(StateMatrixTransitionGroup group)
+    {
+        return group.VisibilityGroupId.HasValue
+            ? group.Exclusive.ShowAsHtml()
+            : new Microsoft.AspNetCore.Components.MarkupString("");
+    }
 
     /// <summary>
     /// Returns the explicitly configured, non-identity derived-state mappings of a phase.
