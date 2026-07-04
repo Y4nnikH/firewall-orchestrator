@@ -1,280 +1,442 @@
-CREATE TABLE IF NOT EXISTS request.workflow_configuration
-(
-    id SERIAL PRIMARY KEY,
-    name Varchar NOT NULL UNIQUE,
-    description text,
-    is_active boolean NOT NULL DEFAULT FALSE
-);
+-- remove deprecated, unused rule.rule_num column (ordering is handled by rule_num_numeric)
+-- the rule_api view and get_rulebase_for_owner function depend on rule_num and are
+-- recreated (without rule_num) afterwards by the idempotent fworch-api-funcs.sql script.
+DROP FUNCTION IF EXISTS public.get_rulebase_for_owner (rulebase, integer);
 
-CREATE UNIQUE INDEX IF NOT EXISTS request_workflow_configuration_single_active
-    ON request.workflow_configuration (is_active) WHERE is_active;
+DROP VIEW IF EXISTS public.rule_api CASCADE;
 
-CREATE TABLE IF NOT EXISTS request.state_matrix_phase
-(
-    id SERIAL PRIMARY KEY,
-    name Varchar NOT NULL UNIQUE,
-    phase Varchar NOT NULL,
-    active boolean NOT NULL DEFAULT FALSE,
-    lowest_input_state int NOT NULL,
-    lowest_start_state int NOT NULL,
-    lowest_end_state int NOT NULL
-);
+ALTER TABLE rule DROP COLUMN IF EXISTS rule_num;
 
-CREATE TABLE IF NOT EXISTS request.workflow_configuration_phase
-(
-    configuration_id int NOT NULL,
-    task_type Varchar NOT NULL,
-    phase Varchar NOT NULL,
-    phase_matrix_id int NOT NULL,
-    PRIMARY KEY (configuration_id, task_type, phase)
-);
+-- remove deprecated, unused direct zone columns from rule.
+-- Zones are represented by the rule_from_zone and rule_to_zone link tables.
+DROP VIEW IF EXISTS v_active_access_allow_rules CASCADE;
 
-CREATE TABLE IF NOT EXISTS request.workflow_visibility_group
-(
-    id SERIAL PRIMARY KEY,
-    name Varchar NOT NULL UNIQUE,
-    description text
-);
+DROP MATERIALIZED VIEW IF EXISTS view_rule_with_owner CASCADE;
 
-CREATE TABLE IF NOT EXISTS request.workflow_visibility_group_member
-(
-    visibility_group_id int NOT NULL,
-    member_dn Varchar NOT NULL,
-    PRIMARY KEY (visibility_group_id, member_dn)
-);
+ALTER TABLE "rule" DROP COLUMN IF EXISTS "rule_from_zone";
 
-CREATE TABLE IF NOT EXISTS request.state_matrix_transition_group
-(
-    id SERIAL PRIMARY KEY,
-    name Varchar NOT NULL UNIQUE,
-    description text,
-    phase Varchar,
-    visibility_group_id int,
-    exclusive boolean NOT NULL DEFAULT FALSE
-);
+ALTER TABLE "rule" DROP COLUMN IF EXISTS "rule_to_zone";
 
-ALTER TABLE request.state_matrix_transition_group ADD COLUMN IF NOT EXISTS exclusive boolean NOT NULL DEFAULT FALSE;
+/*
+logic for checking overlap of ip ranges:
+not (end_ip1 < start_ip2 or start_ip1 > end_ip2)
+=
+end_ip1 >= start_ip2 and start_ip1 <= end_ip2
 
-INSERT INTO config (config_key, config_value, config_user) VALUES ('reqVisibilityBased', 'False', 0) ON CONFLICT DO NOTHING;
+ip1 = owner_network.ip
+ip2 = object.ip
 
-CREATE TABLE IF NOT EXISTS request.state_matrix_phase_transition_group
-(
-    phase_matrix_id int NOT NULL,
-    transition_group_id int NOT NULL,
-    sort_order int NOT NULL DEFAULT 0,
-    PRIMARY KEY (phase_matrix_id, transition_group_id)
-);
+--> 
+owner_network.ip_end >= object.ip and owner_network.ip <= object.ip_end
 
-CREATE TABLE IF NOT EXISTS request.state_matrix_transition
-(
-    transition_group_id int NOT NULL,
-    from_state_id int NOT NULL,
-    to_state_id int NOT NULL,
-    sort_order int NOT NULL DEFAULT 0,
-    PRIMARY KEY (transition_group_id, from_state_id, to_state_id)
-);
+here:
+--> 
+owner_network.ip_end >= o.obj_ip and owner_network.ip <= o.obj_ip_end
 
-CREATE TABLE IF NOT EXISTS request.state_matrix_derived_state
-(
-    phase_matrix_id int NOT NULL,
-    from_state_id int NOT NULL,
-    derived_state_id int NOT NULL,
-    PRIMARY KEY (phase_matrix_id, from_state_id),
-    CONSTRAINT state_matrix_derived_state_non_identity CHECK (from_state_id <> derived_state_id)
-);
+*/
 
-ALTER TABLE request.workflow_configuration_phase DROP CONSTRAINT IF EXISTS request_workflow_configuration_phase_configuration_foreign_key;
-ALTER TABLE request.workflow_configuration_phase ADD CONSTRAINT request_workflow_configuration_phase_configuration_foreign_key FOREIGN KEY (configuration_id) REFERENCES request.workflow_configuration(id) ON UPDATE RESTRICT ON DELETE CASCADE;
-ALTER TABLE request.workflow_configuration_phase DROP CONSTRAINT IF EXISTS request_workflow_configuration_phase_phase_foreign_key;
-ALTER TABLE request.workflow_configuration_phase ADD CONSTRAINT request_workflow_configuration_phase_phase_foreign_key FOREIGN KEY (phase_matrix_id) REFERENCES request.state_matrix_phase(id) ON UPDATE RESTRICT ON DELETE CASCADE;
-ALTER TABLE request.workflow_visibility_group_member DROP CONSTRAINT IF EXISTS request_workflow_visibility_group_member_group_foreign_key;
-ALTER TABLE request.workflow_visibility_group_member ADD CONSTRAINT request_workflow_visibility_group_member_group_foreign_key FOREIGN KEY (visibility_group_id) REFERENCES request.workflow_visibility_group(id) ON UPDATE RESTRICT ON DELETE CASCADE;
-ALTER TABLE request.state_matrix_transition_group DROP CONSTRAINT IF EXISTS request_state_matrix_transition_group_visibility_group_foreign_key;
-ALTER TABLE request.state_matrix_transition_group ADD CONSTRAINT request_state_matrix_transition_group_visibility_group_foreign_key FOREIGN KEY (visibility_group_id) REFERENCES request.workflow_visibility_group(id) ON UPDATE RESTRICT ON DELETE SET NULL;
+DROP VIEW IF EXISTS v_rule_with_src_owner CASCADE;
 
-ALTER TABLE request.state_matrix_phase_transition_group DROP CONSTRAINT IF EXISTS request_state_matrix_phase_transition_group_phase_foreign_key;
-ALTER TABLE request.state_matrix_phase_transition_group ADD CONSTRAINT request_state_matrix_phase_transition_group_phase_foreign_key FOREIGN KEY (phase_matrix_id) REFERENCES request.state_matrix_phase(id) ON UPDATE RESTRICT ON DELETE CASCADE;
-ALTER TABLE request.state_matrix_phase_transition_group DROP CONSTRAINT IF EXISTS request_state_matrix_phase_transition_group_group_foreign_key;
-ALTER TABLE request.state_matrix_phase_transition_group ADD CONSTRAINT request_state_matrix_phase_transition_group_group_foreign_key FOREIGN KEY (transition_group_id) REFERENCES request.state_matrix_transition_group(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+DROP VIEW IF EXISTS v_rule_with_dst_owner CASCADE;
 
-ALTER TABLE request.state_matrix_transition DROP CONSTRAINT IF EXISTS request_state_matrix_transition_group_foreign_key;
-ALTER TABLE request.state_matrix_transition ADD CONSTRAINT request_state_matrix_transition_group_foreign_key FOREIGN KEY (transition_group_id) REFERENCES request.state_matrix_transition_group(id) ON UPDATE RESTRICT ON DELETE CASCADE;
-ALTER TABLE request.state_matrix_transition DROP CONSTRAINT IF EXISTS request_state_matrix_transition_from_state_foreign_key;
-ALTER TABLE request.state_matrix_transition ADD CONSTRAINT request_state_matrix_transition_from_state_foreign_key FOREIGN KEY (from_state_id) REFERENCES request.state(id) ON UPDATE RESTRICT ON DELETE CASCADE;
-ALTER TABLE request.state_matrix_transition DROP CONSTRAINT IF EXISTS request_state_matrix_transition_to_state_foreign_key;
-ALTER TABLE request.state_matrix_transition ADD CONSTRAINT request_state_matrix_transition_to_state_foreign_key FOREIGN KEY (to_state_id) REFERENCES request.state(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+DROP VIEW IF EXISTS v_rule_with_ip_owner CASCADE;
 
-ALTER TABLE request.state_matrix_derived_state DROP CONSTRAINT IF EXISTS request_state_matrix_derived_state_phase_foreign_key;
-ALTER TABLE request.state_matrix_derived_state ADD CONSTRAINT request_state_matrix_derived_state_phase_foreign_key FOREIGN KEY (phase_matrix_id) REFERENCES request.state_matrix_phase(id) ON UPDATE RESTRICT ON DELETE CASCADE;
-ALTER TABLE request.state_matrix_derived_state DROP CONSTRAINT IF EXISTS request_state_matrix_derived_state_from_state_foreign_key;
-ALTER TABLE request.state_matrix_derived_state ADD CONSTRAINT request_state_matrix_derived_state_from_state_foreign_key FOREIGN KEY (from_state_id) REFERENCES request.state(id) ON UPDATE RESTRICT ON DELETE CASCADE;
-ALTER TABLE request.state_matrix_derived_state DROP CONSTRAINT IF EXISTS request_state_matrix_derived_state_derived_state_foreign_key;
-ALTER TABLE request.state_matrix_derived_state ADD CONSTRAINT request_state_matrix_derived_state_derived_state_foreign_key FOREIGN KEY (derived_state_id) REFERENCES request.state(id) ON UPDATE RESTRICT ON DELETE CASCADE;
-
--- Legacy config data is copied only while the normalized configuration store is empty.
--- This prevents repeated upgrades from restoring transitions or mappings deleted by users.
-DO $state_matrix_migration$
-BEGIN
-IF EXISTS (SELECT 1 FROM request.workflow_configuration) THEN
-    RETURN;
-END IF;
-
-INSERT INTO request.workflow_configuration (name, description, is_active)
-VALUES
-    ('current', 'Migrated workflow state matrix configuration', TRUE),
-    ('installation-default', 'Workflow configuration proposal delivered with the installation', FALSE)
-ON CONFLICT (name) DO NOTHING;
-
-DROP TABLE IF EXISTS pg_temp.tmp_state_matrix_key;
-CREATE TEMP TABLE tmp_state_matrix_key
-(
-    config_key Varchar,
-    configuration_name Varchar,
-    task_type Varchar
-);
-
-INSERT INTO tmp_state_matrix_key (config_key, configuration_name, task_type)
-VALUES
-    ('reqMasterStateMatrix', 'current', 'master'),
-    ('reqGenStateMatrix', 'current', 'generic'),
-    ('reqAccStateMatrix', 'current', 'access'),
-    ('reqRulDelStateMatrix', 'current', 'rule_delete'),
-    ('reqRulModStateMatrix', 'current', 'rule_modify'),
-    ('reqGrpCreStateMatrix', 'current', 'group_create'),
-    ('reqGrpModStateMatrix', 'current', 'group_modify'),
-    ('reqGrpDelStateMatrix', 'current', 'group_delete'),
-    ('reqNewIntStateMatrix', 'current', 'new_interface'),
-    ('reqMasterStateMatrixDefault', 'installation-default', 'master'),
-    ('reqGenStateMatrixDefault', 'installation-default', 'generic'),
-    ('reqAccStateMatrixDefault', 'installation-default', 'access'),
-    ('reqRulDelStateMatrixDefault', 'installation-default', 'rule_delete'),
-    ('reqRulModStateMatrixDefault', 'installation-default', 'rule_modify'),
-    ('reqGrpCreStateMatrixDefault', 'installation-default', 'group_create'),
-    ('reqGrpModStateMatrixDefault', 'installation-default', 'group_modify'),
-    ('reqGrpDelStateMatrixDefault', 'installation-default', 'group_delete'),
-    ('reqNewIntStateMatrixDefault', 'installation-default', 'new_interface');
-
-WITH phase_data AS (
-    SELECT
-        matrix_key.configuration_name,
-        matrix_key.task_type,
-        phase.key AS phase,
-        phase.value AS phase_config,
-        matrix_key.configuration_name || '_' || matrix_key.task_type || '_' || phase.key AS phase_name
-    FROM tmp_state_matrix_key matrix_key
-    JOIN config ON config.config_key = matrix_key.config_key AND config.config_user = 0
-    CROSS JOIN LATERAL jsonb_each((config.config_value::jsonb)->'config_value') AS phase
-)
-INSERT INTO request.state_matrix_phase (name, phase, active, lowest_input_state, lowest_start_state, lowest_end_state)
+CREATE OR REPLACE VIEW v_active_access_allow_rules AS
 SELECT
-    phase_name,
-    phase,
-    COALESCE((phase_config->>'active')::boolean, FALSE),
-    (phase_config->>'lowest_input_state')::int,
-    (phase_config->>'lowest_start_state')::int,
-    (phase_config->>'lowest_end_state')::int
-FROM phase_data
-ON CONFLICT (name) DO NOTHING;
+    rule_id,
+    rule_src,
+    rule_dst,
+    rule_svc,
+    rule_svc_neg,
+    rule_src_neg,
+    rule_dst_neg,
+    mgm_id,
+    rule_uid,
+    rule_num_numeric,
+    rule_disabled,
+    rule_src_refs,
+    rule_dst_refs,
+    rule_svc_refs,
+    rule_action,
+    rule_track,
+    track_id,
+    action_id,
+    rule_installon,
+    rule_comment,
+    rule_name,
+    rule_implied,
+    rule_custom_fields,
+    rule_create,
+    removed,
+    is_global,
+    rulebase_id
+FROM rule r
+WHERE
+    r.active
+    AND -- only show current (not historical) rules 
+    r.access_rule
+    AND -- only show access rules (no NAT)
+    r.rule_head_text IS NULL
+    AND -- do not show header rules
+    NOT r.rule_disabled
+    AND -- do not show disabled rules
+    NOT r.action_id IN (2, 3, 7);
+-- do not deal with deny rules
 
-WITH phase_data AS (
-    SELECT
-        matrix_key.configuration_name,
-        matrix_key.task_type,
-        phase.key AS phase,
-        matrix_key.configuration_name || '_' || matrix_key.task_type || '_' || phase.key AS phase_name
-    FROM tmp_state_matrix_key matrix_key
-    JOIN config ON config.config_key = matrix_key.config_key AND config.config_user = 0
-    CROSS JOIN LATERAL jsonb_each((config.config_value::jsonb)->'config_value') AS phase
-)
-INSERT INTO request.workflow_configuration_phase (configuration_id, task_type, phase, phase_matrix_id)
-SELECT configuration.id, phase_data.task_type, phase_data.phase, matrix_phase.id
-FROM phase_data
-JOIN request.workflow_configuration configuration ON configuration.name = phase_data.configuration_name
-JOIN request.state_matrix_phase matrix_phase ON matrix_phase.name = phase_data.phase_name
-ON CONFLICT (configuration_id, task_type, phase) DO NOTHING;
+CREATE OR REPLACE VIEW v_rule_ownership_mode AS
+SELECT c.config_value as mode
+FROM config c
+WHERE
+    c.config_key = 'ruleOwnershipMode';
 
-WITH phase_data AS (
-    SELECT
-        matrix_key.configuration_name,
-        matrix_key.task_type,
-        phase.key AS phase,
-        matrix_phase.id AS phase_matrix_id,
-        matrix_key.configuration_name || '_' || matrix_key.task_type || '_' || phase.key || '_transitions' AS group_name
-    FROM tmp_state_matrix_key matrix_key
-    JOIN config ON config.config_key = matrix_key.config_key AND config.config_user = 0
-    CROSS JOIN LATERAL jsonb_each((config.config_value::jsonb)->'config_value') AS phase
-    JOIN request.state_matrix_phase matrix_phase ON matrix_phase.name = matrix_key.configuration_name || '_' || matrix_key.task_type || '_' || phase.key
-)
-INSERT INTO request.state_matrix_transition_group (name, description, phase, visibility_group_id)
-SELECT group_name, 'Migrated transitions for ' || group_name, phase, NULL
-FROM phase_data
-ON CONFLICT (name) DO NOTHING;
+CREATE OR REPLACE VIEW v_rule_with_rule_owner AS
+SELECT
+    r.rule_id,
+    ow.id as owner_id,
+    ow.name as owner_name,
+    'rule' AS matches,
+    ow.recert_interval,
+    max(rec.recert_date) AS rule_last_certified
+FROM
+    v_active_access_allow_rules r
+    LEFT JOIN rule_metadata met ON (r.rule_uid = met.rule_uid)
+    LEFT JOIN rule_owner ro ON (
+        ro.rule_metadata_id = met.rule_metadata_id
+    )
+    LEFT JOIN owner ow ON (ro.owner_id = ow.id)
+    LEFT JOIN recertification rec ON (
+        rec.rule_metadata_id = met.rule_metadata_id
+        AND rec.owner_id = ow.id
+        AND rec.recertified IS TRUE
+    )
+WHERE
+    NOT ow.id IS NULL
+GROUP BY
+    r.rule_id,
+    ow.id,
+    ow.name,
+    ow.recert_interval;
 
-WITH phase_data AS (
-    SELECT
-        matrix_key.configuration_name,
-        matrix_key.task_type,
-        phase.key AS phase,
-        matrix_phase.id AS phase_matrix_id,
-        matrix_key.configuration_name || '_' || matrix_key.task_type || '_' || phase.key || '_transitions' AS group_name
-    FROM tmp_state_matrix_key matrix_key
-    JOIN config ON config.config_key = matrix_key.config_key AND config.config_user = 0
-    CROSS JOIN LATERAL jsonb_each((config.config_value::jsonb)->'config_value') AS phase
-    JOIN request.state_matrix_phase matrix_phase ON matrix_phase.name = matrix_key.configuration_name || '_' || matrix_key.task_type || '_' || phase.key
-)
-INSERT INTO request.state_matrix_phase_transition_group (phase_matrix_id, transition_group_id, sort_order)
-SELECT phase_data.phase_matrix_id, transition_group.id, 0
-FROM phase_data
-JOIN request.state_matrix_transition_group transition_group ON transition_group.name = phase_data.group_name
-ON CONFLICT (phase_matrix_id, transition_group_id) DO NOTHING;
+CREATE OR REPLACE VIEW v_rule_with_rule_owner_1 AS
+SELECT DISTINCT
+    r.rule_id,
+    r.rule_uid,
+    r.rule_name,
+    r.mgm_id,
+    r.rulebase_id,
+    ow.id AS owner_id,
+    met.rule_metadata_id
+FROM
+    v_active_access_allow_rules r
+    JOIN rule_metadata met ON r.rule_uid = met.rule_uid
+    JOIN rule_owner ro ON ro.rule_metadata_id = met.rule_metadata_id
+    JOIN owner ow ON ro.owner_id = ow.id;
 
-WITH phase_data AS (
-    SELECT
-        phase.value AS phase_config,
-        transition_group.id AS transition_group_id
-    FROM tmp_state_matrix_key matrix_key
-    JOIN config ON config.config_key = matrix_key.config_key AND config.config_user = 0
-    CROSS JOIN LATERAL jsonb_each((config.config_value::jsonb)->'config_value') AS phase
-    JOIN request.state_matrix_transition_group transition_group ON transition_group.name = matrix_key.configuration_name || '_' || matrix_key.task_type || '_' || phase.key || '_transitions'
-),
-transition_data AS (
-    SELECT
-        transition_group_id,
-        transition.key::int AS from_state_id,
-        target.value::int AS to_state_id,
-        target.ordinality::int AS sort_order
-    FROM phase_data
-    CROSS JOIN LATERAL jsonb_each(phase_config->'matrix') AS transition
-    CROSS JOIN LATERAL jsonb_array_elements_text(transition.value) WITH ORDINALITY AS target(value, ordinality)
-)
-INSERT INTO request.state_matrix_transition (transition_group_id, from_state_id, to_state_id, sort_order)
-SELECT transition_group_id, from_state_id, to_state_id, sort_order
-FROM transition_data
-ON CONFLICT (transition_group_id, from_state_id, to_state_id) DO NOTHING;
+CREATE OR REPLACE VIEW v_excluded_src_ips AS
+SELECT distinct
+    o.obj_ip
+FROM
+    v_rule_with_rule_owner r
+    LEFT JOIN rule_from rf ON (r.rule_id = rf.rule_id)
+    LEFT JOIN objgrp_flat of ON (rf.obj_id = of.objgrp_flat_id)
+    LEFT JOIN object o ON (
+        of.objgrp_flat_member_id = o.obj_id
+    )
+WHERE
+    NOT o.obj_ip = '0.0.0.0/0';
 
-WITH phase_data AS (
-    SELECT
-        phase.value AS phase_config,
-        matrix_phase.id AS phase_matrix_id
-    FROM tmp_state_matrix_key matrix_key
-    JOIN config ON config.config_key = matrix_key.config_key AND config.config_user = 0
-    CROSS JOIN LATERAL jsonb_each((config.config_value::jsonb)->'config_value') AS phase
-    JOIN request.state_matrix_phase matrix_phase ON matrix_phase.name = matrix_key.configuration_name || '_' || matrix_key.task_type || '_' || phase.key
-),
-derived_state_data AS (
-    SELECT
-        phase_matrix_id,
-        derived_state.key::int AS from_state_id,
-        derived_state.value::int AS derived_state_id
-    FROM phase_data
-    CROSS JOIN LATERAL jsonb_each_text(phase_config->'derived_states') AS derived_state
-    WHERE derived_state.key::int <> derived_state.value::int
-)
-INSERT INTO request.state_matrix_derived_state (phase_matrix_id, from_state_id, derived_state_id)
-SELECT phase_matrix_id, from_state_id, derived_state_id
-FROM derived_state_data
-ON CONFLICT (phase_matrix_id, from_state_id) DO NOTHING;
+CREATE OR REPLACE VIEW v_excluded_dst_ips AS
+SELECT distinct
+    o.obj_ip
+FROM
+    v_rule_with_rule_owner r
+    LEFT JOIN rule_to rt ON (r.rule_id = rt.rule_id)
+    LEFT JOIN objgrp_flat of ON (rt.obj_id = of.objgrp_flat_id)
+    LEFT JOIN object o ON (
+        of.objgrp_flat_member_id = o.obj_id
+    )
+WHERE
+    NOT o.obj_ip = '0.0.0.0/0';
 
-DROP TABLE IF EXISTS pg_temp.tmp_state_matrix_key;
+-- if start_ip1 <= end_ip2 and start_ip2 <= end_ip1:
+--     overlap_start = max(start_ip1, start_ip2)
+--     overlap_end = min(end_ip1, end_ip2)
+--     return (overlap_start, overlap_end)
+-- else:
+--     return None  # No overlap
+
+CREATE OR REPLACE VIEW v_rule_with_src_owner AS
+SELECT
+    r.rule_id,
+    ow.id as owner_id,
+    ow.name as owner_name,
+    CASE
+        WHEN onw.ip = onw.ip_end THEN SPLIT_PART(
+            CAST(onw.ip AS VARCHAR),
+            '/',
+            1
+        ) -- Single IP overlap, removing netmask
+        ELSE CASE
+            WHEN -- range is a single network
+            host(
+                broadcast(
+                    inet_merge(onw.ip, onw.ip_end)
+                )
+            ) = host(onw.ip_end)
+            AND host(
+                inet_merge(onw.ip, onw.ip_end)
+            ) = host(onw.ip) THEN text(
+                inet_merge(onw.ip, onw.ip_end)
+            )
+            ELSE CONCAT(
+                SPLIT_PART(onw.ip::VARCHAR, '/', 1),
+                '-',
+                SPLIT_PART(onw.ip_end::VARCHAR, '/', 1)
+            )
+        END
+    END AS matching_ip,
+    'source' AS match_in,
+    ow.recert_interval,
+    max(rec.recert_date) AS rule_last_certified
+FROM
+    v_active_access_allow_rules r
+    LEFT JOIN rule_from ON (r.rule_id = rule_from.rule_id)
+    LEFT JOIN objgrp_flat of ON (
+        rule_from.obj_id = of.objgrp_flat_id
+    )
+    LEFT JOIN object o ON (
+        of.objgrp_flat_member_id = o.obj_id
+    )
+    LEFT JOIN owner_network onw ON (
+        onw.ip_end >= o.obj_ip
+        AND onw.ip <= o.obj_ip_end
+    )
+    LEFT JOIN owner ow ON (onw.owner_id = ow.id)
+    LEFT JOIN rule_metadata met ON (r.rule_uid = met.rule_uid)
+    LEFT JOIN recertification rec ON (
+        rec.rule_metadata_id = met.rule_metadata_id
+        AND rec.owner_id = ow.id
+        AND rec.recertified IS TRUE
+    )
+WHERE
+    r.rule_id NOT IN (
+        SELECT distinct
+            rwo.rule_id
+        FROM v_rule_with_rule_owner rwo
+    )
+    AND CASE
+        when (
+            select mode
+            from v_rule_ownership_mode
+        ) = 'exclusive' then (NOT o.obj_ip IS NULL)
+        AND o.obj_ip NOT IN (
+            select *
+            from v_excluded_src_ips
+        )
+        else NOT o.obj_ip IS NULL
+    END
+GROUP BY
+    r.rule_id,
+    o.obj_ip,
+    o.obj_ip_end,
+    onw.ip,
+    onw.ip_end,
+    ow.id,
+    ow.name,
+    ow.recert_interval;
+
+CREATE OR REPLACE VIEW v_rule_with_dst_owner AS
+SELECT
+    r.rule_id,
+    ow.id as owner_id,
+    ow.name as owner_name,
+    CASE
+        WHEN onw.ip = onw.ip_end THEN SPLIT_PART(
+            CAST(onw.ip AS VARCHAR),
+            '/',
+            1
+        ) -- Single IP overlap, removing netmask
+        ELSE CASE
+            WHEN -- range is a single network
+            host(
+                broadcast(
+                    inet_merge(onw.ip, onw.ip_end)
+                )
+            ) = host(onw.ip_end)
+            AND host(
+                inet_merge(onw.ip, onw.ip_end)
+            ) = host(onw.ip) THEN text(
+                inet_merge(onw.ip, onw.ip_end)
+            )
+            ELSE CONCAT(
+                SPLIT_PART(onw.ip::VARCHAR, '/', 1),
+                '-',
+                SPLIT_PART(onw.ip_end::VARCHAR, '/', 1)
+            )
+        END
+    END AS matching_ip,
+    'destination' AS match_in,
+    ow.recert_interval,
+    max(rec.recert_date) AS rule_last_certified
+FROM
+    v_active_access_allow_rules r
+    LEFT JOIN rule_to rt ON (r.rule_id = rt.rule_id)
+    LEFT JOIN objgrp_flat of ON (rt.obj_id = of.objgrp_flat_id)
+    LEFT JOIN object o ON (
+        of.objgrp_flat_member_id = o.obj_id
+    )
+    LEFT JOIN owner_network onw ON (
+        onw.ip_end >= o.obj_ip
+        AND onw.ip <= o.obj_ip_end
+    )
+    LEFT JOIN owner ow ON (onw.owner_id = ow.id)
+    LEFT JOIN rule_metadata met ON (r.rule_uid = met.rule_uid)
+    LEFT JOIN recertification rec ON (
+        rec.rule_metadata_id = met.rule_metadata_id
+        AND rec.owner_id = ow.id
+        AND rec.recertified IS TRUE
+    )
+WHERE
+    r.rule_id NOT IN (
+        SELECT distinct
+            rwo.rule_id
+        FROM v_rule_with_rule_owner rwo
+    )
+    AND CASE
+        when (
+            select mode
+            from v_rule_ownership_mode
+        ) = 'exclusive' then (NOT o.obj_ip IS NULL)
+        AND o.obj_ip NOT IN (
+            select *
+            from v_excluded_dst_ips
+        )
+        else NOT o.obj_ip IS NULL
+    END
+GROUP BY
+    r.rule_id,
+    o.obj_ip,
+    o.obj_ip_end,
+    onw.ip,
+    onw.ip_end,
+    ow.id,
+    ow.name,
+    ow.recert_interval;
+
+CREATE OR REPLACE VIEW v_rule_with_ip_owner AS
+SELECT DISTINCT
+    uno.rule_id,
+    uno.owner_id,
+    uno.owner_name,
+    string_agg(
+        DISTINCT match_in || ':' || matching_ip::VARCHAR,
+        '; '
+        order by match_in || ':' || matching_ip::VARCHAR desc
+    ) as matches,
+    uno.recert_interval,
+    uno.rule_last_certified
+FROM (
+        SELECT DISTINCT
+            *
+        FROM v_rule_with_src_owner AS src
+        UNION
+        SELECT DISTINCT
+            *
+        FROM v_rule_with_dst_owner AS dst
+    ) AS uno
+GROUP BY
+    uno.rule_id,
+    uno.owner_id,
+    uno.owner_name,
+    uno.recert_interval,
+    uno.rule_last_certified;
+
+CREATE OR REPLACE FUNCTION purge_view_rule_with_owner () RETURNS VOID AS $$
+DECLARE
+    r_temp_record RECORD;
+BEGIN
+    select INTO r_temp_record schemaname, viewname from pg_catalog.pg_views
+    where schemaname NOT IN ('pg_catalog', 'information_schema') and viewname='view_rule_with_owner'
+    order by schemaname, viewname;
+    IF FOUND THEN
+        DROP VIEW IF EXISTS view_rule_with_owner CASCADE;
+    END IF;
+    DROP MATERIALIZED VIEW IF EXISTS view_rule_with_owner CASCADE;
+    RETURN;
 END;
-$state_matrix_migration$;
+$$ LANGUAGE plpgsql;
+
+SELECT * FROM purge_view_rule_with_owner ();
+
+DROP FUNCTION purge_view_rule_with_owner ();
+
+-- LargeOwnerChange: remove MATERIALIZED for small installations
+-- SmallOwnerChange: add MATERIALIZED for large installations
+CREATE MATERIALIZED VIEW view_rule_with_owner AS
+SELECT DISTINCT
+    ar.rule_id,
+    ar.owner_id,
+    ar.owner_name,
+    ar.matches,
+    ar.recert_interval,
+    ar.rule_last_certified,
+    r.rule_num_numeric,
+    r.track_id,
+    r.action_id,
+    r.mgm_id,
+    r.rule_uid,
+    r.rule_action,
+    r.rule_name,
+    r.rule_comment,
+    r.rule_track,
+    r.rule_src_neg,
+    r.rule_dst_neg,
+    r.rule_svc_neg,
+    r.rule_head_text,
+    r.rule_disabled,
+    r.access_rule,
+    r.xlate_rule,
+    r.nat_rule
+FROM (
+        SELECT *
+        FROM v_rule_with_rule_owner AS rul
+        UNION
+        SELECT *
+        FROM v_rule_with_ip_owner AS ips
+    ) AS ar
+    LEFT JOIN rule AS r USING (rule_id);
+
+CREATE TABLE IF NOT EXISTS refresh_log (
+    id SERIAL PRIMARY KEY,
+    view_name TEXT NOT NULL,
+    refreshed_at TIMESTAMPTZ DEFAULT now(),
+    status TEXT
+);
+
+CREATE OR REPLACE FUNCTION refresh_view_rule_with_owner()
+RETURNS SETOF refresh_log AS $$
+DECLARE
+    status_message TEXT;
+BEGIN
+    -- Attempt to refresh the materialized view
+    BEGIN
+        REFRESH MATERIALIZED VIEW view_rule_with_owner;
+        status_message := 'Materialized view refreshed successfully';
+    EXCEPTION
+        WHEN OTHERS THEN
+            status_message := format('Failed to refresh view: %s', SQLERRM);
+    END;
+
+    -- Log the operation
+    INSERT INTO refresh_log (view_name, status)
+    VALUES ('view_rule_with_owner', status_message);
+
+    -- Return the log entry
+    RETURN QUERY SELECT * FROM refresh_log WHERE view_name = 'view_rule_with_owner' ORDER BY refreshed_at DESC LIMIT 1;
+END;
+$$ LANGUAGE plpgsql VOLATILE;
+
+-- Create indexes on the materialized view
+CREATE INDEX IF NOT EXISTS idx_view_rule_with_owner_rule_id ON view_rule_with_owner (rule_id);
+
+CREATE INDEX IF NOT EXISTS idx_view_rule_with_owner_owner_id ON view_rule_with_owner (owner_id);
