@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS request.state_matrix_transition_group
 
 ALTER TABLE request.state_matrix_transition_group ADD COLUMN IF NOT EXISTS exclusive boolean NOT NULL DEFAULT FALSE;
 
+INSERT INTO config (config_key, config_value, config_user) VALUES ('reqVisibilityBased', 'False', 0) ON CONFLICT DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS request.state_matrix_phase_transition_group
 (
     phase_matrix_id int NOT NULL,

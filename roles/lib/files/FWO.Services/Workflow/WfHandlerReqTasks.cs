@@ -28,7 +28,7 @@ namespace FWO.Services.Workflow
                     return false;
                 }
 
-                WfTicket? refreshedTicket = await dbAcc.FetchTicket(ActReqTask.TicketId, userConfig.ReqOwnerBased ? AllOwners.ConvertAll(owner => owner.Id) : null, ApplyVisibilityRestrictions);
+                WfTicket? refreshedTicket = await dbAcc.FetchTicket(ActReqTask.TicketId, userConfig.ReqOwnerBased ? AllOwners.ConvertAll(owner => owner.Id) : null, GetVisibilityTicketFilter());
                 if (refreshedTicket != null)
                 {
                     int ticketIndex = TicketList.FindIndex(ticket => ticket.Id == refreshedTicket.Id);
@@ -87,7 +87,7 @@ namespace FWO.Services.Workflow
 
             try
             {
-                WfTicket? ticket = await dbAcc.FetchTicket(reqTask.TicketId, userConfig.ReqOwnerBased ? AllOwners.ConvertAll(owner => owner.Id) : null, ApplyVisibilityRestrictions);
+                WfTicket? ticket = await dbAcc.FetchTicket(reqTask.TicketId, userConfig.ReqOwnerBased ? AllOwners.ConvertAll(owner => owner.Id) : null, GetVisibilityTicketFilter());
                 if (ticket != null)
                 {
                     int ticketIndex = TicketList.FindIndex(existingTicket => existingTicket.Id == ticket.Id);

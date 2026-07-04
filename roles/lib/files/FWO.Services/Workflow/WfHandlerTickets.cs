@@ -20,7 +20,7 @@ namespace FWO.Services.Workflow
             WfTicket? ticket = null;
             if (dbAcc != null)
             {
-                ticket = await dbAcc.FetchTicket(ticketId, userConfig.ReqOwnerBased ? AllOwners.ConvertAll(x => x.Id) : null, ApplyVisibilityRestrictions);
+                ticket = await dbAcc.FetchTicket(ticketId, userConfig.ReqOwnerBased ? AllOwners.ConvertAll(x => x.Id) : null, GetVisibilityTicketFilter());
                 if (ticket != null)
                 {
                     SetTicketEnv(ticket);
@@ -67,7 +67,7 @@ namespace FWO.Services.Workflow
                     _ => throw new NotSupportedException("Time interval is not supported."),
                 };
                 return await dbAcc.GetTicketsByParameters(taskType, StateMatrix(taskType).LowestInputState, StateMatrix(taskType).LowestEndState, cutOffDate,
-                    ApplyVisibilityRestrictions);
+                    null);
             }
             return [];
         }
@@ -76,7 +76,7 @@ namespace FWO.Services.Workflow
         {
             if (ReloadTasks && reload && dbAcc != null)
             {
-                WfTicket? refreshedTicket = await dbAcc.FetchTicket(ticket.Id, null, ApplyVisibilityRestrictions);
+                WfTicket? refreshedTicket = await dbAcc.FetchTicket(ticket.Id, null, GetVisibilityTicketFilter());
                 if (refreshedTicket == null)
                 {
                     return;
@@ -168,46 +168,98 @@ namespace FWO.Services.Workflow
 
         private bool CanViewTicket(WfTicket ticket)
         {
-            bool visible = WorkflowVisibilityHelper.CanAccessStatefulObject(ticket, MasterStateMatrix, userConfig.User.WorkflowVisibilityGroupIds,
-                GetWorkflowExclusiveVisibilityGroupIds());
-            LogVisibilityDecision("ticket", ticket.StateId, ticket.Id.ToString(), MasterStateMatrix, visible);
-            return visible;
+            return CanViewStatefulObject(ticket, MasterStateMatrix, "ticket", ticket.Id.ToString());
+        }
+
+        private bool CanViewReqTask(WfReqTask reqTask)
+        {
+            StateMatrix stateMatrix = StateMatrix(reqTask.TaskType);
+            return CanViewStatefulObject(reqTask, stateMatrix, "request-task", $"{reqTask.TaskType}/{reqTask.Id}");
         }
 
         private bool CanViewImplTask(WfImplTask implTask)
         {
             StateMatrix stateMatrix = StateMatrix(implTask.TaskType);
-            bool visible = WorkflowVisibilityHelper.CanAccessStatefulObject(implTask, stateMatrix, userConfig.User.WorkflowVisibilityGroupIds,
-                GetWorkflowExclusiveVisibilityGroupIds());
-            LogVisibilityDecision("impl-task", implTask.StateId, $"{implTask.TaskType}/{implTask.Id}", stateMatrix, visible);
-            return visible;
+            return CanViewStatefulObject(implTask, stateMatrix, "impl-task", $"{implTask.TaskType}/{implTask.Id}");
         }
 
         private bool CanViewApproval(WfApproval approval, StateMatrix reqTaskMatrix)
         {
+            if (!userConfig.ReqVisibilityBased)
+            {
+                return true;
+            }
+
             bool visible = WorkflowVisibilityHelper.CanAccessStatefulObject(approval, reqTaskMatrix, userConfig.User.WorkflowVisibilityGroupIds,
-                GetWorkflowExclusiveVisibilityGroupIds());
+                GetWorkflowExclusiveVisibilityGroupIds()) || IsExplicitlyAssigned(approval);
             LogVisibilityDecision("approval", approval.StateId, approval.Id.ToString(), reqTaskMatrix, visible);
             return visible;
         }
 
+        private bool CanViewStatefulObject(WfStatefulObject statefulObject, StateMatrix stateMatrix, string objectType, string objectId)
+        {
+            if (!userConfig.ReqVisibilityBased)
+            {
+                return true;
+            }
+
+            bool visible = WorkflowVisibilityHelper.CanAccessStatefulObject(statefulObject, stateMatrix, userConfig.User.WorkflowVisibilityGroupIds,
+                GetWorkflowExclusiveVisibilityGroupIds()) || IsExplicitlyAssigned(statefulObject);
+            LogVisibilityDecision(objectType, statefulObject.StateId, objectId, stateMatrix, visible);
+            return visible;
+        }
+
+        private bool IsExplicitlyAssigned(WfStatefulObject statefulObject)
+        {
+            return IsAssignedToCurrentUser(statefulObject.CurrentHandler) || IsAssignedToCurrentUserGroup(statefulObject.AssignedGroup)
+                || (statefulObject is WfApproval approval && IsExplicitApprovalAssignment(approval));
+        }
+
+        private bool IsExplicitApprovalAssignment(WfApproval approval)
+        {
+            return IsAssignedToCurrentUserDn(approval.ApproverDn) || IsAssignedToCurrentUserGroup(approval.ApproverGroup);
+        }
+
+        private bool IsAssignedToCurrentUser(UiUser? handler)
+        {
+            return handler != null && (handler.DbId == userConfig.User.DbId || DistName.DnEquals(handler.Dn, userConfig.User.Dn));
+        }
+
+        private bool IsAssignedToCurrentUserDn(string? dn)
+        {
+            return DistName.DnEquals(dn, userConfig.User.Dn);
+        }
+
+        private bool IsAssignedToCurrentUserGroup(string? groupDn)
+        {
+            return !string.IsNullOrWhiteSpace(groupDn)
+                && (DistName.DnEquals(groupDn, userConfig.User.Dn)
+                    || userConfig.User.Groups.Any(group => DistName.DnEquals(group, groupDn)));
+        }
+
         private bool ApplyVisibilityRestrictions(WfTicket ticket)
         {
+            if (!userConfig.ReqVisibilityBased)
+            {
+                return true;
+            }
+
             bool ticketVisible = CanViewTicket(ticket);
             bool hadRequestTasks = ticket.Tasks.Count > 0;
             List<WfReqTask> visibleReqTasks = [];
+
             foreach (WfReqTask reqTask in ticket.Tasks)
             {
                 StateMatrix reqTaskMatrix = StateMatrix(reqTask.TaskType);
-                bool taskVisible = WorkflowVisibilityHelper.CanAccessStatefulObject(reqTask, reqTaskMatrix, userConfig.User.WorkflowVisibilityGroupIds,
-                    GetWorkflowExclusiveVisibilityGroupIds());
+                reqTask.ImplementationTasks = [.. reqTask.ImplementationTasks.Where(CanViewImplTask)];
+                reqTask.Approvals = [.. reqTask.Approvals.Where(approval => CanViewApproval(approval, reqTaskMatrix))];
+
+                bool taskVisible = CanViewReqTask(reqTask) || reqTask.ImplementationTasks.Count > 0 || reqTask.Approvals.Count > 0;
                 if (!taskVisible)
                 {
                     continue;
                 }
 
-                reqTask.ImplementationTasks = [.. reqTask.ImplementationTasks.Where(CanViewImplTask)];
-                reqTask.Approvals = [.. reqTask.Approvals.Where(approval => CanViewApproval(approval, reqTaskMatrix))];
                 visibleReqTasks.Add(reqTask);
             }
 
@@ -219,7 +271,13 @@ namespace FWO.Services.Workflow
                     $"user groups: [{string.Join(", ", userConfig.User.WorkflowVisibilityGroupIds)}], exclusive groups: [{string.Join(", ", GetWorkflowExclusiveVisibilityGroupIds())}]");
                 return false;
             }
-            return ticketVisible;
+
+            return ticketVisible || ticket.Tasks.Count > 0;
+        }
+
+        private Func<WfTicket, bool>? GetVisibilityTicketFilter()
+        {
+            return userConfig.ReqVisibilityBased ? ApplyVisibilityRestrictions : null;
         }
 
         private void LogVisibilityDecision(string objectType, int stateId, string objectId, StateMatrix stateMatrix, bool visible)

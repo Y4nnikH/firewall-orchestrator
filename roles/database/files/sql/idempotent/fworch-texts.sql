@@ -2630,6 +2630,8 @@ INSERT INTO txt VALUES ('reqAvailableTaskTypes','German', 	'Verf&uuml;gbare Auft
 INSERT INTO txt VALUES ('reqAvailableTaskTypes','English', 	'Available Task Types');
 INSERT INTO txt VALUES ('reqOwnerBased',        'German', 	'Eigent&uuml;merbasiert');
 INSERT INTO txt VALUES ('reqOwnerBased',        'English', 	'Owner based');
+INSERT INTO txt VALUES ('reqVisibilityBased',   'German', 	'Sichtbarkeit ber&uuml;cksichtigen');
+INSERT INTO txt VALUES ('reqVisibilityBased',   'English', 	'Consider visibility');
 INSERT INTO txt VALUES ('reqReducedView',       'German', 	'Eingeschr&auml;nkte Darstellung');
 INSERT INTO txt VALUES ('reqReducedView',       'English', 	'Reduced view');
 INSERT INTO txt VALUES ('reqUseFlowDb',         'German', 	'Flow DB verwenden');
@@ -6495,6 +6497,8 @@ INSERT INTO txt VALUES ('H5577', 'German',  'Ein Auftrag f&uuml;r alle Ger&auml;
 INSERT INTO txt VALUES ('H5577', 'English', 'One task for all devices: As with Enter device in request, the device selection is already maintained in the request. The only difference is this: if all is selected there, exactly one implementation task is created instead of one per existing device.');
 INSERT INTO txt VALUES ('H5578', 'German',  'B&uuml;ndelung ber&uuml;cksichtigen: Wenn aktiviert, werden automatisch erzeugte Implementierungs-Auftr&auml;ge f&uuml;r Antrags-Auftr&auml;ge mit derselben Flow-B&uuml;ndel-ID auf einem zusammengef&uuml;hrten Auftrag erzeugt. Auftr&auml;ge ohne B&uuml;ndel-ID werden weiterhin einzeln behandelt.');
 INSERT INTO txt VALUES ('H5578', 'English', 'Consider bundling: When enabled, automatically created implementation tasks for request tasks with the same flow bundle id are created from one merged task. Tasks without a bundle id are still handled individually.');
+INSERT INTO txt VALUES ('H5579', 'German',  'Sichtbarkeit ber&uuml;cksichtigen: Aktiviert die Sichtbarkeitseinschr&auml;nkungen f&uuml;r den Workflow. Tickets, Auftr&auml;ge und Genehmigungen werden dann zus&auml;tzlich zu Rolle und Eigentum nach den zugeordneten Sichtbarkeitsgruppen gefiltert. Genehmigungen, die direkt an den eigenen Benutzer oder dessen Gruppe zugewiesen sind, bleiben ebenfalls sichtbar.');
+INSERT INTO txt VALUES ('H5579', 'English', 'Consider visibility: Activates workflow visibility restrictions. Tickets, tasks, and approvals are then filtered by their assigned visibility groups in addition to role and ownership checks. Approvals assigned directly to the current user or the user''s group stay visible as well.');
 INSERT INTO txt VALUES ('H5581', 'German',  'In diesem Abschnitt k&ouml;nnen die vorhandenen Eigent&uuml;mer eingesehen und administriert (falls in den <a href="/help/settings/workflowcustomizing">Einstellungen</a> aktiviert) werden.
     Die Eigent&uuml;merschaft muss Nutzern entweder direkt oder &uuml;ber Eigent&uuml;mergruppen zugeordnet werden.
     Es ist geplant, die Eigent&uuml;merschaft mit der Zust&auml;ndigkeit bei der Antragsstellung zu verkn&uuml;pfen.

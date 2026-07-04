@@ -22,15 +22,25 @@ namespace FWO.Test
             dict.Matrices[taskType] = matrix;
         }
 
+        private static void EnableVisibilityChecks(UserConfig userConfig)
+        {
+            userConfig.ReqVisibilityBased = true;
+        }
+
         private sealed class TicketTestApiConn : SimulatedApiConnection
         {
             public WfTicket Ticket { get; set; } = new();
+            public List<WfTicket> Tickets { get; set; } = [];
 
             public override Task<T> SendQueryAsync<T>(string query, object? variables = null, string? operationName = null, FWO.Api.Client.QueryChunkingOptions? chunkingOptions = null)
             {
                 if (query == RequestQueries.getTicketById)
                 {
                     return Task.FromResult((T)(object)Ticket);
+                }
+                if (query == RequestQueries.getTicketsByParameters || query == RequestQueries.getTickets || query == RequestQueries.getFullTickets)
+                {
+                    return Task.FromResult((T)(object)Tickets);
                 }
                 if (query == ConfigQueries.getConfigItemsByUser)
                 {
@@ -117,6 +127,7 @@ namespace FWO.Test
         {
             TicketTestApiConn apiConn = new() { Ticket = new WfTicket { Id = 7, StateId = 10 } };
             UserConfig userConfig = new();
+            EnableVisibilityChecks(userConfig);
             WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
             handler.MasterStateMatrix = new StateMatrix
             {
@@ -137,6 +148,7 @@ namespace FWO.Test
             TicketTestApiConn apiConn = new() { Ticket = new WfTicket { Id = 7, StateId = 10 } };
             UserConfig userConfig = new();
             userConfig.User.WorkflowVisibilityGroupIds = [7];
+            EnableVisibilityChecks(userConfig);
             WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
             handler.MasterStateMatrix = new StateMatrix
             {
@@ -154,6 +166,7 @@ namespace FWO.Test
             TicketTestApiConn apiConn = new() { Ticket = new WfTicket { Id = 7, StateId = 10 } };
             UserConfig userConfig = new();
             userConfig.User.WorkflowVisibilityGroupIds = [3];
+            EnableVisibilityChecks(userConfig);
             WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
             handler.MasterStateMatrix = new StateMatrix
             {
@@ -175,6 +188,7 @@ namespace FWO.Test
             TicketTestApiConn apiConn = new() { Ticket = new WfTicket { Id = 7, StateId = 10 } };
             UserConfig userConfig = new();
             userConfig.User.WorkflowVisibilityGroupIds = [3];
+            EnableVisibilityChecks(userConfig);
             WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
             handler.MasterStateMatrix = new StateMatrix
             {
@@ -212,6 +226,7 @@ namespace FWO.Test
             };
             UserConfig userConfig = new();
             userConfig.User.WorkflowVisibilityGroupIds = [3, 7];
+            EnableVisibilityChecks(userConfig);
             WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
             handler.MasterStateMatrix = new StateMatrix
             {
@@ -257,6 +272,7 @@ namespace FWO.Test
             };
             UserConfig userConfig = new();
             userConfig.User.WorkflowVisibilityGroupIds = [3];
+            EnableVisibilityChecks(userConfig);
             WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
             handler.MasterStateMatrix = new StateMatrix
             {
@@ -270,7 +286,8 @@ namespace FWO.Test
                 StateVisibilityGroupIds =
                 {
                     [21] = [99]
-                }
+                },
+                ExclusiveVisibilityGroupIds = [3]
             });
 
             WfTicket? ticket = await handler.ResolveTicket(7);
@@ -300,6 +317,7 @@ namespace FWO.Test
             };
             UserConfig userConfig = new();
             userConfig.User.WorkflowVisibilityGroupIds = [3];
+            EnableVisibilityChecks(userConfig);
             WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
             handler.Phase = WorkflowPhases.approval;
             handler.MasterStateMatrix = new StateMatrix
@@ -349,6 +367,7 @@ namespace FWO.Test
             };
             UserConfig userConfig = new();
             userConfig.User.WorkflowVisibilityGroupIds = [3];
+            EnableVisibilityChecks(userConfig);
             WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
             handler.MasterStateMatrix = new StateMatrix
             {
@@ -400,6 +419,7 @@ namespace FWO.Test
             };
             UserConfig userConfig = new();
             userConfig.User.WorkflowVisibilityGroupIds = [3];
+            EnableVisibilityChecks(userConfig);
             WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
             handler.MasterStateMatrix = new StateMatrix
             {
@@ -423,6 +443,290 @@ namespace FWO.Test
 
             Assert.That(handler.ActTicket.Tasks.Select(task => task.Id).ToArray(), Is.EqualTo(new long[] { 11 }));
             Assert.That(handler.TicketList[0].Tasks.Select(task => task.Id).ToArray(), Is.EqualTo(new long[] { 11 }));
+        }
+
+        [Test]
+        public async Task ResolveTicket_ReturnsVisibleTicket_WhenVisibilityChecksDisabled()
+        {
+            TicketTestApiConn apiConn = new()
+            {
+                Ticket = new WfTicket
+                {
+                    Id = 7,
+                    StateId = 10,
+                    Tasks =
+                    [
+                        new WfReqTask
+                        {
+                            Id = 11,
+                            TaskType = WfTaskType.access.ToString(),
+                            StateId = 21
+                        }
+                    ]
+                }
+            };
+            UserConfig userConfig = new();
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [10] = [99]
+                }
+            };
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [21] = [99]
+                },
+                ExclusiveVisibilityGroupIds = [3]
+            });
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Not.Null);
+            Assert.That(ticket!.Tasks, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public async Task ResolveTicket_AllowsApprovalAssignedToCurrentUserEvenIfVisibilityGroupsDoNotMatch()
+        {
+            TicketTestApiConn apiConn = new()
+            {
+                Ticket = new WfTicket
+                {
+                    Id = 7,
+                    StateId = 10,
+                    Tasks =
+                    [
+                        new WfReqTask
+                        {
+                            Id = 11,
+                            TaskType = WfTaskType.access.ToString(),
+                            StateId = 21,
+                            Approvals =
+                            [
+                                new WfApproval
+                                {
+                                    Id = 31,
+                                    StateId = 41,
+                                    ApproverDn = "uid=approver,ou=tenant0,ou=operator,ou=user,dc=fworch,dc=internal"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            };
+            UserConfig userConfig = new();
+            userConfig.User.Dn = "uid=approver,ou=tenant0,ou=operator,ou=user,dc=fworch,dc=internal";
+            userConfig.User.WorkflowVisibilityGroupIds = [3];
+            EnableVisibilityChecks(userConfig);
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [10] = [99]
+                }
+            };
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [21] = [99]
+                }
+            });
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Not.Null);
+            Assert.That(ticket!.Tasks, Has.Count.EqualTo(1));
+            Assert.That(ticket.Tasks[0].Approvals, Has.Count.EqualTo(1));
+            Assert.That(ticket.Tasks[0].Approvals[0].Id, Is.EqualTo(31));
+        }
+
+        [Test]
+        public async Task ResolveTicket_AllowsRequestTaskAssignedToCurrentUserEvenIfVisibilityGroupsDoNotMatch()
+        {
+            TicketTestApiConn apiConn = new()
+            {
+                Ticket = new WfTicket
+                {
+                    Id = 7,
+                    StateId = 10,
+                    Tasks =
+                    [
+                        new WfReqTask
+                        {
+                            Id = 11,
+                            TaskType = WfTaskType.access.ToString(),
+                            StateId = 21,
+                            CurrentHandler = new UiUser
+                            {
+                                DbId = 13,
+                                Dn = "uid=approver,ou=tenant0,ou=operator,ou=user,dc=fworch,dc=internal"
+                            }
+                        }
+                    ]
+                }
+            };
+            UserConfig userConfig = new();
+            userConfig.User.Dn = "uid=approver,ou=tenant0,ou=operator,ou=user,dc=fworch,dc=internal";
+            userConfig.User.WorkflowVisibilityGroupIds = [3];
+            EnableVisibilityChecks(userConfig);
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [10] = [99]
+                }
+            };
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [21] = [99]
+                }
+            });
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Not.Null);
+            Assert.That(ticket!.Tasks, Has.Count.EqualTo(1));
+            Assert.That(ticket.Tasks[0].Id, Is.EqualTo(11));
+        }
+
+        [Test]
+        public async Task ResolveTicket_AllowsRequestTaskAssignedToCurrentGroupEvenIfVisibilityGroupsDoNotMatch()
+        {
+            string groupDn = "cn=approvers,ou=groups,dc=fworch,dc=internal";
+            TicketTestApiConn apiConn = new()
+            {
+                Ticket = new WfTicket
+                {
+                    Id = 7,
+                    StateId = 10,
+                    Tasks =
+                    [
+                        new WfReqTask
+                        {
+                            Id = 11,
+                            TaskType = WfTaskType.access.ToString(),
+                            StateId = 21,
+                            AssignedGroup = groupDn
+                        }
+                    ]
+                }
+            };
+            UserConfig userConfig = new();
+            userConfig.User.Dn = "uid=approver,ou=tenant0,ou=operator,ou=user,dc=fworch,dc=internal";
+            userConfig.User.Groups = [groupDn];
+            userConfig.User.WorkflowVisibilityGroupIds = [3];
+            EnableVisibilityChecks(userConfig);
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [10] = [99]
+                }
+            };
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [21] = [99]
+                }
+            });
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Not.Null);
+            Assert.That(ticket!.Tasks, Has.Count.EqualTo(1));
+            Assert.That(ticket.Tasks[0].Id, Is.EqualTo(11));
+        }
+
+        [Test]
+        public async Task ResolveTicket_AllowsApprovalAssignedToCurrentGroupEvenIfVisibilityGroupsDoNotMatch()
+        {
+            string groupDn = "cn=approvers,ou=groups,dc=fworch,dc=internal";
+            TicketTestApiConn apiConn = new()
+            {
+                Ticket = new WfTicket
+                {
+                    Id = 7,
+                    StateId = 10,
+                    Tasks =
+                    [
+                        new WfReqTask
+                        {
+                            Id = 11,
+                            TaskType = WfTaskType.access.ToString(),
+                            StateId = 21,
+                            Approvals =
+                            [
+                                new WfApproval
+                                {
+                                    Id = 31,
+                                    StateId = 41,
+                                    ApproverGroup = groupDn
+                                }
+                            ]
+                        }
+                    ]
+                }
+            };
+            UserConfig userConfig = new();
+            userConfig.User.Dn = "uid=approver,ou=tenant0,ou=operator,ou=user,dc=fworch,dc=internal";
+            userConfig.User.Groups = [groupDn];
+            userConfig.User.WorkflowVisibilityGroupIds = [3];
+            EnableVisibilityChecks(userConfig);
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [10] = [99]
+                }
+            };
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [21] = [99]
+                }
+            });
+
+            WfTicket? ticket = await handler.ResolveTicket(7);
+
+            Assert.That(ticket, Is.Not.Null);
+            Assert.That(ticket!.Tasks, Has.Count.EqualTo(1));
+            Assert.That(ticket.Tasks[0].Approvals, Has.Count.EqualTo(1));
+            Assert.That(ticket.Tasks[0].Approvals[0].Id, Is.EqualTo(31));
+        }
+
+        [Test]
+        public void GetWorkflowExclusiveVisibilityGroupIds_MergesMasterAndPhaseMatrices()
+        {
+            WfHandler handler = new();
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix
+            {
+                ExclusiveVisibilityGroupIds = [4, 5]
+            });
+            SetMatrix(handler, WfTaskType.new_interface.ToString(), new StateMatrix
+            {
+                ExclusiveVisibilityGroupIds = [5, 6]
+            });
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                ExclusiveVisibilityGroupIds = [1, 2]
+            };
+
+            HashSet<int> exclusiveGroupIds = handler.GetWorkflowExclusiveVisibilityGroupIds();
+
+            Assert.That(exclusiveGroupIds, Is.EquivalentTo(new[] { 1, 2, 4, 5, 6 }));
         }
 
         [Test]
@@ -465,6 +769,42 @@ namespace FWO.Test
             List<WfTicket> tickets = await handler.GetOpenTickets(WfTaskType.access.ToString());
 
             Assert.That(tickets, Is.Empty);
+        }
+
+        [Test]
+        public async Task GetOpenTickets_DoesNotApplyVisibilityFiltering()
+        {
+            TicketTestApiConn apiConn = new()
+            {
+                Tickets =
+                [
+                    new WfTicket
+                    {
+                        Id = 7,
+                        StateId = 10
+                    }
+                ]
+            };
+            UserConfig userConfig = new();
+            EnableVisibilityChecks(userConfig);
+            WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            SetMatrix(handler, WfTaskType.access.ToString(), new StateMatrix
+            {
+                LowestInputState = 1,
+                LowestEndState = 10
+            });
+            handler.MasterStateMatrix = new StateMatrix
+            {
+                StateVisibilityGroupIds =
+                {
+                    [10] = [3]
+                }
+            };
+
+            List<WfTicket> tickets = await handler.GetOpenTickets(WfTaskType.access.ToString());
+
+            Assert.That(tickets, Has.Count.EqualTo(1));
+            Assert.That(tickets[0].Id, Is.EqualTo(7));
         }
 
         [Test]

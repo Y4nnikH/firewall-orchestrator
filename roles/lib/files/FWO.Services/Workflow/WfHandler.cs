@@ -201,7 +201,7 @@ namespace FWO.Services.Workflow
             MasterStateMatrix = stateMatrixDict.Matrices[WfTaskType.master.ToString()];
             if (fetchData)
             {
-                TicketList = await dbAcc.FetchTickets(MasterStateMatrix, ownerIds, allStates, fullTickets, ApplyVisibilityRestrictions);
+                TicketList = await dbAcc.FetchTickets(MasterStateMatrix, ownerIds, allStates, fullTickets, GetVisibilityTicketFilter());
             }
             ReloadTasks = !fullTickets;
             PrioList = System.Text.Json.JsonSerializer.Deserialize<List<WfPriority>>(userConfig.ReqPriorities) ?? throw new JsonException("Config data could not be parsed.");
