@@ -558,6 +558,21 @@ namespace FWO.Test
             Assert.That(GetField<bool>(component, "SaveMatrixMode"), Is.True);
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public async Task OpenConfigurationTransfer_SelectsModeAndOpensPopup(bool importMode)
+        {
+            SettingsStateMatrix component = new();
+
+            await InvokeAsync(component, "OpenConfigurationTransfer", importMode);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(GetField<bool>(component, "transferImportMode"), Is.EqualTo(importMode));
+                Assert.That(GetField<bool>(component, "TransferConfigurationMode"), Is.True);
+            });
+        }
+
         [Test]
         public void HasUnsavedChanges_ReflectsDeferredMatrixEditsAfterInitialization()
         {

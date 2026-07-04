@@ -3551,6 +3551,18 @@ INSERT INTO txt VALUES ('source_configuration', 'German',   'Quellkonfiguration'
 INSERT INTO txt VALUES ('source_configuration', 'English',  'Source configuration');
 INSERT INTO txt VALUES ('empty_configuration',  'German',   'Leere Konfiguration');
 INSERT INTO txt VALUES ('empty_configuration',  'English',  'Empty configuration');
+INSERT INTO txt VALUES ('export_configuration', 'German',   'Konfiguration exportieren');
+INSERT INTO txt VALUES ('export_configuration', 'English',  'Export configuration');
+INSERT INTO txt VALUES ('import_configuration', 'German',   'Konfiguration importieren');
+INSERT INTO txt VALUES ('import_configuration', 'English',  'Import configuration');
+INSERT INTO txt VALUES ('imported_configuration','German',   'Importierte Konfiguration');
+INSERT INTO txt VALUES ('imported_configuration','English',  'Imported configuration');
+INSERT INTO txt VALUES ('include_visibility_groups','German','Sichtbarkeitsgruppen und Mitglieder einschliessen');
+INSERT INTO txt VALUES ('include_visibility_groups','English','Include visibility groups and members');
+INSERT INTO txt VALUES ('phases',                'German',   'Phasen');
+INSERT INTO txt VALUES ('phases',                'English',  'Phases');
+INSERT INTO txt VALUES ('visibility_groups',     'German',   'Sichtbarkeitsgruppen');
+INSERT INTO txt VALUES ('visibility_groups',     'English',  'Visibility groups');
 INSERT INTO txt VALUES ('delete_configuration', 'German',   'Konfiguration l&ouml;schen');
 INSERT INTO txt VALUES ('delete_configuration', 'English',  'Delete configuration');
 INSERT INTO txt VALUES ('delete_configuration_message','German', 'Inaktive Konfiguration l&ouml;schen:');
@@ -3585,10 +3597,10 @@ INSERT INTO txt VALUES ('unlink_transition_group_message','German', 'Verkn&uuml;
 INSERT INTO txt VALUES ('unlink_transition_group_message','English','Remove this phase link to the transition group:');
 INSERT INTO txt VALUES ('no_transition_groups_available','German', 'Keine passenden &Uuml;bergangsgruppen verf&uuml;gbar.');
 INSERT INTO txt VALUES ('no_transition_groups_available','English','No matching transition groups available.');
-INSERT INTO txt VALUES ('matrices',              'German',   'Matrizen');
-INSERT INTO txt VALUES ('matrices',              'English',  'Matrices');
-INSERT INTO txt VALUES ('edit_transition_groups','German',  '&Uuml;bergangsgruppen bearbeiten');
-INSERT INTO txt VALUES ('edit_transition_groups','English', 'Edit transition groups');
+INSERT INTO txt VALUES ('using_phases',          'German',   'Nutzende Phasen');
+INSERT INTO txt VALUES ('using_phases',          'English',  'Using Phases');
+INSERT INTO txt VALUES ('edit_transition_groups','German',   '&Uuml;bergangsgruppen bearbeiten');
+INSERT INTO txt VALUES ('edit_transition_groups','English',  'Edit transition groups');
 INSERT INTO txt VALUES ('add_transition_group',  'German',   '&Uuml;bergangsgruppe hinzuf&uuml;gen');
 INSERT INTO txt VALUES ('add_transition_group',  'English',  'Add transition group');
 INSERT INTO txt VALUES ('edit_transition_group', 'German',   '&Uuml;bergangsgruppe bearbeiten');
@@ -6396,6 +6408,7 @@ INSERT INTO txt VALUES ('H5541', 'German',  'In der Status-Matrix werden die ver
     Oberhalb der Konfigurationsauswahl k&ouml;nnen Sichtbarkeitsgruppen und &Uuml;bergangsgruppen bearbeitet sowie neue leere Konfigurationen oder Kopien einer ausgew&auml;hlten Konfiguration angelegt werden. Nur inaktive Konfigurationen k&ouml;nnen gel&ouml;scht werden; nicht mehr verwendete Phasenmatrizen werden dabei ebenfalls entfernt. Mitglieder von Sichtbarkeitsgruppen k&ouml;nnen als DN eingegeben oder &uuml;ber die Benutzer- und Gruppensuche ausgew&auml;hlt werden. Beim L&ouml;schen einer Sichtbarkeitsgruppe wird ihre Zuordnung zu &Uuml;bergangsgruppen entfernt. Beim L&ouml;schen einer &Uuml;bergangsgruppe werden auch ihre &Uuml;berg&auml;nge und Phasenzuordnungen gel&ouml;scht. Genau eine Konfiguration ist aktiv und wird zur Laufzeit verwendet.
     In der Installation sind diese Matrizen bereits vorbelegt, sie k&ouml;nnen aber nahezu beliebig &uuml;berschrieben werden.
     Die "Speichern"-Schaltfl&auml;che erscheint nur bei ungespeicherten &Auml;nderungen an Phasen, Sonderstatus oder abgeleiteten Status. Vor dem Wechsel der Konfiguration, des Tasktyps oder der Seite wird vor dem Verwerfen solcher &Auml;nderungen gewarnt. &Uuml;bergangsgruppen werden separat und sofort gespeichert.
+    Konfigurationen k&ouml;nnen als versionsbehaftete JSON-Pakete exportiert und als neue inaktive Konfigurationen importiert werden. Das Paket enth&auml;lt alle Phasenmatrizen und verwendeten &Uuml;bergangsgruppen. Sichtbarkeitsgruppen einschliesslich ihrer Mitglied-DNs sind optional und standardm&auml;ssig nicht enthalten; dann werden auch ihre Zuordnungen und Exklusivkennzeichen aus den exportierten &Uuml;bergangsgruppen entfernt. Beim Import werden gleichnamige Gruppen nur wiederverwendet, wenn ihre Definition vollst&auml;ndig &uuml;bereinstimmt; abweichende Definitionen brechen den Import ab. Die im Paket verwendeten Status-IDs m&uuml;ssen im Zielsystem vorhanden sein.
     Alle Status werden zur eindeutigen Identifikation mit ihrer ID in Klammern angezeigt.
     W&auml;hrend die bereits vorhandenen Matrizen bei Software-Upgrades nicht ber&uuml;hrt werden, kann der mitgelieferte Installationsvorschlag aktualisiert werden.
 ');
@@ -6404,6 +6417,7 @@ INSERT INTO txt VALUES ('H5541', 'English', 'In the state matrix the usable stat
     Above the configuration selector, visibility groups and transition groups can be edited and new empty configurations or copies of a selected configuration can be created. Only inactive configurations can be deleted; phase matrices that are no longer used are removed as well. Visibility-group members can be entered as DNs or selected through the user and group lookup. Deleting a visibility group removes its assignment from transition groups. Deleting a transition group also deletes its transitions and phase assignments. Exactly one configuration is active and used at runtime.
     During installation these matrices are already initialized, but they can be overwritten almost arbitrarily.
     The "Save" button appears only for unsaved changes to phases, special states, or derived states. Before changing the configuration, task type, or page, a warning is shown before such changes are discarded. Transition groups are saved separately and immediately.
+    Configurations can be exported as versioned JSON packages and imported as new inactive configurations. The package contains all phase matrices and referenced transition groups. Visibility groups, including their member DNs, are optional and excluded by default; their assignments and exclusive flags are then removed from the exported transition groups as well. During import, groups with matching names are reused only when their complete definitions match; conflicting definitions stop the import. Every state ID referenced by the package must exist on the target system.
     All states are displayed with their ID in brackets for unambiguous identification.
     Existing matrices are not touched by software upgrades, but the supplied installation proposal may be updated.
 ');

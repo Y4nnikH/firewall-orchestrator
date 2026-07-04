@@ -41,7 +41,7 @@
                         @RenderExclusiveFlag(context)
                     </Template>
                 </Column>
-                <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("matrices"))" Field="@(group => group.PhaseMatrixUsageCount)" Sortable="true" Filterable="false" />
+                <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("using_phases"))" Field="@(group => group.PhaseMatrixUsageCount)" Sortable="true" Filterable="false" />
                 <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("transitions"))" Field="@(group => group.TransitionCount)" Sortable="true" Filterable="false" />
             </Table>
         }
@@ -94,7 +94,7 @@
                 </div>
             </div>
             <div class="form-group row mb-3">
-                <label class="col-sm-3 col-form-label col-form-label-sm">@(userConfig.GetText("matrices")):</label>
+                <label class="col-sm-3 col-form-label col-form-label-sm">@(userConfig.GetText("using_phases")):</label>
                 <div class="col-sm-9">
                     @if (editGroup.PhaseMatrixUsages.Count == 0)
                     {

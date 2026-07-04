@@ -23,7 +23,7 @@
     <hr />
     <div class="form-group row mb-2">
         <div class="col-sm-12">
-            <div class="btn-group">
+            <div class="d-flex flex-wrap gap-1">
                 <button type="button" class="btn btn-sm btn-warning" @onclick="() => EditVisibilityGroupsMode = true">
                     @(DisplayService.DisplayButton(userConfig, "edit_visibility_groups", Icons.Edit, "", Icons.UserGroup))
                 </button>
@@ -32,6 +32,12 @@
                 </button>
                 <button type="button" class="btn btn-sm btn-success" @onclick="OpenAddConfiguration">
                     @(DisplayService.DisplayButton(userConfig, "add_configuration", Icons.Add))
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" @onclick="() => OpenConfigurationTransfer(false)">
+                    @(DisplayService.DisplayButton(userConfig, "export_configuration", Icons.Export))
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" @onclick="() => OpenConfigurationTransfer(true)">
+                    @(DisplayService.DisplayButton(userConfig, "import_configuration", Icons.Import))
                 </button>
             </div>
         </div>
@@ -129,7 +135,7 @@
                             @RenderExclusiveFlag(context)
                         </Template>
                     </Column>
-                    <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("matrices"))" Field="@(group => group.PhaseMatrixUsageCount)" Sortable="true" Filterable="false" />
+                    <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("using_phases"))" Field="@(group => group.PhaseMatrixUsageCount)" Sortable="true" Filterable="false" />
                     <Column TableItem="StateMatrixTransitionGroup" Title="@(userConfig.GetText("transitions"))" Field="@(group => group.TransitionCount)" Sortable="true" Filterable="false" />
                 </Table>
             </div>
@@ -278,6 +284,9 @@
                                      TransitionGroupIdToEdit="transitionGroupIdToEdit" />
     <AddWorkflowConfiguration @bind-Display="AddConfigurationMode" ExistingConfigurations="workflowConfigurations"
                               StateIds="stateIds" ConfigurationCreated="SelectCreatedConfiguration" />
+    <TransferWorkflowConfiguration @bind-Display="TransferConfigurationMode" ImportMode="transferImportMode"
+                                   SelectedConfigurationId="selectedConfigurationId" ExistingConfigurations="workflowConfigurations"
+                                   ConfigurationImported="SelectCreatedConfiguration" />
     <ConfirmDelete @bind-Display="DeleteConfigurationMode" PerformAction="DeleteSelectedConfiguration" AllowedRoles="@Roles.Admin"
                    Title="@userConfig.GetText("delete_configuration")" DeleteMessage="@DeleteConfigurationMessage" />
     <ConfirmDelete @bind-Display="DeleteTransitionGroupMode" PerformAction="DeleteSelectedTransitionGroup" AllowedRoles="@Roles.Admin"
@@ -318,6 +327,8 @@ else
     private bool EditVisibilityGroupsMode = false;
     private bool EditTransitionGroupsMode = false;
     private bool AddConfigurationMode = false;
+    private bool TransferConfigurationMode = false;
+    private bool transferImportMode;
     private bool DeleteConfigurationMode = false;
     private bool DeleteTransitionGroupMode = false;
     private bool LinkTransitionGroupMode = false;
@@ -435,6 +446,22 @@ else
         {
             await InitMatrix();
             AddConfigurationMode = true;
+        });
+    }
+
+    private async Task OpenConfigurationTransfer(bool importMode)
+    {
+        if (!HasUnsavedChanges)
+        {
+            transferImportMode = importMode;
+            TransferConfigurationMode = true;
+            return;
+        }
+        await ExecuteOrConfirmDiscard(async () =>
+        {
+            await InitMatrix();
+            transferImportMode = importMode;
+            TransferConfigurationMode = true;
         });
     }
 
