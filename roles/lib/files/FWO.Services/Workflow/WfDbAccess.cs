@@ -23,7 +23,7 @@ namespace FWO.Services.Workflow
                 tickets = await ApiConnection.SendQueryAsync<List<WfTicket>>(fullTickets ? RequestQueries.getFullTickets : RequestQueries.getTickets, Variables);
                 if (UserConfig.ReqOwnerBased && !AsAdmin)
                 {
-                    tickets = await FilterWrongOwnersOut(tickets, ownerIds, ticketFilter != null);
+                    tickets = await FilterWrongOwnersOut(tickets, ownerIds);
                 }
                 if (ticketFilter != null)
                 {
@@ -68,7 +68,7 @@ namespace FWO.Services.Workflow
                 ticket = await GetTicket(ticketId);
                 if (UserConfig.ReqOwnerBased && !AsAdmin)
                 {
-                    ticket = (await FilterWrongOwnersOut([ticket], ownerIds, ticketFilter != null)).FirstOrDefault();
+                    ticket = (await FilterWrongOwnersOut([ticket], ownerIds)).FirstOrDefault();
                 }
                 if (ticket != null && ticketFilter != null && !ticketFilter(ticket))
                 {
@@ -82,20 +82,18 @@ namespace FWO.Services.Workflow
             return ticket;
         }
 
-        private async Task<List<WfTicket>> FilterWrongOwnersOut(List<WfTicket> ticketsIn, List<int>? ownerIds, bool keepNonOwnerVisibleTickets = false)
+        private async Task<List<WfTicket>> FilterWrongOwnersOut(List<WfTicket> ticketsIn, List<int>? ownerIds)
         {
             if (ownerIds == null || ownerIds.Count == 0)
             {
-                return keepNonOwnerVisibleTickets ? ticketsIn : [];
+                return [];
             }
             List<long> registeredTickets = (await ApiConnection.SendQueryAsync<List<TicketId>>(RequestQueries.getOwnerTicketIds, new { ownerIds })).ConvertAll(t => t.Id);
             foreach (var ticket in ticketsIn.Where(ti => !ti.IsEditableForOwner(registeredTickets, ownerIds, UserConfig.UserId)))
             {
                 ticket.Editable = false;
             }
-            return keepNonOwnerVisibleTickets
-                ? ticketsIn
-                : [.. ticketsIn.Where(ti => ti.IsVisibleForOwner(registeredTickets, ownerIds, UserConfig.UserId))];
+            return [.. ticketsIn.Where(ti => ti.IsVisibleForOwner(registeredTickets, ownerIds, UserConfig.UserId))];
         }
 
         public async Task<WfTicket> GetTicket(long id)

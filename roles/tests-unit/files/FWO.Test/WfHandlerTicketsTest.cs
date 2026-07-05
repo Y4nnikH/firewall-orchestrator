@@ -31,9 +31,15 @@ namespace FWO.Test
         {
             public WfTicket Ticket { get; set; } = new();
             public List<WfTicket> Tickets { get; set; } = [];
+            public List<long> RegisteredTicketIds { get; set; } = [];
 
             public override Task<T> SendQueryAsync<T>(string query, object? variables = null, string? operationName = null, FWO.Api.Client.QueryChunkingOptions? chunkingOptions = null)
             {
+                if (query == RequestQueries.getOwnerTicketIds)
+                {
+                    List<TicketId> ids = RegisteredTicketIds.ConvertAll(id => new TicketId { Id = id });
+                    return Task.FromResult((T)(object)ids);
+                }
                 if (query == RequestQueries.getTicketById)
                 {
                     return Task.FromResult((T)(object)Ticket);
@@ -398,10 +404,11 @@ namespace FWO.Test
         }
 
         [Test]
-        public async Task SelectTicket_ReloadsVisibleTicketWithoutDroppingOwnerInvisibleOne()
+        public async Task SelectTicket_ReturnsWithoutReloading_WhenTicketIsNotOwnerVisible()
         {
             TicketTestApiConn apiConn = new()
             {
+                RegisteredTicketIds = [1],
                 Ticket = new WfTicket
                 {
                     Id = 7,
@@ -419,8 +426,10 @@ namespace FWO.Test
             };
             UserConfig userConfig = new();
             userConfig.User.WorkflowVisibilityGroupIds = [3];
+            userConfig.ReqOwnerBased = true;
             EnableVisibilityChecks(userConfig);
             WfHandler handler = CreateHandlerWithDbAccess(apiConn, userConfig);
+            handler.AllOwners = [new FwoOwner { Id = 7 }];
             handler.MasterStateMatrix = new StateMatrix
             {
                 StateVisibilityGroupIds =
@@ -438,11 +447,12 @@ namespace FWO.Test
             typeof(WfHandler).GetField("ReloadTasks", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .SetValue(handler, true);
             handler.TicketList = [new WfTicket { Id = 7, StateId = 10 }];
+            handler.ActTicket = new WfTicket { Id = 99 };
 
             await handler.SelectTicket(handler.TicketList[0], ObjAction.display, true);
 
-            Assert.That(handler.ActTicket.Tasks.Select(task => task.Id).ToArray(), Is.EqualTo(new long[] { 11 }));
-            Assert.That(handler.TicketList[0].Tasks.Select(task => task.Id).ToArray(), Is.EqualTo(new long[] { 11 }));
+            Assert.That(handler.ActTicket.Id, Is.EqualTo(99));
+            Assert.That(handler.TicketList[0].Tasks, Is.Empty);
         }
 
         [Test]

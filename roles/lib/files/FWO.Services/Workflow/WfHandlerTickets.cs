@@ -20,7 +20,7 @@ namespace FWO.Services.Workflow
             WfTicket? ticket = null;
             if (dbAcc != null)
             {
-                ticket = await dbAcc.FetchTicket(ticketId, userConfig.ReqOwnerBased ? AllOwners.ConvertAll(x => x.Id) : null, GetVisibilityTicketFilter());
+                ticket = await dbAcc.FetchTicket(ticketId, GetOwnerIdsForFiltering(), GetVisibilityTicketFilter());
                 if (ticket != null)
                 {
                     SetTicketEnv(ticket);
@@ -76,7 +76,7 @@ namespace FWO.Services.Workflow
         {
             if (ReloadTasks && reload && dbAcc != null)
             {
-                WfTicket? refreshedTicket = await dbAcc.FetchTicket(ticket.Id, null, GetVisibilityTicketFilter());
+                WfTicket? refreshedTicket = await dbAcc.FetchTicket(ticket.Id, GetOwnerIdsForFiltering(), GetVisibilityTicketFilter());
                 if (refreshedTicket == null)
                 {
                     return;
@@ -273,6 +273,11 @@ namespace FWO.Services.Workflow
             }
 
             return ticketVisible || ticket.Tasks.Count > 0;
+        }
+
+        private List<int>? GetOwnerIdsForFiltering()
+        {
+            return userConfig.ReqOwnerBased ? AllOwners.ConvertAll(owner => owner.Id) : null;
         }
 
         private Func<WfTicket, bool>? GetVisibilityTicketFilter()

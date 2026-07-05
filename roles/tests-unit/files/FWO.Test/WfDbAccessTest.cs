@@ -72,7 +72,7 @@ namespace FWO.Test
 
             MethodInfo? filterMethod = typeof(WfDbAccess).GetMethod("FilterWrongOwnersOut", BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.That(filterMethod, Is.Not.Null);
-            Task<List<WfTicket>> filterTask = (Task<List<WfTicket>>)filterMethod!.Invoke(dbAccess, new object[] { tickets, ownerIds, false })!;
+            Task<List<WfTicket>> filterTask = (Task<List<WfTicket>>)filterMethod!.Invoke(dbAccess, new object[] { tickets, ownerIds })!;
             List<WfTicket> filtered = await filterTask;
 
             Assert.That(filtered.Select(t => t.Id), Is.EquivalentTo(new long[] { 1, 3 }));
@@ -93,7 +93,7 @@ namespace FWO.Test
 
             MethodInfo? filterMethod = typeof(WfDbAccess).GetMethod("FilterWrongOwnersOut", BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.That(filterMethod, Is.Not.Null);
-            Task<List<WfTicket>> filterTask = (Task<List<WfTicket>>)filterMethod!.Invoke(dbAccess, new object[] { tickets, new List<int>(), false })!;
+            Task<List<WfTicket>> filterTask = (Task<List<WfTicket>>)filterMethod!.Invoke(dbAccess, new object[] { tickets, new List<int>() })!;
             List<WfTicket> filtered = await filterTask;
 
             Assert.That(filtered, Is.Empty);
@@ -114,7 +114,7 @@ namespace FWO.Test
 
             MethodInfo? filterMethod = typeof(WfDbAccess).GetMethod("FilterWrongOwnersOut", BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.That(filterMethod, Is.Not.Null);
-            Task<List<WfTicket>> filterTask = (Task<List<WfTicket>>)filterMethod!.Invoke(dbAccess, new object[] { tickets, new List<int> { 7 }, false })!;
+            Task<List<WfTicket>> filterTask = (Task<List<WfTicket>>)filterMethod!.Invoke(dbAccess, new object[] { tickets, new List<int> { 7 } })!;
             List<WfTicket> filtered = await filterTask;
 
             Assert.That(filtered, Has.Count.EqualTo(1));
@@ -122,7 +122,7 @@ namespace FWO.Test
         }
 
         [Test]
-        public async Task FilterWrongOwnersOut_KeepsWorkflowVisibleTicketsWhenRequested()
+        public async Task FilterWrongOwnersOut_DropsNonOwnerVisibleTickets()
         {
             WfDbAccessTestApiConn apiConn = new() { RegisteredTicketIds = [1] };
             UserConfig userConfig = new();
@@ -136,16 +136,14 @@ namespace FWO.Test
 
             MethodInfo? filterMethod = typeof(WfDbAccess).GetMethod("FilterWrongOwnersOut", BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.That(filterMethod, Is.Not.Null);
-            Task<List<WfTicket>> filterTask = (Task<List<WfTicket>>)filterMethod!.Invoke(dbAccess, new object[] { tickets, new List<int> { 7 }, true })!;
+            Task<List<WfTicket>> filterTask = (Task<List<WfTicket>>)filterMethod!.Invoke(dbAccess, new object[] { tickets, new List<int> { 7 } })!;
             List<WfTicket> filtered = await filterTask;
 
-            Assert.That(filtered, Has.Count.EqualTo(1));
-            Assert.That(filtered[0].Id, Is.EqualTo(2));
-            Assert.That(filtered[0].Editable, Is.False);
+            Assert.That(filtered, Is.Empty);
         }
 
         [Test]
-        public async Task FetchTicket_StillReturnsNonOwnerVisibleTicket_WhenTicketFilterIsProvided()
+        public async Task FetchTicket_ReturnsNull_WhenTicketIsNotOwnerVisible()
         {
             WfDbAccessTestApiConn apiConn = new()
             {
@@ -165,9 +163,7 @@ namespace FWO.Test
 
             WfTicket? ticket = await dbAccess.FetchTicket(2, [7], _ => true);
 
-            Assert.That(ticket, Is.Not.Null);
-            Assert.That(ticket!.Id, Is.EqualTo(2));
-            Assert.That(ticket.Editable, Is.False);
+            Assert.That(ticket, Is.Null);
         }
 
         [Test]
@@ -193,7 +189,7 @@ namespace FWO.Test
         }
 
         [Test]
-        public async Task FetchTickets_AppliesOwnerFilterButKeepsNonOwnerVisibleTicketsWhenTicketFilterExists()
+        public async Task FetchTickets_AppliesOwnerFilterBeforeVisibilityFilter()
         {
             WfDbAccessTestApiConn apiConn = new()
             {
@@ -214,8 +210,8 @@ namespace FWO.Test
 
             List<WfTicket> tickets = await dbAccess.FetchTickets(matrix, [7], false, false, _ => true);
 
-            Assert.That(tickets, Has.Count.EqualTo(2));
-            Assert.That(tickets.Single(ticket => ticket.Id == 2).Editable, Is.False);
+            Assert.That(tickets, Has.Count.EqualTo(1));
+            Assert.That(tickets[0].Id, Is.EqualTo(1));
         }
 
         [Test]
@@ -245,7 +241,7 @@ namespace FWO.Test
         }
 
         [Test]
-        public async Task FetchTicket_KeepsTicketWhenOwnerListIsEmptyAndFilterExists()
+        public async Task FetchTicket_ReturnsNull_WhenOwnerListIsEmpty()
         {
             WfDbAccessTestApiConn apiConn = new()
             {
@@ -264,8 +260,7 @@ namespace FWO.Test
 
             WfTicket? ticket = await dbAccess.FetchTicket(2, [], _ => true);
 
-            Assert.That(ticket, Is.Not.Null);
-            Assert.That(ticket!.Id, Is.EqualTo(2));
+            Assert.That(ticket, Is.Null);
         }
 
         [Test]
