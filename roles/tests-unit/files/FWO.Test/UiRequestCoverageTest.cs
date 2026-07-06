@@ -27,6 +27,14 @@ namespace FWO.Test
     [TestFixture]
     internal class UiRequestCoverageTest
     {
+        private static readonly int[] kOwnerOptionIds = [-2, -1, 1, 2];
+        private static readonly int[] kDeviceOptionIds = [11, 12, 0, -1];
+        private static readonly int[] kAllDeviceSelectionIds = [WfReqTaskBase.kAllDevicesId];
+        private static readonly int[] kSingleDeviceSelectionIds = [1];
+        private static readonly int[] kTwoDeviceSelectionIds = [1, 2];
+        private static readonly long[] kRemovedElementIds = [1L, 2L, 3L];
+        private static readonly int[] kDeviceListIds = [101, 102];
+
         private static void SetMember(object instance, string memberName, object? value)
         {
             Type type = instance.GetType();
@@ -870,7 +878,7 @@ namespace FWO.Test
 
             Assert.Multiple(() =>
             {
-                Assert.That(ownerOptions.Select(owner => owner.Id), Is.EqualTo(new[] { -2, -1, 1, 2 }));
+                Assert.That(ownerOptions.Select(owner => owner.Id), Is.EqualTo(kOwnerOptionIds));
                 Assert.That(GetMember<FwoOwner>(component, "selectedOwnerOpt").Id, Is.EqualTo(-1));
                 Assert.That(ownerOptions.Any(owner => owner.Id == -3), Is.False);
             });
@@ -900,7 +908,7 @@ namespace FWO.Test
 
             Assert.Multiple(() =>
             {
-                Assert.That(deviceOptions.Select(device => device.Id), Is.EqualTo(new[] { 11, 12, 0, -1 }));
+                Assert.That(deviceOptions.Select(device => device.Id), Is.EqualTo(kDeviceOptionIds));
                 Assert.That(GetMember<Device>(component, "selectedDeviceOpt").Id, Is.EqualTo(-1));
             });
         }
@@ -1337,15 +1345,15 @@ namespace FWO.Test
 
             SetMember(component, "selectedDevices", new List<Device> { gw1 });
             GetPrivateMethod(typeof(DisplayRequestTask), "SetDevices").Invoke(component, [new List<Device> { allDevice, gw2 }]);
-            Assert.That(GetMember<IEnumerable<Device>>(component, "selectedDevices").Select(device => device.Id), Is.EqualTo(new[] { WfReqTaskBase.kAllDevicesId }));
+            Assert.That(GetMember<IEnumerable<Device>>(component, "selectedDevices").Select(device => device.Id), Is.EqualTo(kAllDeviceSelectionIds));
 
             GetPrivateMethod(typeof(DisplayRequestTask), "SetDevice").Invoke(component, [allDevice]);
             Assert.That(GetPrivateMethod(typeof(DisplayRequestTask), "DisplayDevices").Invoke(component, []), Is.EqualTo(userConfig.GetText("all")));
             GetPrivateMethod(typeof(DisplayRequestTask), "SetDevices").Invoke(component, [new List<Device> { allDevice, gw1 }]);
-            Assert.That(GetMember<IEnumerable<Device>>(component, "selectedDevices").Select(device => device.Id), Is.EqualTo(new[] { 1 }));
+            Assert.That(GetMember<IEnumerable<Device>>(component, "selectedDevices").Select(device => device.Id), Is.EqualTo(kSingleDeviceSelectionIds));
 
             GetPrivateMethod(typeof(DisplayRequestTask), "SetDevices").Invoke(component, [new List<Device> { gw1, gw2 }]);
-            Assert.That(GetMember<IEnumerable<Device>>(component, "selectedDevices").Select(device => device.Id), Is.EqualTo(new[] { 1, 2 }));
+            Assert.That(GetMember<IEnumerable<Device>>(component, "selectedDevices").Select(device => device.Id), Is.EqualTo(kTwoDeviceSelectionIds));
             Assert.That(GetPrivateMethod(typeof(DisplayRequestTask), "DisplayDevices").Invoke(component, []), Is.EqualTo("gw-1, gw-2"));
         }
 
@@ -1391,7 +1399,7 @@ namespace FWO.Test
 
             Assert.Multiple(() =>
             {
-                Assert.That(reqTask.RemovedElements.Select(element => element.Id), Is.EquivalentTo(new[] { 1L, 2L, 3L }));
+                Assert.That(reqTask.RemovedElements.Select(element => element.Id), Is.EquivalentTo(kRemovedElementIds));
                 Assert.That(reqTask.Elements.Any(element => element.Id is 1 or 2 or 3), Is.False);
                 Assert.That(reqTask.Elements.Any(element => element.Id == 5 && element.Field == ElemFieldType.source.ToString()), Is.True);
                 Assert.That(reqTask.Elements.Any(element => element.Id == 6 && element.Field == ElemFieldType.destination.ToString()), Is.True);
@@ -1452,7 +1460,7 @@ namespace FWO.Test
                 Assert.That(reqTask.Tracking, Is.EqualTo(4));
                 Assert.That(reqTask.ManagementId, Is.EqualTo(44));
                 Assert.That(reqTask.GetAddInfoIntValue(AdditionalInfoKeys.ReqOwner), Is.EqualTo(11));
-                Assert.That(reqTask.GetDeviceList(), Is.EqualTo(new[] { 101, 102 }));
+                Assert.That(reqTask.GetDeviceList(), Is.EqualTo(kDeviceListIds));
                 Assert.That(reqTask.Owners, Has.Count.EqualTo(1));
                 Assert.That(reqTask.Owners[0].Owner.Id, Is.EqualTo(21));
                 Assert.That(reqTask.RemovedOwners, Has.Count.EqualTo(1));

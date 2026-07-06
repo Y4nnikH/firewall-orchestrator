@@ -9,7 +9,7 @@ namespace FWO.Services.Workflow
         /// <summary>
         /// Loads one task type from either the active workflow configuration or a named configuration.
         /// </summary>
-        public async Task<StateMatrixConfigurationSnapshot> Load(ApiConnection apiConnection, WfTaskType taskType, string? configurationName = null)
+        public static async Task<StateMatrixConfigurationSnapshot> Load(ApiConnection apiConnection, WfTaskType taskType, string? configurationName = null)
         {
             object variables = configurationName == null
                 ? new { taskType = taskType.ToString() }
@@ -30,7 +30,7 @@ namespace FWO.Services.Workflow
         /// <summary>
         /// Persists changed matrix values while preserving phase and transition-group identities.
         /// </summary>
-        public async Task Update(ApiConnection apiConnection, GlobalStateMatrix stateMatrix)
+        public static async Task Update(ApiConnection apiConnection, GlobalStateMatrix stateMatrix)
         {
             ValidateEditableBindings(stateMatrix);
             StateMatrixConfigurationChanges changes = BuildChanges(stateMatrix);
@@ -57,65 +57,14 @@ namespace FWO.Services.Workflow
 
             foreach (WorkflowConfigurationPhase configurationPhase in configuration.Phases)
             {
-                if (!Enum.TryParse(configurationPhase.Phase, true, out WorkflowPhases phase))
-                {
-                    throw new InvalidOperationException($"Unknown workflow phase '{configurationPhase.Phase}'.");
-                }
+                (WorkflowPhases phase, StateMatrix matrix, StateMatrixPhaseBinding binding) = BuildPhaseSnapshot(configurationPhase);
                 if (matrices.ContainsKey(phase))
                 {
                     throw new InvalidOperationException($"Workflow phase '{phase}' is configured more than once for task type '{configurationPhase.TaskType}'.");
                 }
 
-                StateMatrixPhase phaseData = configurationPhase.PhaseMatrix;
-                Dictionary<int, HashSet<int>> stateVisibilityGroupIds = [];
-                HashSet<int> exclusiveVisibilityGroupIds = [];
-                StateMatrix matrix = new()
-                {
-                    Active = phaseData.Active,
-                    LowestInputState = phaseData.LowestInputState,
-                    LowestStartedState = phaseData.LowestStartState,
-                    LowestEndState = phaseData.LowestEndState,
-                    DerivedStates = phaseData.DerivedStates.ToDictionary(item => item.FromStateId, item => item.DerivedStateId)
-                };
-
-                foreach (StateMatrixPhaseTransitionGroup groupLink in phaseData.TransitionGroups.OrderBy(group => group.SortOrder))
-                {
-                    int? visibilityGroupId = groupLink.TransitionGroup.VisibilityGroupId;
-                    if (visibilityGroupId != null && groupLink.TransitionGroup.Exclusive)
-                    {
-                        exclusiveVisibilityGroupIds.Add(visibilityGroupId.Value);
-                    }
-                    foreach (StateMatrixTransition transition in groupLink.TransitionGroup.Transitions
-                        .OrderBy(transition => transition.FromStateId)
-                        .ThenBy(transition => transition.SortOrder))
-                    {
-                        if (visibilityGroupId != null)
-                        {
-                            AddStateVisibilityGroupId(stateVisibilityGroupIds, transition.FromStateId, visibilityGroupId.Value);
-                            AddStateVisibilityGroupId(stateVisibilityGroupIds, transition.ToStateId, visibilityGroupId.Value);
-                        }
-
-                        if (!matrix.Matrix.TryGetValue(transition.FromStateId, out List<int>? targets))
-                        {
-                            targets = [];
-                            matrix.Matrix[transition.FromStateId] = targets;
-                        }
-                        if (!targets.Contains(transition.ToStateId))
-                        {
-                            targets.Add(transition.ToStateId);
-                        }
-                    }
-                }
-
-                matrix.StateVisibilityGroupIds = stateVisibilityGroupIds.ToDictionary(entry => entry.Key, entry => entry.Value.ToList());
-                matrix.ExclusiveVisibilityGroupIds = exclusiveVisibilityGroupIds;
-
                 matrices.Add(phase, matrix);
-                bindings.Add(phase, new(
-                    phaseData.Id,
-                    phaseData.Name,
-                    phaseData.TransitionGroups.OrderBy(group => group.SortOrder).Select(group => group.TransitionGroupId).ToList(),
-                    BuildTransitionSortOrders(phaseData)));
+                bindings.Add(phase, binding);
             }
 
             List<WorkflowPhases> missingPhases = Enum.GetValues<WorkflowPhases>().Where(phase => !matrices.ContainsKey(phase)).ToList();
@@ -125,6 +74,85 @@ namespace FWO.Services.Workflow
             }
 
             return new(configuration.Id, configuration.Name, matrices, bindings);
+        }
+
+        private static (WorkflowPhases Phase, StateMatrix Matrix, StateMatrixPhaseBinding Binding) BuildPhaseSnapshot(WorkflowConfigurationPhase configurationPhase)
+        {
+            if (!Enum.TryParse(configurationPhase.Phase, true, out WorkflowPhases phase))
+            {
+                throw new InvalidOperationException($"Unknown workflow phase '{configurationPhase.Phase}'.");
+            }
+
+            StateMatrixPhase phaseData = configurationPhase.PhaseMatrix;
+            StateMatrix matrix = CreateStateMatrix(phaseData);
+            Dictionary<int, HashSet<int>> stateVisibilityGroupIds = [];
+            HashSet<int> exclusiveVisibilityGroupIds = [];
+
+            foreach (StateMatrixPhaseTransitionGroup groupLink in phaseData.TransitionGroups.OrderBy(group => group.SortOrder))
+            {
+                ApplyTransitionGroup(groupLink, matrix, stateVisibilityGroupIds, exclusiveVisibilityGroupIds);
+            }
+
+            matrix.StateVisibilityGroupIds = stateVisibilityGroupIds.ToDictionary(entry => entry.Key, entry => entry.Value.ToList());
+            matrix.ExclusiveVisibilityGroupIds = exclusiveVisibilityGroupIds;
+
+            return (phase, matrix, new(
+                phaseData.Id,
+                phaseData.Name,
+                phaseData.TransitionGroups.OrderBy(group => group.SortOrder).Select(group => group.TransitionGroupId).ToList(),
+                BuildTransitionSortOrders(phaseData)));
+        }
+
+        private static StateMatrix CreateStateMatrix(StateMatrixPhase phaseData)
+        {
+            return new StateMatrix
+            {
+                Active = phaseData.Active,
+                LowestInputState = phaseData.LowestInputState,
+                LowestStartedState = phaseData.LowestStartState,
+                LowestEndState = phaseData.LowestEndState,
+                DerivedStates = phaseData.DerivedStates.ToDictionary(item => item.FromStateId, item => item.DerivedStateId)
+            };
+        }
+
+        private static void ApplyTransitionGroup(
+            StateMatrixPhaseTransitionGroup groupLink,
+            StateMatrix matrix,
+            Dictionary<int, HashSet<int>> stateVisibilityGroupIds,
+            HashSet<int> exclusiveVisibilityGroupIds)
+        {
+            int? visibilityGroupId = groupLink.TransitionGroup.VisibilityGroupId;
+            if (visibilityGroupId != null && groupLink.TransitionGroup.Exclusive)
+            {
+                exclusiveVisibilityGroupIds.Add(visibilityGroupId.Value);
+            }
+
+            foreach (StateMatrixTransition transition in groupLink.TransitionGroup.Transitions
+                .OrderBy(transition => transition.FromStateId)
+                .ThenBy(transition => transition.SortOrder))
+            {
+                if (visibilityGroupId != null)
+                {
+                    AddStateVisibilityGroupId(stateVisibilityGroupIds, transition.FromStateId, visibilityGroupId.Value);
+                    AddStateVisibilityGroupId(stateVisibilityGroupIds, transition.ToStateId, visibilityGroupId.Value);
+                }
+
+                AddTransition(matrix, transition.FromStateId, transition.ToStateId);
+            }
+        }
+
+        private static void AddTransition(StateMatrix matrix, int fromStateId, int toStateId)
+        {
+            if (!matrix.Matrix.TryGetValue(fromStateId, out List<int>? targets))
+            {
+                targets = [];
+                matrix.Matrix[fromStateId] = targets;
+            }
+
+            if (!targets.Contains(toStateId))
+            {
+                targets.Add(toStateId);
+            }
         }
 
         private static void ValidateEditableBindings(GlobalStateMatrix stateMatrix)

@@ -14,6 +14,10 @@ namespace FWO.Test
     [TestFixture]
     internal class WfHandlerTicketsTest
     {
+        private static readonly long[] kVisibleRequestTaskIds = [11];
+        private static readonly int[] kExclusiveVisibilityGroupIds = [1, 2, 4, 5, 6];
+        private static readonly long[] kImplTaskIds = [21, 22];
+
         private static void SetMatrix(WfHandler handler, string taskType, StateMatrix matrix)
         {
             FieldInfo? field = typeof(WfHandler).GetField("stateMatrixDict", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -400,7 +404,7 @@ namespace FWO.Test
             WfTicket? ticket = await handler.ResolveTicket(7);
 
             Assert.That(ticket, Is.Not.Null);
-            Assert.That(ticket!.Tasks.Select(task => task.Id), Is.EqualTo(new long[] { 11 }));
+            Assert.That(ticket!.Tasks.Select(task => task.Id), Is.EqualTo(kVisibleRequestTaskIds));
         }
 
         [Test]
@@ -736,7 +740,7 @@ namespace FWO.Test
 
             HashSet<int> exclusiveGroupIds = handler.GetWorkflowExclusiveVisibilityGroupIds();
 
-            Assert.That(exclusiveGroupIds, Is.EquivalentTo(new[] { 1, 2, 4, 5, 6 }));
+            Assert.That(exclusiveGroupIds, Is.EquivalentTo(kExclusiveVisibilityGroupIds));
         }
 
         [Test]
@@ -841,7 +845,7 @@ namespace FWO.Test
             {
                 Assert.That(handler.ActTicket, Is.SameAs(ticket));
                 Assert.That(handler.ActStateMatrix, Is.SameAs(handler.MasterStateMatrix));
-                Assert.That(handler.AllTicketImplTasks.Select(task => task.Id), Is.EqualTo(new long[] { 21, 22 }));
+                Assert.That(handler.AllTicketImplTasks.Select(task => task.Id), Is.EqualTo(kImplTaskIds));
                 Assert.That(handler.AllTicketImplTasks.All(task => task.TicketId == 7), Is.True);
                 Assert.That(handler.AllTicketImplTasks.All(task => task.ReqTaskId == 11), Is.True);
             });

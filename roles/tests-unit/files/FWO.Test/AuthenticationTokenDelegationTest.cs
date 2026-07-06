@@ -18,6 +18,8 @@ namespace FWO.Test
     [TestFixture]
     public class AuthenticationTokenDelegationTest
     {
+        private static readonly string[] kResolvedGroupNames = ["ApproverGroup", "cn=DirectApprover,ou=groups,dc=example,dc=com"];
+
         [Test]
         public async Task CreateTokenPair_WhenRefreshTokenWithheld_IssuesNonRefreshablePair()
         {
@@ -40,7 +42,7 @@ namespace FWO.Test
                 "cn=DirectApprover,ou=groups,dc=example,dc=com"
             };
 
-            addResolvedGroupMemberships.Invoke(null, [userGroups, new[] { "ApproverGroup", "cn=DirectApprover,ou=groups,dc=example,dc=com" }, "ou=groups,dc=example,dc=com"]);
+            addResolvedGroupMemberships.Invoke(null, [userGroups, kResolvedGroupNames, "ou=groups,dc=example,dc=com"]);
 
             Assert.That(userGroups, Does.Contain("cn=DirectApprover,ou=groups,dc=example,dc=com"));
             Assert.That(userGroups, Does.Contain("cn=ApproverGroup,ou=groups,dc=example,dc=com"));

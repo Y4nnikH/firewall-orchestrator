@@ -11,6 +11,9 @@ namespace FWO.Test
     [TestFixture]
     internal class WorkflowConfigurationTransferServiceTest
     {
+        private static readonly string[] kExpectedPhaseTransitionGroups = ["Reviewers"];
+        private static readonly string[] kExpectedVisibilityGroupMembers = ["cn=operators"];
+
         [TestCase(true)]
         [TestCase(false)]
         public async Task Export_UsesNamesAndOptionallyIncludesVisibilityGroups(bool includeVisibilityGroups)
@@ -40,10 +43,10 @@ namespace FWO.Test
             {
                 Assert.That(package.Format, Is.EqualTo(WorkflowConfigurationTransferPackage.kFormat));
                 Assert.That(package.Configuration.Name, Is.EqualTo("Shared"));
-                Assert.That(package.Configuration.Phases[0].TransitionGroups, Is.EqualTo(new[] { "Reviewers" }));
+                Assert.That(package.Configuration.Phases[0].TransitionGroups, Is.EqualTo(kExpectedPhaseTransitionGroups));
                 Assert.That(package.TransitionGroups[0].VisibilityGroup, Is.EqualTo(includeVisibilityGroups ? "Operators" : null));
                 Assert.That(package.TransitionGroups[0].Exclusive, Is.EqualTo(includeVisibilityGroups));
-                Assert.That(package.VisibilityGroups?.Single().Members, Is.EqualTo(includeVisibilityGroups ? new[] { "cn=operators" } : null));
+                Assert.That(package.VisibilityGroups?.Single().Members, Is.EqualTo(includeVisibilityGroups ? kExpectedVisibilityGroupMembers : null));
             });
         }
 

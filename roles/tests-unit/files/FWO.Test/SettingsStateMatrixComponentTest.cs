@@ -12,6 +12,17 @@ namespace FWO.Test
     [TestFixture]
     internal class SettingsStateMatrixComponentTest
     {
+        private static readonly int[] kStateIds1122 = [11, 22];
+        private static readonly int[] kConfigurationIds12 = [1, 2];
+        private static readonly WfTaskType[] kAvailableTaskTypes = [WfTaskType.master, WfTaskType.access];
+        private static readonly int[] kConfigurationIds21 = [2, 1];
+        private static readonly int[] kPhaseMatrixIds57 = [5, 7];
+        private static readonly int[] kConfigurationIds123 = [1, 2, 3];
+        private static readonly int[] kGroupIds21 = [2, 1];
+        private static readonly int[] kLinkableTransitionGroupIds23 = [2, 3];
+        private static readonly int[] kDerivedStateKeys23 = [2, 3];
+        private static readonly int[] kTransitionGroupIds21 = [2, 1];
+
         [Test]
         public void HasCompleteMatrix_RequiresEveryWorkflowPhase()
         {
@@ -60,10 +71,10 @@ namespace FWO.Test
             Assert.Multiple(() =>
             {
                 Assert.That(GetField<bool>(component, "InitComplete"), Is.True);
-                Assert.That(GetField<List<int>>(component, "stateIds"), Is.EqualTo(new[] { 11, 22 }));
-                Assert.That(GetField<List<int>>(component, "configurationIds"), Is.EqualTo(new[] { 1, 2 }));
+                Assert.That(GetField<List<int>>(component, "stateIds"), Is.EqualTo(kStateIds1122));
+                Assert.That(GetField<List<int>>(component, "configurationIds"), Is.EqualTo(kConfigurationIds12));
                 Assert.That(GetField<int>(component, "selectedConfigurationId"), Is.EqualTo(1));
-                Assert.That(GetProperty<List<WfTaskType>>(component, "availableTaskTypes"), Is.EqualTo(new[] { WfTaskType.master, WfTaskType.access }));
+                Assert.That(GetProperty<List<WfTaskType>>(component, "availableTaskTypes"), Is.EqualTo(kAvailableTaskTypes));
                 Assert.That(matrix.InitCalls.Single(), Is.EqualTo((WfTaskType.master, "Alpha")));
             });
         }
@@ -138,7 +149,7 @@ namespace FWO.Test
             {
                 object configurationVariables = GetRecordedCallVariables(apiConnection, RequestQueries.setActiveWorkflowConfiguration)
                     ?? throw new InvalidOperationException("Expected configuration mutation variables.");
-                Assert.That(GetField<List<int>>(component, "configurationIds"), Is.EqualTo(new[] { 2, 1 }));
+                Assert.That(GetField<List<int>>(component, "configurationIds"), Is.EqualTo(kConfigurationIds21));
                 Assert.That(GetAnonymousProperty<int>(configurationVariables, "configurationId"), Is.EqualTo(2));
                 Assert.That(GetField<List<WorkflowConfiguration>>(component, "workflowConfigurations").Single(configuration => configuration.Id == 2).IsActive, Is.True);
                 Assert.That(GetField<List<WorkflowConfiguration>>(component, "workflowConfigurations").Single(configuration => configuration.Id == 1).IsActive, Is.False);
@@ -180,7 +191,7 @@ namespace FWO.Test
                     ?? throw new InvalidOperationException("Expected delete mutation variables.");
                 Assert.That(GetField<int>(component, "selectedConfigurationId"), Is.EqualTo(1));
                 Assert.That(GetAnonymousProperty<List<int>>(deleteVariables, "phaseMatrixIds"),
-                    Is.EqualTo(new[] { 5, 7 }));
+                    Is.EqualTo(kPhaseMatrixIds57));
                 Assert.That(matrix.InitCalls.Single(), Is.EqualTo((WfTaskType.master, "Alpha")));
             });
         }
@@ -346,7 +357,7 @@ namespace FWO.Test
 
             Invoke(component, "RefreshConfigurationIds");
 
-            Assert.That(GetField<List<int>>(component, "configurationIds"), Is.EqualTo(new[] { 1, 2, 3 }));
+            Assert.That(GetField<List<int>>(component, "configurationIds"), Is.EqualTo(kConfigurationIds123));
         }
 
         [Test]
@@ -380,7 +391,7 @@ namespace FWO.Test
 
             List<StateMatrixTransitionGroup> result = (List<StateMatrixTransitionGroup>)Invoke(component, "GetPhaseTransitionGroups", WorkflowPhases.approval)!;
 
-            Assert.That(result.Select(group => group.Id), Is.EqualTo(new[] { 2, 1 }));
+            Assert.That(result.Select(group => group.Id), Is.EqualTo(kGroupIds21));
             Assert.That((List<StateMatrixTransitionGroup>)Invoke(component, "GetPhaseTransitionGroups", WorkflowPhases.request)!, Is.Empty);
         }
 
@@ -427,7 +438,7 @@ namespace FWO.Test
 
             Assert.Multiple(() =>
             {
-                Assert.That(GetField<List<int>>(component, "linkableTransitionGroupIds"), Is.EqualTo(new[] { 2, 3 }));
+                Assert.That(GetField<List<int>>(component, "linkableTransitionGroupIds"), Is.EqualTo(kLinkableTransitionGroupIds23));
                 Assert.That(GetField<int>(component, "selectedTransitionGroupId"), Is.EqualTo(2));
                 Assert.That(GetField<bool>(component, "LinkTransitionGroupMode"), Is.True);
             });
@@ -447,7 +458,7 @@ namespace FWO.Test
 
             Assert.Multiple(() =>
             {
-                Assert.That(result.Select(mapping => mapping.Key), Is.EqualTo(new[] { 2, 3 }));
+                Assert.That(result.Select(mapping => mapping.Key), Is.EqualTo(kDerivedStateKeys23));
                 Assert.That(Invoke(component, "HasDerivedStates", WorkflowPhases.request), Is.True);
             });
         }
@@ -654,7 +665,7 @@ namespace FWO.Test
 
             Assert.Multiple(() =>
             {
-                Assert.That(matrix.PhaseBindings[WorkflowPhases.request].TransitionGroupIds, Is.EqualTo(new[] { 2, 1 }));
+                Assert.That(matrix.PhaseBindings[WorkflowPhases.request].TransitionGroupIds, Is.EqualTo(kTransitionGroupIds21));
                 Assert.That(matrix.GlobalMatrix[WorkflowPhases.request].LowestEndState, Is.EqualTo(42));
                 Assert.That(GetProperty<bool>(component, "HasUnsavedChanges"), Is.True);
             });

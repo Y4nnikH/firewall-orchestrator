@@ -11,6 +11,8 @@ namespace FWO.Test
     [TestFixture]
     internal class AddWorkflowConfigurationComponentTest
     {
+        private static readonly int[] kExpectedSourceConfigurationIds = [0, 3, 9];
+
         [Test]
         public void CanSave_RequiresNonBlankUniqueNameAndValidCreationSource()
         {
@@ -62,7 +64,7 @@ namespace FWO.Test
                 Assert.That(GetField<string>(component, "name"), Is.Empty);
                 Assert.That(GetFieldValue(component, "description"), Is.Null);
                 Assert.That(GetField<int>(component, "selectedSourceConfigurationId"), Is.Zero);
-                Assert.That(GetField<List<int>>(component, "sourceConfigurationIds"), Is.EqualTo(new[] { 0, 3, 9 }));
+                Assert.That(GetField<List<int>>(component, "sourceConfigurationIds"), Is.EqualTo(kExpectedSourceConfigurationIds));
             });
 
             SetField(component, "name", "In progress");

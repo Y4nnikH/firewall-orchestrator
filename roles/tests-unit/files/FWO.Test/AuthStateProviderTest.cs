@@ -30,6 +30,12 @@ namespace FWO.Test
     [NonParallelizable]
     public class AuthStateProviderTest
     {
+        private static readonly string[] kDefaultAllowedRoles = [Roles.Reporter];
+        private static readonly string[] kExpectedReporterRoles = [Roles.Reporter];
+        private static readonly int[] kExpectedOwnerships = [3, 7];
+        private static readonly int[] kExpectedRecertOwnerships = [9];
+        private static readonly int[] kExpectedWorkflowVisibilityGroupIds = [2, 4];
+
         private static readonly FieldInfo JwtPublicKeyField = typeof(ConfigFile).GetField("jwtPublicKey", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new MissingFieldException(typeof(ConfigFile).FullName, "jwtPublicKey");
 
@@ -242,10 +248,10 @@ namespace FWO.Test
             Assert.That(storedTokenPair?.RefreshToken, Is.EqualTo("rotated-refresh-token"));
             Assert.That(userConfig.User.Dn, Is.EqualTo(TestApiConnection.TestUserDn));
             Assert.That(userConfig.User.Tenant?.Id, Is.EqualTo(TestApiConnection.TestTenantId));
-            Assert.That(userConfig.User.Roles, Is.EquivalentTo(new[] { Roles.Reporter }));
-            Assert.That(userConfig.User.Ownerships, Is.EquivalentTo(new[] { 3, 7 }));
-            Assert.That(userConfig.User.RecertOwnerships, Is.EquivalentTo(new[] { 9 }));
-            Assert.That(userConfig.User.WorkflowVisibilityGroupIds, Is.EquivalentTo(new[] { 2, 4 }));
+            Assert.That(userConfig.User.Roles, Is.EquivalentTo(kExpectedReporterRoles));
+            Assert.That(userConfig.User.Ownerships, Is.EquivalentTo(kExpectedOwnerships));
+            Assert.That(userConfig.User.RecertOwnerships, Is.EquivalentTo(kExpectedRecertOwnerships));
+            Assert.That(userConfig.User.WorkflowVisibilityGroupIds, Is.EquivalentTo(kExpectedWorkflowVisibilityGroupIds));
         }
 
         [Test]
@@ -361,7 +367,7 @@ namespace FWO.Test
 
         private static List<Claim> BuildJwtClaims(params string[] allowedRoles)
         {
-            string[] roles = allowedRoles.Length > 0 ? allowedRoles : [Roles.Reporter];
+            string[] roles = allowedRoles.Length > 0 ? allowedRoles : kDefaultAllowedRoles;
             return
             [
                 new Claim(JwtRegisteredClaimNames.UniqueName, "test-user"),

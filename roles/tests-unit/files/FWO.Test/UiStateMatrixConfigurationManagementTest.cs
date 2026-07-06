@@ -11,6 +11,8 @@ namespace FWO.Test
     [TestFixture]
     internal class UiStateMatrixConfigurationManagementTest
     {
+        private static readonly string[] kExpectedVisibilityGroupMemberDns = ["CN=User,DC=example,DC=org"];
+
         [Test]
         public void RequestQueries_LoadsWorkflowConfigurationManagementOperations()
         {
@@ -81,7 +83,7 @@ namespace FWO.Test
             method.Invoke(component, [""]);
 
             WorkflowVisibilityGroup group = (WorkflowVisibilityGroup)field.GetValue(component)!;
-            Assert.That(group.Members.Select(member => member.MemberDn), Is.EqualTo(new[] { "CN=User,DC=example,DC=org" }));
+            Assert.That(group.Members.Select(member => member.MemberDn), Is.EqualTo(kExpectedVisibilityGroupMemberDns));
         }
 
         [Test]

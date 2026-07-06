@@ -262,8 +262,7 @@ namespace FWO.Services.Workflow
 
         private async Task Load(ApiConnection apiConnection, WfTaskType taskType, string? configurationName)
         {
-            StateMatrixConfigurationRepository repository = new();
-            StateMatrixConfigurationSnapshot snapshot = await repository.Load(apiConnection, taskType, configurationName);
+            StateMatrixConfigurationSnapshot snapshot = await StateMatrixConfigurationRepository.Load(apiConnection, taskType, configurationName);
             ConfigurationId = snapshot.ConfigurationId;
             ConfigurationName = snapshot.ConfigurationName;
             GlobalMatrix = snapshot.Matrices;
@@ -276,8 +275,7 @@ namespace FWO.Services.Workflow
         /// </summary>
         public virtual async Task Save(ApiConnection apiConnection)
         {
-            StateMatrixConfigurationRepository repository = new();
-            await repository.Update(apiConnection, this);
+            await StateMatrixConfigurationRepository.Update(apiConnection, this);
         }
 
         /// <summary>

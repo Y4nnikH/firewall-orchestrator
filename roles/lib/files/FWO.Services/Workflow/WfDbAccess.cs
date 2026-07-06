@@ -15,43 +15,18 @@ namespace FWO.Services.Workflow
             List<WfTicket> tickets = [];
             try
             {
-                // todo: filter own approvals, plannings...
                 int fromState = allStates ? 0 : stateMatrix.LowestInputState;
                 int toState = allStates ? 999 : stateMatrix.LowestEndState;
 
-                var Variables = new { fromState, toState };
-                tickets = await ApiConnection.SendQueryAsync<List<WfTicket>>(fullTickets ? RequestQueries.getFullTickets : RequestQueries.getTickets, Variables);
+                tickets = await ApiConnection.SendQueryAsync<List<WfTicket>>(
+                    fullTickets ? RequestQueries.getFullTickets : RequestQueries.getTickets,
+                    new { fromState, toState });
                 if (UserConfig.ReqOwnerBased && !AsAdmin)
                 {
                     tickets = await FilterWrongOwnersOut(tickets, ownerIds);
                 }
-                if (ticketFilter != null)
-                {
-                    List<WfTicket> filteredTickets = [];
-                    foreach (WfTicket ticket in tickets)
-                    {
-                        if (ticketFilter(ticket))
-                        {
-                            filteredTickets.Add(ticket);
-                        }
-                    }
-                    tickets = filteredTickets;
-                }
-                if (fullTickets)
-                {
-                    foreach (var ticket in tickets)
-                    {
-                        ticket.UpdateCidrsInTaskElements();
-                        ticket.ResetStateChangeTracking();
-                    }
-                }
-                else
-                {
-                    foreach (var ticket in tickets)
-                    {
-                        ticket.ResetStateChangeTracking();
-                    }
-                }
+                tickets = ApplyTicketFilter(tickets, ticketFilter);
+                FinalizeTickets(tickets, fullTickets);
             }
             catch (Exception exception)
             {
@@ -145,6 +120,36 @@ namespace FWO.Services.Workflow
                 DisplayMessageInUi(exception, UserConfig.GetText("fetch_requests"), "", true);
             }
             return tickets;
+        }
+
+        private static List<WfTicket> ApplyTicketFilter(List<WfTicket> tickets, Func<WfTicket, bool>? ticketFilter)
+        {
+            if (ticketFilter == null)
+            {
+                return tickets;
+            }
+
+            List<WfTicket> filteredTickets = [];
+            foreach (WfTicket ticket in tickets)
+            {
+                if (ticketFilter(ticket))
+                {
+                    filteredTickets.Add(ticket);
+                }
+            }
+            return filteredTickets;
+        }
+
+        private static void FinalizeTickets(List<WfTicket> tickets, bool fullTickets)
+        {
+            foreach (WfTicket ticket in tickets)
+            {
+                if (fullTickets)
+                {
+                    ticket.UpdateCidrsInTaskElements();
+                }
+                ticket.ResetStateChangeTracking();
+            }
         }
 
 

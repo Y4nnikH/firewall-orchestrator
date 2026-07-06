@@ -12,6 +12,9 @@ namespace FWO.Test
     [TestFixture]
     internal class EditWorkflowVisibilityGroupsComponentTest
     {
+        private static readonly string[] kSingleMemberDns = ["cn=a"];
+        private static readonly string[] kNormalizedMemberDns = ["CN=User,DC=example", "CN=Second,DC=example", "CN=NestedGroup,DC=example"];
+
         [TestCase(null, null)]
         [TestCase("", null)]
         [TestCase("   ", null)]
@@ -42,7 +45,7 @@ namespace FWO.Test
                 Assert.That(clone.Id, Is.EqualTo(7));
                 Assert.That(clone.Description, Is.EqualTo("Original"));
                 Assert.That(source.Name, Is.EqualTo("Operators"));
-                Assert.That(source.Members.Select(member => member.MemberDn), Is.EqualTo(new[] { "cn=a" }));
+                Assert.That(source.Members.Select(member => member.MemberDn), Is.EqualTo(kSingleMemberDns));
             });
         }
 
@@ -58,12 +61,7 @@ namespace FWO.Test
             Invoke(component, "AddMemberDn", "   ");
 
             WorkflowVisibilityGroup group = GetField<WorkflowVisibilityGroup>(component, "editGroup");
-            Assert.That(group.Members.Select(member => member.MemberDn), Is.EqualTo(new[]
-            {
-                "CN=User,DC=example",
-                "CN=Second,DC=example",
-                "CN=NestedGroup,DC=example"
-            }));
+            Assert.That(group.Members.Select(member => member.MemberDn), Is.EqualTo(kNormalizedMemberDns));
         }
 
         [Test]
