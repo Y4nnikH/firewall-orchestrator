@@ -34,14 +34,18 @@ fi
 
 . /etc/os-release
 
+# ansible==12.3.0 (see requirements.txt) requires Python >=3.11. On RHEL/Rocky 9
+# the platform python3 is 3.9, so the venv must be built with python3.11 there.
+python_bin="python3"
+
 case "${ID_LIKE:-$ID}" in
     *debian*)
         sudo apt update
         sudo apt install python3-venv -y
-        python3 -m venv --clear installer-venv
         ;;
     *rhel*|*fedora*)
-        sudo dnf install python3 python3-pip -y
+        sudo dnf install python3.11 python3.11-pip -y
+        python_bin="python3.11"
         ;;
     *)
         echo "Unsupported operating system family: ${ID_LIKE:-$ID}"
@@ -49,7 +53,7 @@ case "${ID_LIKE:-$ID}" in
         ;;
 esac
 
-python3 -m venv installer-venv
+"$python_bin" -m venv --clear installer-venv
 
 source installer-venv/bin/activate
 if [[ "${http_proxy:-}" != "" ]];
