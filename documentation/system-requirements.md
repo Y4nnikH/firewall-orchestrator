@@ -26,7 +26,7 @@ Both physical and virtual systems are supported
 Supported operating systms: 
 - Ubuntu >=22.04 (LTS only)
 - RHEL 8, 9, 10
-- Debian >=11
+- Debian >=12
 
 Recommended: Ubuntu 24.04, Debian 12
 
