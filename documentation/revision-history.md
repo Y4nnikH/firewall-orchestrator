@@ -533,5 +533,8 @@ This PR hardens FWO installation and security-sensitive workflows. It restricts 
 - remove deprecated, unused rule.rule_num column (rule ordering is handled by rule_num_numeric)
 - remove deprecated, unused direct rule zone columns (rule_from_zone, rule_to_zone); rule zones remain available through the rule_from_zone and rule_to_zone link tables
 
-## 9.1.15 - 04.07.2026
+## 9.1.15 - 06.07.2026
+- make offered protocols configurable
+
+## 9.1.16 - 06.07.2026
 - move workflow state matrices to own database tables
