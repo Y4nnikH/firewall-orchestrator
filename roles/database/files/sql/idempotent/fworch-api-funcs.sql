@@ -1,4 +1,6 @@
-
+-- ensure the firewall schema is resolvable for the unqualified references below, even on a
+-- connection opened before the ALTER DATABASE ... SET search_path took effect (issue #4793).
+SET search_path TO "$user", public, firewall;
 
 CREATE OR REPLACE FUNCTION public.get_visible_devices_per_tenant(integer)
     RETURNS SETOF device_type 

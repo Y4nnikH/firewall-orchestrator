@@ -1,3 +1,7 @@
+-- ensure the firewall schema is resolvable for the unqualified references below, even on a
+-- connection opened before the ALTER DATABASE ... SET search_path took effect (issue #4793).
+SET search_path TO "$user", public, firewall;
+
 CREATE OR REPLACE FUNCTION is_single_ip (ip CIDR)
 	RETURNS BOOLEAN
 	LANGUAGE 'plpgsql' IMMUTABLE COST 1

@@ -55,3 +55,7 @@ DO $$
 BEGIN
     EXECUTE format('ALTER DATABASE %I SET search_path = %s', current_database(), '"$user", public, firewall');
 END $$;
+
+-- keep upgraded installs in sync with fresh ones: this index is created by
+-- fworch-create-indices.sql on a fresh install, so add it here for existing installs too.
+CREATE INDEX IF NOT EXISTS "IX_Relationship90" ON firewall.rule ("rule_from_zone");

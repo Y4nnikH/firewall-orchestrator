@@ -1,3 +1,7 @@
+-- ensure the firewall schema is resolvable for the unqualified references below, even on a
+-- connection opened before the ALTER DATABASE ... SET search_path took effect (issue #4793).
+SET search_path TO "$user", public, firewall;
+
 /*
     logic for checking overlap of ip ranges:
     not (end_ip1 < start_ip2 or start_ip1 > end_ip2)

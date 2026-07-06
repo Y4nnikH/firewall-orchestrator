@@ -1,4 +1,4 @@
-mutation updateServiceFlowMappings($updates: [service_updates!]!) {
+mutation updateServiceFlowMappings($updates: [firewall_nw_service_updates!]!) {
   update_firewall_nw_service_many(updates: $updates) {
     affected_rows
   }
