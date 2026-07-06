@@ -13,6 +13,7 @@ using Microsoft.OpenApi;
 using Quartz;
 
 object changesLock = new(); // LOCK
+const string kApiDocsPageRoute = "/api-docs";
 const string kApiDocsRoute = "/api-docs/{documentName}.json";
 const string kApiDocsV1Route = "/api-docs/v1.json";
 
@@ -156,7 +157,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapOpenApi(kApiDocsRoute);
-app.UseSwaggerRedirect(kApiDocsV1Route);
+app.MapGet(kApiDocsPageRoute, () => Results.Content(ApiDocsPage.Render(kApiDocsV1Route), "text/html; charset=utf-8"));
+app.UseSwaggerRedirect(kApiDocsPageRoute);
 
 //app.UseHttpsRedirection();
 

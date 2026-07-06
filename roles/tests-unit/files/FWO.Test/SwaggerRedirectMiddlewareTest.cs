@@ -13,7 +13,7 @@ namespace FWO.Test;
 [TestFixture]
 internal class SwaggerRedirectMiddlewareTest
 {
-    private const string kOpenApiRoute = "/api-docs/v1.json";
+    private const string kApiDocsRoute = "/api-docs";
 
     /// <summary>
     /// Verifies legacy Swagger paths redirect without ambiguous endpoint routing.
@@ -31,7 +31,7 @@ internal class SwaggerRedirectMiddlewareTest
         HttpResponseMessage response = await client.GetAsync(requestPath);
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Redirect));
-        Assert.That(response.Headers.Location?.OriginalString, Is.EqualTo(kOpenApiRoute));
+        Assert.That(response.Headers.Location?.OriginalString, Is.EqualTo(kApiDocsRoute));
     }
 
     /// <summary>
@@ -59,7 +59,7 @@ internal class SwaggerRedirectMiddlewareTest
         builder.WebHost.UseTestServer();
 
         WebApplication app = builder.Build();
-        app.UseSwaggerRedirect(kOpenApiRoute);
+        app.UseSwaggerRedirect(kApiDocsRoute);
         app.MapGet("/swagger-status", () => Results.Ok());
 
         return app;
