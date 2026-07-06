@@ -5,6 +5,7 @@ using FWO.Config.Api;
 using FWO.Config.File;
 using FWO.Logging;
 using FWO.Middleware.Server;
+using FWO.Middleware.Server.OpenApi;
 using FWO.Middleware.Server.Services;
 using FWO.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -87,8 +88,7 @@ builder.Services.AddSingleton<UpdateFlowsSchedulerService>();
 builder.Services.AddControllers()
   .AddJsonOptions(jsonOptions =>
   {
-      //jsonOptions.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-      jsonOptions.JsonSerializerOptions.PropertyNamingPolicy = null;
+      ApiDocumentationJsonOptions.Configure(jsonOptions);
   });
 
 builder.Services.AddSingleton<JwtWriter>(jwtWriter);
