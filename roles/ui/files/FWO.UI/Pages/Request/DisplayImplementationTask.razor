@@ -387,7 +387,10 @@
         {
             ruleActions = await apiConnection.SendQueryAsync<List<RuleAction>>(StmQueries.getRuleActions);
             trackings = await apiConnection.SendQueryAsync<List<Tracking>>(StmQueries.getTracking);
-            ipProtos = DisplayBase.CustomSortProtocols(await apiConnection.SendQueryAsync<List<IpProtocol>>(StmQueries.getIpProtocols));
+            ipProtos = ProtocolDisplayHelper.CustomSortProtocols(
+                await apiConnection.SendQueryAsync<List<IpProtocol>>(StmQueries.getIpProtocols),
+                ProtocolDisplayHelper.ParseProtocolNames(userConfig.ReducedProtocolSetProtocols),
+                userConfig.ReducedProtocolSet);
             firstParamSet = true;
         }
         catch (Exception exception)
@@ -718,7 +721,7 @@
         {
             if (implElem.Field == ElemFieldType.service.ToString() && implElem.ServiceId == null)
             {
-                if (implElem.Port < 1 || implElem.Port > GlobalConst.kMaxPortNumber)
+                if (IsInvalidServicePort(implElem))
                 {
                     DisplayMessageInUi(null, userConfig.GetText("save_element"), userConfig.GetText("E5103"), true);
                     return false;
@@ -726,6 +729,16 @@
             }
         }
         return true;
+    }
+
+    private bool IsInvalidServicePort(WfImplElement element)
+    {
+        if (!IpProtocol.HasPorts(element.ProtoId))
+        {
+            return false;
+        }
+
+        return element.Port < 1 || element.Port > GlobalConst.kMaxPortNumber;
     }
 
     private bool RejectInvalidTargetDates()

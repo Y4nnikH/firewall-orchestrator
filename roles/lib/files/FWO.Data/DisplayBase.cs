@@ -19,7 +19,7 @@ namespace FWO.Data
             StringBuilder result = new();
             string ports = service.DestinationPortEnd == null || service.DestinationPortEnd == 0 || service.DestinationPort == service.DestinationPortEnd ?
                 $"{service.DestinationPort}" : $"{service.DestinationPort}-{service.DestinationPortEnd}";
-            bool displayPorts = service.Protocol != null && service.Protocol.HasPorts() && service.DestinationPort != null;
+            bool displayPorts = IpProtocol.HasPorts(service.Protocol?.Id) && service.DestinationPort != null;
             if (isTechReport)
             {
                 if (displayPorts)
