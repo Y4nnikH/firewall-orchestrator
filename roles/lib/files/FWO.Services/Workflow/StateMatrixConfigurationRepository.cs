@@ -4,7 +4,7 @@ using FWO.Data.Workflow;
 
 namespace FWO.Services.Workflow
 {
-    public class StateMatrixConfigurationRepository
+    public static class StateMatrixConfigurationRepository
     {
         /// <summary>
         /// Loads one task type from either the active workflow configuration or a named configuration.
