@@ -356,7 +356,7 @@ namespace FWO.Middleware.Server.Controllers
 
 #if DEBUG
         /// <summary>
-        ///  Tests the Auth from swagger. If this returns unauthorized then check JWT token in swagger and try again.
+        ///  Tests the Auth from API docs. If this returns unauthorized then check JWT token in API docs and try again.
         /// </summary>
         /// <returns></returns>
         [Authorize]

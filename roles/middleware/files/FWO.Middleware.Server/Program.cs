@@ -11,9 +11,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Quartz;
-using System.Reflection;
 
 object changesLock = new(); // LOCK
+const string kApiDocsRoute = "/api-docs/{documentName}.json";
+const string kApiDocsV1Route = "/api-docs/v1.json";
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -115,29 +116,34 @@ builder.Services.AddAuthentication(confOptions =>
         IssuerSigningKey = ConfigFile.JwtPublicKey
     };
 });
-builder.Services.AddSwaggerGen(c =>
+builder.Services.AddOpenApi("v1", options =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
     {
-        Title = "FWO Middleware API Documentation",
-        Description = "A documentation of the REST API interface for the FWO Middleware.",
-        Version = "v1"
-    });
-    string documentationPath = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
-    c.IncludeXmlComments(documentationPath);
+        document.Info = new OpenApiInfo
+        {
+            Title = "FWO Middleware API Documentation",
+            Description = "A documentation of the REST API interface for the FWO Middleware.",
+            Version = "v1"
+        };
 
-    //! Microsoft broke the current OpenAPI "AddSecurityRequirement" so we have to use the workaround with "OpenApiSecuritySchemeReference" until they fix it
-    c.AddSecurityDefinition("bearer", new OpenApiSecurityScheme
-    {
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        Description = "JWT Authorization header using the Bearer scheme."
-    });
+        OpenApiComponents components = document.Components ??= new OpenApiComponents();
+        components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        components.SecuritySchemes["bearer"] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Description = "JWT Authorization header using the Bearer scheme."
+        };
 
-    c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-    {
-        [new OpenApiSecuritySchemeReference("bearer", document)] = []
+        document.Security ??= [];
+        document.Security.Add(new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference("bearer", document)] = []
+        });
+
+        return Task.CompletedTask;
     });
 });
 
@@ -149,8 +155,10 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
-app.UseSwagger();
-app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "FWO.Middleware v1"); });
+app.MapOpenApi(kApiDocsRoute);
+app.MapGet("/swagger", () => Results.Redirect(kApiDocsV1Route));
+app.MapGet("/swagger/", () => Results.Redirect(kApiDocsV1Route));
+app.MapGet("/swagger/{**path}", () => Results.Redirect(kApiDocsV1Route));
 
 //app.UseHttpsRedirection();
 
