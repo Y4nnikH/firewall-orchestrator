@@ -1111,7 +1111,6 @@ class FwConfigImportRule:
         rulebase_id = self.uid2id_mapper.get_rulebase_id(rulebase_uid)
         return Rule(
             mgm_id=self.import_details.state.mgm_details.current_mgm_id,
-            rule_num=rule.rule_num,
             rule_disabled=rule.rule_disabled,
             rule_src_neg=rule.rule_src_neg,
             rule_src=rule.rule_src,
@@ -1275,7 +1274,6 @@ class FwConfigImportRule:
         """
         exclude = {
             "last_hit",
-            "rule_num",
             "rule_name",
             "rule_comment",
             "rule_custom_fields",

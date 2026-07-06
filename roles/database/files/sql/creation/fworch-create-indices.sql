@@ -61,7 +61,6 @@ Create index "IX_Relationship90" on "rule" ("rule_from_zone");
 Create index "IX_Relationship95" on "rule_from" ("user_id");
 Create index "IX_relationship26" on "rule_from" ("obj_id");
 Create index "IX_relationship28" on "rule_to" ("obj_id");
-Create index "IX_Relationship91" on "rule" ("rule_to_zone");
 
 Create index "IX_Relationship65" on "changelog_object" ("old_obj_id");
 Create index "IX_Relationship66" on "changelog_object" ("new_obj_id");
