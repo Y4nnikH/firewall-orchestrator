@@ -11,11 +11,11 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Quartz;
+using Scalar.AspNetCore;
 
 object changesLock = new(); // LOCK
 const string kApiDocsPageRoute = "/api-docs";
 const string kApiDocsRoute = "/api-docs/{documentName}.json";
-const string kApiDocsV1Route = "/api-docs/v1.json";
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -157,7 +157,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapOpenApi(kApiDocsRoute);
-app.MapGet(kApiDocsPageRoute, () => Results.Content(ApiDocsPage.Render(kApiDocsV1Route), "text/html; charset=utf-8"));
+app.MapScalarApiReference(kApiDocsPageRoute, options =>
+{
+    options.WithTitle("FWO Middleware API Documentation")
+        .WithOpenApiRoutePattern(kApiDocsRoute);
+});
 app.UseSwaggerRedirect(kApiDocsPageRoute);
 
 //app.UseHttpsRedirection();
