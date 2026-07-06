@@ -96,6 +96,7 @@ builder.Services.AddSingleton<List<Ldap>>(connectedLdaps);
 builder.Services.AddSingleton<FlowCatalogService>();
 builder.Services.AddSingleton<FlowComplianceService>();
 builder.Services.AddSingleton<FlowRequestService>();
+builder.Services.AddApiExamples();
 
 builder.Services.AddAuthentication(confOptions =>
 {
@@ -120,6 +121,8 @@ builder.Services.AddAuthentication(confOptions =>
 builder.Services.AddOpenApi("v1", options =>
 {
     options.AddOperationTransformer<OpenApiOperationNameTransformer>();
+    options.AddOperationTransformer<OpenApiAuthorizationOperationTransformer>();
+    options.AddOperationTransformer<OpenApiApiExampleOperationTransformer>();
     options.AddDocumentTransformer((document, context, cancellationToken) =>
     {
         document.Info = new OpenApiInfo
@@ -158,12 +161,6 @@ builder.Services.AddOpenApi("v1", options =>
             BearerFormat = "JWT",
             Description = "JWT Authorization header using the Bearer scheme."
         };
-
-        document.Security ??= [];
-        document.Security.Add(new OpenApiSecurityRequirement
-        {
-            [new OpenApiSecuritySchemeReference("bearer", document)] = []
-        });
 
         return Task.CompletedTask;
     });
