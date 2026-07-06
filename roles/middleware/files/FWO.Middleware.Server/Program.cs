@@ -119,6 +119,7 @@ builder.Services.AddAuthentication(confOptions =>
 });
 builder.Services.AddOpenApi("v1", options =>
 {
+    options.AddOperationTransformer<OpenApiOperationNameTransformer>();
     options.AddDocumentTransformer((document, context, cancellationToken) =>
     {
         document.Info = new OpenApiInfo
