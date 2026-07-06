@@ -135,6 +135,8 @@ namespace FWO.Middleware.Server.Controllers
         /// Generates an authentication token (jwt) given valid credentials.  
         /// </summary>
         /// <remarks>
+        /// Deprecated: This endpoint will be dropped in the next major release. Use /api/AuthenticationToken/GetTokenPair instead.
+        ///
         /// Username (required)&#xA;
         /// Password (required)
         /// </remarks>

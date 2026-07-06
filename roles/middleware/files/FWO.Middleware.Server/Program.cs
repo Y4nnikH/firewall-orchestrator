@@ -125,7 +125,27 @@ builder.Services.AddOpenApi("v1", options =>
         document.Info = new OpenApiInfo
         {
             Title = "FWO Middleware API Documentation",
-            Description = "A documentation of the REST API interface for the FWO Middleware.",
+            // Top-level Markdown headings ("# ...") in the description are rendered by Scalar as
+            // their own sidebar sections at the same level as the auto-generated "Introduction".
+            // The "Authentication" section documents the single, top-level bearer scheme.
+            Description =
+                "This is the REST API interface for the Firewall Orchestrator (FWO) Middleware Server. " +
+                "The middleware server brokers communication between the FWO UI, the data layer and the " +
+                "automation routines. It exposes endpoints for authentication and JWT issuance, " +
+                "authorization (roles, groups and tenants), user and credential management, scheduling, " +
+                "rule compliance checks, reporting and change-request workflows.\n\n" +
+                "Use this interactive documentation to explore the available endpoints, inspect their " +
+                "request and response schemas, and send live test requests directly from your browser. " +
+                "Every request requires a valid JWT — see the **Authentication** section below on how to " +
+                "obtain and apply one.\n\n" +
+                "## Authentication\n\n" +
+                "All endpoints are protected by a single JWT bearer scheme. In this API documentation, there is no need to " +
+                "add an individual authorization header to each endpoint. Instead, set the token " +
+                "once in the top-level **Authentication** field at the top of this page and it is " +
+                "automatically applied to every request you send.\n\n" +
+                "To obtain a token, call `POST /api/AuthenticationToken/GetTokenPair` and paste only " +
+                "the returned `accessToken` value into the Authentication field (without the " +
+                "`Bearer` prefix and without the `refreshToken`).",
             Version = "v1"
         };
 
@@ -161,7 +181,13 @@ app.MapOpenApi(kApiDocsRoute);
 app.MapScalarApiReference(kApiDocsPageRoute, options =>
 {
     options.WithTitle("FWO Middleware API Documentation")
-        .WithOpenApiRoutePattern(kApiDocsRoute);
+        .WithOpenApiRoutePattern(kApiDocsRoute)
+        .AddPreferredSecuritySchemes(["bearer"])
+        .AddHttpAuthentication("bearer", scheme =>
+        {
+            scheme.WithDescription("Paste only the accessToken value returned by /api/AuthenticationToken/GetTokenPair. Do not paste the refreshToken or add the Bearer prefix.");
+        })
+        .EnablePersistentAuthentication();
 });
 app.UseSwaggerRedirect(kApiDocsPageRoute);
 
