@@ -1163,7 +1163,7 @@ namespace FWO.Test
                     TaskType = WfTaskType.access.ToString(),
                     ImplElements =
                     [
-                        new WfImplElement { Id = 1, ImplTaskId = 99, Field = ElemFieldType.service.ToString(), Port = 0, ServiceId = null }
+                        new WfImplElement { Id = 1, ImplTaskId = 99, Field = ElemFieldType.service.ToString(), Port = 0, ProtoId = 6, ServiceId = null }
                     ]
                 }
             });
@@ -1174,7 +1174,7 @@ namespace FWO.Test
             Assert.Multiple(() =>
             {
                 Assert.That(valid, Is.False);
-                Assert.That(messages, Does.Contain("E5103"));
+                Assert.That(messages, Does.Contain("Port invalid"));
             });
         }
 
