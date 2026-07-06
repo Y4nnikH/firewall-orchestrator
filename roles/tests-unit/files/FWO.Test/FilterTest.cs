@@ -13,8 +13,10 @@ namespace FWO.Test
 {
     [TestFixture]
     [Parallelizable]
-    public class FilterTest
+    public partial class FilterTest
     {
+        private const int kRegexTimeoutMilliseconds = 1000;
+
         private delegate void StubExtractDelegate(ref DynGraphqlQuery query, ReportType? reportType);
 
         private sealed class StubAstNode(StubExtractDelegate extractAction) : AstNode
@@ -48,7 +50,12 @@ namespace FWO.Test
 
         private static string NormalizeGraphQl(string query)
         {
-            return Regex.Replace(query, @"\s+", " ").Trim();
+            return GraphQlWhitespaceRegex().Replace(query, " ").Trim();
+        }
+
+        private static Regex GraphQlWhitespaceRegex()
+        {
+            return new Regex("\\s+", RegexOptions.None, TimeSpan.FromMilliseconds(kRegexTimeoutMilliseconds));
         }
 
         private static TException AssertDateTimeRangeThrows<TException>(TokenKind operatorKind, string value)
