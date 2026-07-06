@@ -62,6 +62,15 @@
 
       when: ansible_facts['distribution'] == "Ubuntu" and ansible_facts['distribution_version'] | float >= 24.04
 
+    - name: Install additional Pango libraries for Debian 11
+      apt:
+        name:
+          - libpangocairo-1.0-0
+          - libpangoft2-1.0-0
+        state: present
+        update_cache: yes
+      when: ansible_facts['distribution'] == "Debian" and ansible_facts['distribution_version'] == "11"
+
     - name: Combine all packages
       set_fact:
         platform_packages: "{{ core_packages + [sound_library, glib_library] }}"

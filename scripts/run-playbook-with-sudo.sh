@@ -1,16 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-args=()
-for arg in "$@"; do
-    case "$arg" in
-        -K|--ask-become-pass|--ask-sudo-pass)
-            ;;
-        *)
-            args+=("$arg")
-            ;;
-    esac
-done
+args=("$@")
 
 if [[ "${#args[@]}" -eq 0 ]]; then
     args=(site.yml)

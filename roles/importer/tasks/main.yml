@@ -35,7 +35,11 @@
         state: present
 
     - name: Check importer Python version
-      command: "{{ importer_python_interpreter }} -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'"
+      command:
+        argv:
+          - "{{ importer_python_interpreter }}"
+          - -c
+          - "import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)"
       changed_when: false
 
 
