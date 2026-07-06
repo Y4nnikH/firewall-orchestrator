@@ -156,9 +156,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapOpenApi(kApiDocsRoute);
-app.MapGet("/swagger", () => Results.Redirect(kApiDocsV1Route));
-app.MapGet("/swagger/", () => Results.Redirect(kApiDocsV1Route));
-app.MapGet("/swagger/{**path}", () => Results.Redirect(kApiDocsV1Route));
+app.UseSwaggerRedirect(kApiDocsV1Route);
 
 //app.UseHttpsRedirection();
 
