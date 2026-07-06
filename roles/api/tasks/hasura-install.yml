@@ -259,12 +259,13 @@
   command: "{{ api_hasura_cli_bin }} init {{ product_name }} --skip-update-check --endpoint http://{{ api_local_listening_ip_address }}:{{ api_port }}"
   args:
     chdir: "{{ api_home }}"
+    creates: "{{ api_home }}/{{ product_name }}/config.yaml"
   become: true
   become_user: "{{ fworch_user }}"
   no_log: true
   environment: "{{ proxy_env | combine({'HASURA_GRAPHQL_ADMIN_SECRET': api_hasura_admin_secret}) }}"
   when:
-    - api_cli_check.stat.exists
+    - not api_cli_check.stat.exists
     - not api_use_existing_hasura_on_upgrade | default(false) | bool
 
 - name: set Hasura image reuse mode

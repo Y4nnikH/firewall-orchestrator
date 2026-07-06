@@ -118,6 +118,16 @@
     - "'frontends' in group_names"
     - "ansible_facts['os_family'] == 'Debian'"
 
+- name: remove RedHat maintenance web site config
+  file:
+    path: "{{ http_conf_dir }}/{{ product_name }}-maintenance.conf"
+    state: absent
+  become: true
+  when:
+    - "installation_mode == 'upgrade'"
+    - "'frontends' in group_names"
+    - "ansible_facts['os_family'] == 'RedHat'"
+
 - name: restart apache without maintenance site
   service:
     name: "{{ webserver_package_name }}"
