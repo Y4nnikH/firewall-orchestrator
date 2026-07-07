@@ -6,6 +6,7 @@ using FWO.Logging;
 using RestSharp;
 using System.Net;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace FWO.ExternalSystems.CheckPoint
 {
@@ -151,7 +152,7 @@ namespace FWO.ExternalSystems.CheckPoint
 
         private bool HasLoginCredentials()
         {
-            return Management.ExportCredential != null 
+            return Management.ExportCredential != null
                 && !string.IsNullOrWhiteSpace(Management.ExportCredential.ImportUser)
                 && !string.IsNullOrWhiteSpace(Management.ExportCredential.Secret);
         }
@@ -211,7 +212,12 @@ namespace FWO.ExternalSystems.CheckPoint
 
         private sealed class LoginResponse
         {
-            public required string Sid { get; set; }
+            [JsonConstructor]
+            public LoginResponse(string sid)
+            {
+                Sid = sid;
+            }
+            public string Sid { get;  }
         }
     }
 }

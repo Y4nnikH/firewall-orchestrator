@@ -173,7 +173,7 @@ namespace FWO.ExternalSystems.CheckPoint
         {
             return element.Name ?? "";
         }
-       
+
         private static bool IsNetworkMember(WfReqElement element)
         {
             return element.Field != ElemFieldType.service.ToString()
@@ -237,6 +237,6 @@ namespace FWO.ExternalSystems.CheckPoint
             string hostIp = ipString.StripOffNetmask();
             IPAddress hostAddress = IPAddress.Parse(hostIp);
             return new IPAddressRange(hostAddress, hostAddress);
-        }       
+        }
     }
 }

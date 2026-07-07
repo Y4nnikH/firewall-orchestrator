@@ -127,10 +127,12 @@ namespace FWO.Middleware.Server
 
         private async Task SendRequest(ExternalRequest request)
         {
-            ExternalTicket? ticket = await ConstructTicket(request);
+            ExternalTicket? ticket = null;
 
             try
             {
+                ticket = await ConstructTicket(request);
+
                 if (ExtTicketSystem == null)
                 {
                     throw new InvalidOperationException("No external ticket system loaded.");

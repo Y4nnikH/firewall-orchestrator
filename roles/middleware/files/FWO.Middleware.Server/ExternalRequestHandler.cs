@@ -28,7 +28,6 @@ namespace FWO.Middleware.Server
         private readonly WfHandler wfHandler;
         private readonly UserConfig UserConfig;
         private bool disposed = false;
-        private int extSystemType = BuiltInExternalTicketSystemTypes.GenericId;
         private ExternalTicketSystem actSystem = new();
         private string actTaskType = "";
         private List<IpProtocol> ipProtos = [];
@@ -223,8 +222,12 @@ namespace FWO.Middleware.Server
                     return true;
                 }
 
-                GetExtSystemFromTask(nextTask);
-                //string changeCategory = GetChangeCategory(nextTask);
+                List<ManagementFwConfigChangeState> managementSettings = JsonSerializer.Deserialize<List<ManagementFwConfigChangeState>>(UserConfig.FwConfigChangeMgmSettings) ?? new();
+
+                List<ExternalTicketSystem> extTicketSystems = JsonSerializer.Deserialize<List<ExternalTicketSystem>>(UserConfig.ExtTicketSystems) ?? new();
+                GetExtSystemFromTask(nextTask, managementSettings, extTicketSystems);
+
+
 
                 if (actInternalWork)
                 {
@@ -357,20 +360,24 @@ namespace FWO.Middleware.Server
                 throw new InvalidOperationException("Could not initialize implementation workflow handler.");
             }
 
-            return batch.All(task => task.StateId >= implementationHandler.StateMatrix(task.TaskType).LowestEndState);
-        }
-
         private void BundleTasks(WfTicket ticket, int lastTaskNumber, WfReqTask nextTask, List<WfReqTask> bundledTasks, List<WfReqTask> handledTasks)   // ToDo check if same system?
         {
             int actTaskNumber = lastTaskNumber + 2;
             bool taskFound = true;
             WfReqTask actBundledTask = nextTask;
+
+            int startSystemId = actSystem.Id;
+
             while (taskFound && bundledTasks.Count < actSystem.MaxBundledTasks())
             {
                 WfReqTask? furtherTask = ticket.Tasks.FirstOrDefault(ta => ta.TaskNumber == actTaskNumber);
                 if (furtherTask != null && furtherTask.TaskType == nextTask.TaskType)
                 {
                     taskFound = HandleFurtherTask(furtherTask, nextTask.TaskType, ref actBundledTask, bundledTasks, handledTasks);
+                if (furtherTask != null && furtherTask.TaskType == nextTask.TaskType && CanBundleWithStartTask(furtherTask, nextTask, startSystemId, managementSettings, extTicketSystems))
+                {
+                    taskFound = HandleFurtherTask(furtherTask, nextTask.TaskType, ref actBundledTask, bundledTasks, handledTasks);
+
                     actTaskNumber++;
                 }
                 else
@@ -380,6 +387,71 @@ namespace FWO.Middleware.Server
                 }
             }
         }
+
+        private static bool CanBundleWithStartTask(WfReqTask furtherTask, WfReqTask startTask, int startSystemId, List<ManagementFwConfigChangeState> managementSettings, List<ExternalTicketSystem> extTicketSystems)
+        {
+            if (GetChangeCategory(furtherTask) != GetChangeCategory(startTask))
+            {
+                return false;
+            }
+
+            return TryResolveExtSystemForTask(furtherTask, managementSettings, extTicketSystems, out ExternalTicketSystem? furtherSystem)
+                   && furtherSystem != null
+                   && furtherSystem.Id == startSystemId;
+        }
+
+        private static bool TryResolveExtSystemForTask(WfReqTask task, List<ManagementFwConfigChangeState> managementSettings, List<ExternalTicketSystem> extTicketSystems, out ExternalTicketSystem? system)
+        {
+            system = null;
+
+            try
+            {
+                system = ResolveExtSystemForTask(task, managementSettings, extTicketSystems);
+
+                return true;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+        }
+
+        private static ExternalTicketSystem ResolveExtSystemForTask(WfReqTask task, List<ManagementFwConfigChangeState> managementSettings, List<ExternalTicketSystem> extTicketSystems)
+        {
+            ArgumentNullException.ThrowIfNull(task);
+
+            ManagementFwConfigChangeState managementSetting =
+                managementSettings.FirstOrDefault(m => m.Id == task.ManagementId)
+                ?? throw new InvalidOperationException($"No matching config item found for management {task.ManagementId}.");
+
+            if (!managementSetting.Enabled)
+            {
+                throw new InvalidOperationException($"External workflow is disabled for management {task.ManagementId}.");
+            }
+
+            string changeCategory = GetChangeCategory(task);
+
+            if (!managementSetting.SelectedChanges.TryGetValue(changeCategory, out string? selectedSystemValue) || string.IsNullOrWhiteSpace(selectedSystemValue) || selectedSystemValue == ManagementFwConfigChangeTargets.Disabled)
+            {
+                throw new InvalidOperationException(
+                    $"No external ticket system configured for management {task.ManagementId} and category '{changeCategory}'.");
+            }
+
+            if (!int.TryParse(selectedSystemValue, out int externalTicketSystemId))
+            {
+                throw new InvalidOperationException(
+                    $"Configured external ticket system id '{selectedSystemValue}' for management {task.ManagementId} and category '{changeCategory}' is invalid.");
+            }
+
+            return extTicketSystems.FirstOrDefault(s => s.Id == externalTicketSystemId)
+                ?? throw new InvalidOperationException($"No matching external ticket system found for id {externalTicketSystemId}.");
+        }
+
+        private void GetExtSystemFromTask(WfReqTask task, List<ManagementFwConfigChangeState> managementSettings, List<ExternalTicketSystem> extTicketSystems)
+        {
+            actSystem = ResolveExtSystemForTask(task, managementSettings, extTicketSystems);
+        }
+
 
         private bool HandleFurtherTask(WfReqTask furtherTask, string actTaskType, ref WfReqTask actBundledTask, List<WfReqTask> bundledTasks, List<WfReqTask> handledTasks)
         {
@@ -488,11 +560,11 @@ namespace FWO.Middleware.Server
             await LogRequestTasks(handledTasks, ticket.Requester?.Name, ModellingTypes.ChangeType.Request);
         }
 
-        private Dictionary<string, List<int>> BuildExtQueryVariables(List<WfReqTask> tasks, List<WfReqTask> handledTasks)
+        private static Dictionary<string, List<int>> BuildExtQueryVariables(List<WfReqTask> tasks, List<WfReqTask> handledTasks)
         {
             Dictionary<string, List<int>> extQueryVariables = [];
 
-            int? managementId = tasks.FirstOrDefault()?.OnManagement?.Id;
+            int? managementId = tasks.FirstOrDefault()?.OnManagement?.Id ?? tasks.FirstOrDefault()?.ManagementId;
             if (managementId != null)
             {
                 extQueryVariables[ExternalVarKeys.ManagementId] = [managementId.Value];
@@ -527,11 +599,11 @@ namespace FWO.Middleware.Server
 
         private void GetExtSystemFromTask(WfReqTask task)
         {
-            actInternalWork = false;
-
             ArgumentNullException.ThrowIfNull(task);
 
             var managementSettings = JsonSerializer.Deserialize<List<ManagementFwConfigChangeState>>(UserConfig.FwConfigChangeMgmSettings) ?? new List<ManagementFwConfigChangeState>();
+
+            ManagementFwConfigChangeState managementSetting = managementSettings.FirstOrDefault(m => m.Id == task.ManagementId)
 
             ManagementFwConfigChangeState managementSetting = managementSettings.FirstOrDefault(m => m.Id == task.ManagementId)
                 ?? throw new InvalidOperationException($"No matching config item found for management {task.ManagementId}.");
@@ -557,7 +629,7 @@ namespace FWO.Middleware.Server
                 {
                     Name = "Internal work",
                     TypeId = BuiltInExternalTicketSystemTypes.GenericId
-                };
+            ExternalTicketSystem system = extTicketSystems.FirstOrDefault(s => s.Id == externalTicketSystemId) ?? throw new InvalidOperationException(
                 return;
             }
 

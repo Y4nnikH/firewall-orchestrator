@@ -26,8 +26,6 @@ namespace FWO.ExternalSystems.CheckPoint
     /// </summary>
     public class CheckPointTicket : ExternalTicket
     {
-        private const string Content = "Content: ";
-
         private CheckPointClient? checkPointClient;
 
         private WfReqTask? rootTask;
@@ -152,7 +150,7 @@ namespace FWO.ExternalSystems.CheckPoint
             };
         }
 
-        private static JsonNode RenderObjectBody(CheckPointObjectRequest request)
+        private static JsonObject RenderObjectBody(CheckPointObjectRequest request)
         {
             return request.NetworkObjectType switch
             {
@@ -262,7 +260,7 @@ namespace FWO.ExternalSystems.CheckPoint
 
                 if (!string.IsNullOrWhiteSpace(lastResponse.Content))
                 {
-                    Log.WriteInfo("CheckPoint RESPONSE BODY", lastResponse.Content);
+                    Log.WriteDebug("CheckPoint RESPONSE BODY", lastResponse.Content);
                 }
                 else
                 {
@@ -323,13 +321,7 @@ namespace FWO.ExternalSystems.CheckPoint
             RestRequest request = new(endpoint, Method.Post);
             request.AddStringBody(requestBody.ToJsonString(), ContentType.Json);
 
-            Log.WriteInfo("CheckPoint REQUEST", endpoint);
-            Log.WriteInfo("CheckPoint BODY", requestBody.ToJsonString());
-
             RestResponse response = await checkPointClient!.RestCall(request, endpoint);
-
-            Log.WriteInfo("CheckPoint RESPONSE STATUS", $"{(int)response.StatusCode} {response.StatusCode}");
-            Log.WriteInfo("CheckPoint RESPONSE BODY", string.IsNullOrWhiteSpace(response.Content) ? "<empty>" : response.Content);
 
             CheckPointResponseCategory category = CategorizeResponse(response);
 
@@ -388,7 +380,7 @@ namespace FWO.ExternalSystems.CheckPoint
             retryBody["ignore-warnings"] = true;
 
             Log.WriteInfo("CheckPoint RETRY", $"Retrying {endpoint} with ignore-warnings=true");
-            Log.WriteInfo("CheckPoint RETRY BODY", retryBody.ToJsonString());
+            Log.WriteDebug("CheckPoint RETRY BODY", retryBody.ToJsonString());
 
             RestRequest retryRequest = new(endpoint, Method.Post);
             retryRequest.AddStringBody(retryBody.ToJsonString(), ContentType.Json);
@@ -396,7 +388,7 @@ namespace FWO.ExternalSystems.CheckPoint
             RestResponse retryResponse = await checkPointClient!.RestCall(retryRequest, endpoint);
 
             Log.WriteInfo("CheckPoint RETRY RESPONSE STATUS", $"{(int)retryResponse.StatusCode} {retryResponse.StatusCode}");
-            Log.WriteInfo("CheckPoint RETRY RESPONSE BODY", string.IsNullOrWhiteSpace(retryResponse.Content) ? "<empty>" : retryResponse.Content);
+            Log.WriteDebug("CheckPoint RETRY RESPONSE BODY", string.IsNullOrWhiteSpace(retryResponse.Content) ? "<empty>" : retryResponse.Content);
 
             return retryResponse;
         }
@@ -504,20 +496,7 @@ namespace FWO.ExternalSystems.CheckPoint
 
         private static string GetCheckPointTaskType(WfReqTask task)
         {
-            return task.TaskType switch
-            {
-                nameof(WfTaskType.group_create)
-                    => IsServiceFlavor(task)
-                        ? SCTaskType.NetworkServiceCreate.ToString()
-                        : task.TaskType,
-
-                nameof(WfTaskType.group_modify)
-                    => IsServiceFlavor(task)
-                        ? SCTaskType.NetworkServiceUpdate.ToString()
-                        : task.TaskType,
-
-                _ => task.TaskType
-            };
+            return task.TaskType;
         }
 
         private static string GetSecureChangeTemplateTaskType(WfReqTask task)
@@ -543,57 +522,43 @@ namespace FWO.ExternalSystems.CheckPoint
             };
         }
 
-        private static bool IsServiceFlavor(WfReqTask task)
-        {
-            return
-                task.Elements.Any(
-                    e => e.Field ==
-                    ElemFieldType.service.ToString()) &&
-                task.Elements.All(
-                    e => e.Field ==
-                    ElemFieldType.service.ToString());
-        }
-
         private static string? FindJsonValue(JsonElement element, params string[] propertyNames)
         {
-            if (element.ValueKind == JsonValueKind.Object)
+            return element.ValueKind switch
             {
-                foreach (JsonProperty property
-                    in element.EnumerateObject())
+                JsonValueKind.Object => FindJsonValueInObject(element, propertyNames),
+                JsonValueKind.Array => FindJsonValueInArray(element, propertyNames),
+                _ => null
+            };
+        }
+
+        private static string? FindJsonValueInObject(JsonElement element, string[] propertyNames)
+        {
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                if (propertyNames.Contains(property.Name, StringComparer.OrdinalIgnoreCase))
                 {
-                    if (propertyNames.Contains(
-                        property.Name,
-                        StringComparer.OrdinalIgnoreCase))
-                    {
-                        return property.Value.ToString();
-                    }
+                    return property.Value.ToString();
+                }
 
-                    string? childValue =
-                        FindJsonValue(
-                            property.Value,
-                            propertyNames);
-
-                    if (!string.IsNullOrWhiteSpace(childValue))
-                    {
-                        return childValue;
-                    }
+                string? childValue = FindJsonValue(property.Value, propertyNames);
+                if (!string.IsNullOrWhiteSpace(childValue))
+                {
+                    return childValue;
                 }
             }
 
-            if (element.ValueKind == JsonValueKind.Array)
-            {
-                foreach (JsonElement child
-                    in element.EnumerateArray())
-                {
-                    string? childValue =
-                        FindJsonValue(
-                            child,
-                            propertyNames);
+            return null;
+        }
 
-                    if (!string.IsNullOrWhiteSpace(childValue))
-                    {
-                        return childValue;
-                    }
+        private static string? FindJsonValueInArray(JsonElement element, string[] propertyNames)
+        {
+            foreach (JsonElement child in element.EnumerateArray())
+            {
+                string? childValue = FindJsonValue(child, propertyNames);
+                if (!string.IsNullOrWhiteSpace(childValue))
+                {
+                    return childValue;
                 }
             }
 
@@ -621,36 +586,45 @@ namespace FWO.ExternalSystems.CheckPoint
 
         private static bool HasMatchingMessage(JsonElement element, string expectedMessageFragment)
         {
-            if (element.ValueKind == JsonValueKind.Object)
+            return element.ValueKind switch
             {
-                foreach (JsonProperty property in element.EnumerateObject())
+                JsonValueKind.Object => HasMatchingMessageInObject(element, expectedMessageFragment),
+                JsonValueKind.Array => HasMatchingMessageInArray(element, expectedMessageFragment),
+                _ => false
+            };
+        }
+
+        private static bool HasMatchingMessageInObject(JsonElement element, string expectedMessageFragment)
+        {
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                if (property.NameEquals("message"))
                 {
-                    if (property.NameEquals("message"))
-                    {
-                        string? message = property.Value.GetString();
+                    string? message = property.Value.GetString();
 
-                        if (!string.IsNullOrWhiteSpace(message)
-                            && message.Contains(expectedMessageFragment, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return true;
-                        }
-                    }
-
-                    if (HasMatchingMessage(property.Value, expectedMessageFragment))
+                    if (!string.IsNullOrWhiteSpace(message)
+                        && message.Contains(expectedMessageFragment, StringComparison.OrdinalIgnoreCase))
                     {
                         return true;
                     }
                 }
+
+                if (HasMatchingMessage(property.Value, expectedMessageFragment))
+                {
+                    return true;
+                }
             }
 
-            if (element.ValueKind == JsonValueKind.Array)
+            return false;
+        }
+
+        private static bool HasMatchingMessageInArray(JsonElement element, string expectedMessageFragment)
+        {
+            foreach (JsonElement child in element.EnumerateArray())
             {
-                foreach (JsonElement child in element.EnumerateArray())
+                if (HasMatchingMessage(child, expectedMessageFragment))
                 {
-                    if (HasMatchingMessage(child, expectedMessageFragment))
-                    {
-                        return true;
-                    }
+                    return true;
                 }
             }
 

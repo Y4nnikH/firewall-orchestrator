@@ -41,8 +41,8 @@
                                     @change
                                 </div>
                                 <div class="col-2">
-                                    <Dropdown ElementType="FwConfigChangeSelection" Elements="GetAvailableSelections(change)" SelectedElement="GetSelectedSelection(management, change)"
-                                              SelectedElementChanged="@(val => SetSelectedSelection(management, change, val))" ElementToString="selection => selection.DisplayName" Id="@($"dropdown-{management.Id}-{change}")">
+                                    <Dropdown ElementType="FwConfigChangeSelection" Elements="GetAvailableSelections()" SelectedElement="GetSelectedSelection(management, change)"
+                                              SelectedElementChanged="@(val => SetSelectedSelection(management, change, val))" ElementToString="selection => selection.DisplayName" Id="@($"dropdown-{management.Id}-{change.Replace(" ", "-")}")">
                                         <ElementTemplate Context="selection">
                                             @selection.DisplayName
                                         </ElementTemplate>
@@ -79,7 +79,6 @@ else
     private List<ManagementFwConfigChangeState> managementStates = new();
     private List<ExternalTicketSystem> extTicketSystems = new();
     private sealed record FwConfigChangeSelection(string Value, string DisplayName);
-
 
     protected override async Task OnInitializedAsync()
     {
@@ -121,15 +120,22 @@ else
             }
         }
 
-        // 2. Merge if needed
-        foreach (var m in allManagements)
+        Dictionary<int, Management> currentManagements = allManagements.ToDictionary(m => m.Id);
+
+        managementStates = managementStates
+            .Where(state => currentManagements.ContainsKey(state.Id))
+            .ToList();
+
+        // refresh names and add missing managements
+        foreach (Management management in allManagements)
         {
-            if (!managementStates.Any(s => s.Id == m.Id))
+            ManagementFwConfigChangeState? existingState = managementStates.FirstOrDefault(s => s.Id == management.Id);
+            if (existingState == null)
             {
                 managementStates.Add(new ManagementFwConfigChangeState
                 {
-                    Id = m.Id,
-                    Name = m.Name,
+                    Id = management.Id,
+                    Name = management.Name,
                     Enabled = false,
                     SelectedChanges = AvailableChanges.ToDictionary(c => c, c => ManagementFwConfigChangeTargets.Disabled)
                 });
