@@ -12,7 +12,6 @@ namespace FWO.ExternalSystems.CheckPoint
 {
     public class CheckPointClient : RestApiClient
     {
-        private readonly ExternalTicketSystem TicketSystem;
         private readonly Management Management;
 
         private string? SessionId;
@@ -21,7 +20,6 @@ namespace FWO.ExternalSystems.CheckPoint
         public CheckPointClient(ExternalTicketSystem ticketSystem, Management management)
             : base(BuildBaseUrl(ticketSystem, management), ticketSystem.ResponseTimeout)
         {
-            TicketSystem = ticketSystem;
             Management = management;
         }
 
