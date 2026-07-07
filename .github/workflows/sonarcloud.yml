@@ -61,11 +61,24 @@ jobs:
 
       - name: Build and analyze
         run: |
-          .sonar/scanner/dotnet-sonarscanner begin \
-            /k:"${SONAR_PROJECT_KEY}" \
-            /o:"${SONAR_ORGANIZATION}" \
-            /d:sonar.token="${SONAR_TOKEN}" \
-            /d:sonar.host.url="https://sonarcloud.io" \
-            /d:sonar.qualitygate.wait=true
+          for attempt in 1 2 3; do
+            if .sonar/scanner/dotnet-sonarscanner begin \
+              /k:"${SONAR_PROJECT_KEY}" \
+              /o:"${SONAR_ORGANIZATION}" \
+              /d:sonar.token="${SONAR_TOKEN}" \
+              /d:sonar.host.url="https://sonarcloud.io" \
+              /d:sonar.qualitygate.wait=true; then
+              break
+            else
+              status=$?
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              exit "$status"
+            fi
+
+            rm -rf .sonarqube
+            sleep $((attempt * 30))
+          done
           dotnet build roles/FWO.sln --configuration Debug --no-incremental
           .sonar/scanner/dotnet-sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
