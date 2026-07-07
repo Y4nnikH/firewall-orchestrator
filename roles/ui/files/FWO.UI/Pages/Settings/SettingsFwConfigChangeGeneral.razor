@@ -41,7 +41,7 @@
                                     @change
                                 </div>
                                 <div class="col-2">
-                                    <Dropdown ElementType="FwConfigChangeSelection" Elements="GetAvailableSelections()" SelectedElement="GetSelectedSelection(management, change)"
+                                    <Dropdown ElementType="FwConfigChangeSelection" Elements="GetAvailableSelections(change)" SelectedElement="GetSelectedSelection(management, change)"
                                               SelectedElementChanged="@(val => SetSelectedSelection(management, change, val))" ElementToString="selection => selection.DisplayName" Id="@($"dropdown-{management.Id}-{change.Replace(" ", "-")}")">
                                         <ElementTemplate Context="selection">
                                             @selection.DisplayName
@@ -139,6 +139,10 @@ else
                     Enabled = false,
                     SelectedChanges = AvailableChanges.ToDictionary(c => c, c => ManagementFwConfigChangeTargets.Disabled)
                 });
+            }
+            else
+            {
+                existingState.Name = management.Name;
             }
         }
 

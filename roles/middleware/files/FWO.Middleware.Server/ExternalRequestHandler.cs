@@ -227,8 +227,6 @@ namespace FWO.Middleware.Server
                 List<ExternalTicketSystem> extTicketSystems = JsonSerializer.Deserialize<List<ExternalTicketSystem>>(UserConfig.ExtTicketSystems) ?? new();
                 GetExtSystemFromTask(nextTask, managementSettings, extTicketSystems);
 
-
-
                 if (actInternalWork)
                 {
                     //internalWorkBatchCategory ??= changeCategory;
@@ -254,7 +252,7 @@ namespace FWO.Middleware.Server
                 {
                     List<WfReqTask> bundledTasks = [];
                     List<WfReqTask> handledTasks = [nextTask];
-                    BundleTasks(ticket, lastTaskNumber, nextTask, bundledTasks, handledTasks);
+                    BundleTasks(ticket, lastTaskNumber, nextTask, bundledTasks, handledTasks, managementSettings, extTicketSystems);
                     await CreateExtRequest(ticket, bundledTasks, handledTasks, waitCycles);
                 }
                 else
@@ -360,7 +358,10 @@ namespace FWO.Middleware.Server
                 throw new InvalidOperationException("Could not initialize implementation workflow handler.");
             }
 
-        private void BundleTasks(WfTicket ticket, int lastTaskNumber, WfReqTask nextTask, List<WfReqTask> bundledTasks, List<WfReqTask> handledTasks)   // ToDo check if same system?
+            return batch.All(task => task.StateId >= implementationHandler.StateMatrix(task.TaskType).LowestEndState);
+        }
+
+        private void BundleTasks(WfTicket ticket, int lastTaskNumber, WfReqTask nextTask, List<WfReqTask> bundledTasks, List<WfReqTask> handledTasks, List<ManagementFwConfigChangeState> managementSettings, List<ExternalTicketSystem> extTicketSystems)
         {
             int actTaskNumber = lastTaskNumber + 2;
             bool taskFound = true;
@@ -371,9 +372,6 @@ namespace FWO.Middleware.Server
             while (taskFound && bundledTasks.Count < actSystem.MaxBundledTasks())
             {
                 WfReqTask? furtherTask = ticket.Tasks.FirstOrDefault(ta => ta.TaskNumber == actTaskNumber);
-                if (furtherTask != null && furtherTask.TaskType == nextTask.TaskType)
-                {
-                    taskFound = HandleFurtherTask(furtherTask, nextTask.TaskType, ref actBundledTask, bundledTasks, handledTasks);
                 if (furtherTask != null && furtherTask.TaskType == nextTask.TaskType && CanBundleWithStartTask(furtherTask, nextTask, startSystemId, managementSettings, extTicketSystems))
                 {
                     taskFound = HandleFurtherTask(furtherTask, nextTask.TaskType, ref actBundledTask, bundledTasks, handledTasks);
@@ -446,12 +444,6 @@ namespace FWO.Middleware.Server
             return extTicketSystems.FirstOrDefault(s => s.Id == externalTicketSystemId)
                 ?? throw new InvalidOperationException($"No matching external ticket system found for id {externalTicketSystemId}.");
         }
-
-        private void GetExtSystemFromTask(WfReqTask task, List<ManagementFwConfigChangeState> managementSettings, List<ExternalTicketSystem> extTicketSystems)
-        {
-            actSystem = ResolveExtSystemForTask(task, managementSettings, extTicketSystems);
-        }
-
 
         private bool HandleFurtherTask(WfReqTask furtherTask, string actTaskType, ref WfReqTask actBundledTask, List<WfReqTask> bundledTasks, List<WfReqTask> handledTasks)
         {
@@ -597,13 +589,11 @@ namespace FWO.Middleware.Server
             }
         }
 
-        private void GetExtSystemFromTask(WfReqTask task)
+        private void GetExtSystemFromTask(WfReqTask task, List<ManagementFwConfigChangeState> managementSettings, List<ExternalTicketSystem> extTicketSystems)
         {
+            actInternalWork = false;
+
             ArgumentNullException.ThrowIfNull(task);
-
-            var managementSettings = JsonSerializer.Deserialize<List<ManagementFwConfigChangeState>>(UserConfig.FwConfigChangeMgmSettings) ?? new List<ManagementFwConfigChangeState>();
-
-            ManagementFwConfigChangeState managementSetting = managementSettings.FirstOrDefault(m => m.Id == task.ManagementId)
 
             ManagementFwConfigChangeState managementSetting = managementSettings.FirstOrDefault(m => m.Id == task.ManagementId)
                 ?? throw new InvalidOperationException($"No matching config item found for management {task.ManagementId}.");
@@ -613,9 +603,11 @@ namespace FWO.Middleware.Server
                 throw new InvalidOperationException($"External workflow is disabled for management {task.ManagementId}.");
             }
 
-            string changeCategory = GetChangeCategory(task);    // object oder rule
+            string changeCategory = GetChangeCategory(task);
 
-            if (!managementSetting.SelectedChanges.TryGetValue(changeCategory, out string? selectedSystemValue) || string.IsNullOrWhiteSpace(selectedSystemValue) || selectedSystemValue == ManagementFwConfigChangeTargets.Disabled)
+            if (!managementSetting.SelectedChanges.TryGetValue(changeCategory, out string? selectedSystemValue)
+                || string.IsNullOrWhiteSpace(selectedSystemValue)
+                || selectedSystemValue == ManagementFwConfigChangeTargets.Disabled)
             {
                 throw new InvalidOperationException(
                     $"No external ticket system configured for management {task.ManagementId} and category '{changeCategory}'.");
@@ -629,7 +621,7 @@ namespace FWO.Middleware.Server
                 {
                     Name = "Internal work",
                     TypeId = BuiltInExternalTicketSystemTypes.GenericId
-            ExternalTicketSystem system = extTicketSystems.FirstOrDefault(s => s.Id == externalTicketSystemId) ?? throw new InvalidOperationException(
+                };
                 return;
             }
 
@@ -639,10 +631,8 @@ namespace FWO.Middleware.Server
                     $"Configured external ticket system id '{selectedSystemValue}' for management {task.ManagementId} and category '{changeCategory}' is invalid.");
             }
 
-            var extTicketSystems = JsonSerializer.Deserialize<List<ExternalTicketSystem>>(UserConfig.ExtTicketSystems) ?? new List<ExternalTicketSystem>();
-
-            ExternalTicketSystem system = extTicketSystems.FirstOrDefault(s => s.Id == externalTicketSystemId) ?? throw new InvalidOperationException(
-                $"No matching external ticket system found for id {externalTicketSystemId}.");
+            ExternalTicketSystem system = extTicketSystems.FirstOrDefault(s => s.Id == externalTicketSystemId)
+                ?? throw new InvalidOperationException($"No matching external ticket system found for id {externalTicketSystemId}.");
 
             extSystemType = system.TypeId;
             actSystem = system;
