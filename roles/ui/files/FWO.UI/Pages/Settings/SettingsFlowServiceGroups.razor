@@ -145,11 +145,6 @@ else
                 </span>
             </Template>
         </Column>
-        <Column TableItem="NetworkService" Title="@(userConfig.GetText("state"))" Field="@(service => service.FlowActive)" Sortable="true" Filterable="true" Context="service">
-            <Template>
-                @service.FlowActive.ShowAsHtml()
-            </Template>
-        </Column>
         <Pager ShowPageNumber="true" ShowTotalCount="true" />
     </ChildContent>
 </FlowDuplicateResolver>
