@@ -159,20 +159,12 @@ namespace FWO.ExternalSystems.CheckPoint
 
         private void AddAuthHeader(RestRequest request)
         {
-            if (!string.IsNullOrWhiteSpace(SessionId))
+            if (string.IsNullOrWhiteSpace(SessionId))
             {
-                request.AddHeader("X-chkp-sid", SessionId);
-                return;
+                throw new ProcessingFailedException("CheckPoint session missing.");
             }
 
-            var auth = TicketSystem.Authorization;
-
-            if (string.IsNullOrWhiteSpace(auth))
-            {
-                return;
-            }
-
-            request.AddHeader("Authorization", auth.Trim());
+            request.AddHeader("X-chkp-sid", SessionId);
         }
 
         // =========================================================

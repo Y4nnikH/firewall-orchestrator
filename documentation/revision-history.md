@@ -539,3 +539,6 @@ This PR hardens FWO installation and security-sensitive workflows. It restricts 
 ## 9.1.16 - 07.07.2026
 - credentials field in management for writing on Firewalls
 - migrate old Tufin template to list entry
+- Support for writing firewall configurations via templates
+- A template provider (Tufin or custom templates) must be configured before use
+- FW config change external workflow is only active after explicit assignment per management and change category in the settings

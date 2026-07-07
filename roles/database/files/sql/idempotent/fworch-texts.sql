@@ -2322,10 +2322,10 @@ INSERT INTO txt VALUES ('public_key',           'German', 	'&Ouml;ffentlicher Sc
 INSERT INTO txt VALUES ('public_key',           'English', 	'Public Key');
 INSERT INTO txt VALUES ('readonly_credential',  'German', 	'Login-Daten');
 INSERT INTO txt VALUES ('readonly_credential',  'English', 	'Credentials');
-INSERT INTO txt VALUES ('readonly_credential_mgm','German', 	'Login-Daten(Import)');
-INSERT INTO txt VALUES ('readonly_credential_mgm','English', 	'Credentials(import)');
-INSERT INTO txt VALUES ('write_credential',    'German', 	'Login-Daten(Bereitstellung)');
-INSERT INTO txt VALUES ('write_credential',    'English', 	'Credentials(Provisioning)');
+INSERT INTO txt VALUES ('readonly_credential_mgm','German', 	'Login-Daten (Import)');
+INSERT INTO txt VALUES ('readonly_credential_mgm','English', 	'Credentials (Import)');
+INSERT INTO txt VALUES ('write_credential',    'German', 	'Login-Daten (Bereitstellung)');
+INSERT INTO txt VALUES ('write_credential',    'English', 	'Credentials (Provisioning)');
 INSERT INTO txt VALUES ('is_key_pair',          'German', 	'Schl&uuml;sselpaar?');
 INSERT INTO txt VALUES ('is_key_pair',          'English', 	'Key pair?');
 INSERT INTO txt VALUES ('hide_in_ui',           'German', 	'Nicht sichtbar');
@@ -5624,10 +5624,10 @@ INSERT INTO txt VALUES ('H5116', 'German',  'Login-Daten*: Zugangsdaten f&uuml;r
 INSERT INTO txt VALUES ('H5116', 'English', 'Import Credentials*: User/Password combination for logging into the management.<br>
     Choose a set of <a href="/help/settings/credentials">credentials</a> which will be used to get the management''s configuration.
 ');
-INSERT INTO txt VALUES ('H5117', 'German',  'Login-Daten*: Zugangsdaten f&uuml;r den Export-Nutzer des Managements.<br>
-    Hier kann ein Satz <a href="/help/settings/credentials">Zugangsdaten</a> ausgew&auml;hlt werden, der zum schreiben auf das Management dient.
+INSERT INTO txt VALUES ('H5117', 'German',  'Login-Daten: Zugangsdaten f&uuml;r den Export-Nutzer des Managements.<br>
+    Hier kann ein Satz <a href="/help/settings/credentials">Zugangsdaten</a> ausgew&auml;hlt werden, der zum Schreiben auf das Management dient.
 ');
-INSERT INTO txt VALUES ('H5117', 'English', 'Export Credentials*: User/Password combination for logging into the management.<br>
+INSERT INTO txt VALUES ('H5117', 'English', 'Export Credentials: User/Password combination for logging into the management.<br>
     Choose a set of <a href="/help/settings/credentials">credentials</a> which will be used to write on the management.
 ');
 INSERT INTO txt VALUES ('H5119', 'German',  'Domain: Firewall Domain Name <br>

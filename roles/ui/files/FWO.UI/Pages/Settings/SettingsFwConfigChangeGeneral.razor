@@ -24,8 +24,7 @@
                     <div class="col-2 border justify-content-start px-3 py-2 fw-bold">
                         <div>@management.Name</div>
                     </div>
-                    <button class="btn fw-bold @(management.Enabled ? "btn-success" : "btn-danger")"
-                            style="border-radius:15px;"
+                    <button class="btn rounded-pill fw-bold @(management.Enabled ? "btn-success" : "btn-danger")"
                             @onclick="() => ToggleManagement(management)">
                         @(management.Enabled ? userConfig.GetText("enabled") : userConfig.GetText("disabled"))
                     </button>

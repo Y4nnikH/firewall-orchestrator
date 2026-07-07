@@ -1,4 +1,4 @@
-﻿query getUsedMgmDeviceTypes {
+query getUsedMgmDeviceTypes {
   management(order_by: { mgm_name: asc }) {
     id: mgm_id
     deviceType: stm_dev_typ {

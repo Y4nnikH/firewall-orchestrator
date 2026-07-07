@@ -13940,18 +13940,6 @@
               ],
               "array_relationships": [
                 {
-                  "name": "accesses",
-                  "using": {
-                    "foreign_key_constraint_on": {
-                      "column": "owner_id",
-                      "table": {
-                        "name": "access",
-                        "schema": "flow"
-                      }
-                    }
-                  }
-                },
-                {
                   "name": "change_histories",
                   "using": {
                     "foreign_key_constraint_on": {
@@ -24839,18 +24827,6 @@
                       }
                     }
                   }
-                },
-                {
-                  "name": "svcobjects",
-                  "using": {
-                    "foreign_key_constraint_on": {
-                      "column": "ip_proto_id",
-                      "table": {
-                        "name": "svcobject",
-                        "schema": "flow"
-                      }
-                    }
-                  }
                 }
               ],
               "select_permissions": [
@@ -27474,18 +27450,6 @@
                 }
               ],
               "array_relationships": [
-                {
-                  "name": "accesses",
-                  "using": {
-                    "foreign_key_constraint_on": {
-                      "column": "requester_id",
-                      "table": {
-                        "name": "access",
-                        "schema": "flow"
-                      }
-                    }
-                  }
-                },
                 {
                   "name": "alerts",
                   "using": {
