@@ -35,6 +35,7 @@
     - docker-ce
     - docker-ce-cli
     - containerd.io
+    - podman
     - "dotnet-sdk-{{ dotnet_version }}"
     - make
     - "{{ postgresql_dev_package }}"
