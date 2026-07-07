@@ -70,7 +70,6 @@
         mode: "0755"
       loop:
         - /var/{{ product_name }}
-        - /var/{{ product_name }}/tmp
         - /var/{{ product_name }}/import_archive
 
     - name: copy api-importer systemd service script

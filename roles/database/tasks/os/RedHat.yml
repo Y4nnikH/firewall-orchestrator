@@ -4,14 +4,15 @@
       include_tasks: ../redhat_preps.yml
       when: installation_mode == "new"
 
-    - name: install package postgresql packages for RedHat
-      package:
-        name: "{{ item }}"
+    - name: install OS postgresql packages for RedHat
+      ansible.builtin.dnf:
+        name:
+          - postgresql-server
+          - postgresql-contrib
+          - python3-psycopg2
         state: present
-      loop:
-        - postgresql-server
-        - postgresql-contrib
-        - python3-psycopg2
+        disablerepo:
+          - pgdg*
 
     - name: initdb as extra step for RedHat
       command: /usr/bin/postgresql-setup --initdb

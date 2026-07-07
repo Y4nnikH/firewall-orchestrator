@@ -10,6 +10,22 @@
         msg: Ansible 2.13 or above is required
       when: ansible_version.full is version('2.13', '<')
 
+    - name: create remote installer tmp directory
+      file:
+        path: "{{ installer_tmp_dir }}"
+        state: directory
+        mode: "0700"
+      become: false
+
+    - name: create controller installer tmp directory
+      file:
+        path: "{{ installer_controller_tmp_dir }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      run_once: true
+      become: false
+
     - name: check for existing main config file {{ fworch_conf_file }}
       stat:
         path: "{{ fworch_conf_file }}"
@@ -317,6 +333,14 @@
         owner: "{{ fworch_user }}"
         group: "{{ fworch_group }}"
         mode: "0775"
+
+    - name: create product tmp directory
+      file:
+        path: "{{ fworch_tmp_dir }}"
+        state: directory
+        owner: "{{ fworch_user }}"
+        group: "{{ fworch_group }}"
+        mode: "0700"
 
     - name: copy fworch scripts directory
       ansible.posix.synchronize:

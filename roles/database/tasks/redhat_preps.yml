@@ -13,7 +13,10 @@
   become: true
   when: redhat_major_version | int == 8
 
-- name: install glibc-langpack-en for postgresql to handle utf-8
-  package:
+- name: install OS glibc-langpack-en for postgresql to handle utf-8
+  ansible.builtin.dnf:
     name: glibc-langpack-en
+    state: present
+    disablerepo:
+      - pgdg*
   become: true

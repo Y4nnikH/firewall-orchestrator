@@ -4,29 +4,12 @@
   changed_when: false
   failed_when: false
 
-- block:
-    - name: fetch EPEL
-      get_url:
-        url: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ redhat_major_version }}.noarch.rpm"
-        dest: "/tmp/epel-release-latest-{{ redhat_major_version }}.noarch.rpm"
-      environment: "{{ proxy_env }}"
-
-    - name: import EPEL GPG key
-      rpm_key:
-        state: present
-        key: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ redhat_major_version }}"
-      environment: "{{ proxy_env }}"
-
-    - name: add EPEL repos
-      yum:
-        name: "/tmp/epel-release-latest-{{ redhat_major_version }}.noarch.rpm"
-        state: present
-
-    - name: remove file EPEL repo
-      file:
-        name: "/tmp/epel-release-latest-{{ redhat_major_version }}.noarch.rpm"
-        state: absent
-
+- name: install EPEL release package from configured repositories
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+  environment: "{{ proxy_env }}"
+  become: true
   when: epel_release_check.rc != 0
 
 - name: install subscription-manager
