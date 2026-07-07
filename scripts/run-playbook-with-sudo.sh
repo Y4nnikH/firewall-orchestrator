@@ -18,6 +18,37 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' HUP INT TERM
 
+# ansible-core (default on RedHat-like systems) does not bundle the collections
+# needed by the playbooks - install them when any of them is missing
+ensure_collections() {
+    local requirements_file="collections/requirements.yml"
+
+    [[ -f "$requirements_file" ]] || return 0
+
+    local installed name missing=0
+    installed="$(ansible-galaxy collection list 2>/dev/null || true)"
+
+    while read -r name; do
+        [[ -n "$name" ]] || continue
+        if ! awk -v collection="$name" '$1 == collection { found = 1 } END { exit !found }' <<<"$installed"; then
+            missing=1
+            break
+        fi
+    done < <(awk '/- name:/ {print $3}' "$requirements_file")
+
+    if [[ "$missing" -eq 1 ]]; then
+        echo "Installing required Ansible collections from $requirements_file ..."
+        if ! ansible-galaxy collection install -r "$requirements_file" -p collections; then
+            echo "Failed to install the required Ansible collections." >&2
+            echo "Install them manually before running the playbook:" >&2
+            echo "    ansible-galaxy collection install -r $requirements_file -p collections --force" >&2
+            exit 1
+        fi
+    fi
+}
+
+ensure_collections
+
 if [[ "$(id -u)" -ne 0 ]]; then
     if ! command -v sudo >/dev/null 2>&1; then
         echo "sudo is required to run the Firewall Orchestrator installer." >&2

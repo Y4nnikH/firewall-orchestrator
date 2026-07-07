@@ -81,5 +81,14 @@
         state: present
         update_cache: yes
 
+    # distribution chromium can replace the chrome download; Ubuntu only ships a snap wrapper, so skip there
+    - name: Define Debian headless chromium package
+      set_fact:
+        chromium_headless_packages:
+          - chromium
+        chromium_headless_binary_candidates:
+          - /usr/bin/chromium
+      when: ansible_facts['distribution'] == "Debian"
+
   become: true
   environment: "{{ proxy_env }}"

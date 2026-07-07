@@ -1,6 +1,61 @@
 - name: include puppeteer dependency tasks for current OS family
   include_tasks: "os/install_puppeteer.{{ ansible_facts['os_family'] }}.yml"
 
+# prefer a headless chromium package from the configured (local) repos over downloading
+# chrome for testing - avoids internet downloads on hardened / proxy-restricted systems
+- name: try to install headless chromium package from configured repos
+  package:
+    name: "{{ chromium_headless_packages }}"
+    state: present
+  register: chromium_headless_install
+  failed_when: false
+  become: true
+  environment: "{{ proxy_env }}"
+  when: chromium_headless_packages | default([]) | length > 0
+
+- name: locate system chromium headless binary
+  stat:
+    path: "{{ item }}"
+  register: chromium_headless_stat
+  loop: "{{ chromium_headless_binary_candidates | default([]) }}"
+  become: true
+
+- name: record system chromium path (empty when none found)
+  set_fact:
+    system_chromium_path: >-
+      {{ chromium_headless_stat.results | default([])
+         | selectattr('stat', 'defined') | selectattr('stat.exists')
+         | map(attribute='item') | list | first | default('') }}
+
+- name: record whether system chromium is available
+  set_fact:
+    system_chromium_available: "{{ system_chromium_path | trim | length > 0 }}"
+
+- name: make sure {{ fworch_home }}/bin exists
+  file:
+    path: "{{ fworch_home }}/bin"
+    state: directory
+    owner: "{{ fworch_user }}"
+    group: "{{ fworch_group }}"
+    mode: "0755"
+  become: true
+  when: system_chromium_available
+
+- name: symlink system chromium to {{ fworch_home }}/bin/chromium-headless
+  file:
+    src: "{{ system_chromium_path | trim }}"
+    dest: "{{ fworch_home }}/bin/chromium-headless"
+    state: link
+  become: true
+  when: system_chromium_available
+
+- name: use system chromium instead of chrome download
+  debug:
+    msg: >-
+      Using system chromium at {{ system_chromium_path | trim }} -
+      skipping chrome for testing download.
+  when: system_chromium_available
+
 # get google chrome for pdf generation
 - name: get last known good versions (primary)
   uri:
@@ -10,6 +65,7 @@
   failed_when: false
   become: false
   environment: "{{ proxy_env }}"
+  when: not system_chromium_available
 
 - name: get last known good versions (github api raw)
   uri:
@@ -21,6 +77,7 @@
   failed_when: false
   become: false
   environment: "{{ proxy_env }}"
+  when: not system_chromium_available
 
 - name: pick chrome metadata source (primary -> github api)
   set_fact:
@@ -59,8 +116,9 @@
   fail:
     msg: >-
       Could not fetch Chrome for Testing version metadata via primary URL or
-      GitHub API, and no existing Chrome installation was found to fall back on.
-  when: not chrome_metadata_available and not chrome_existing_usable
+      GitHub API, and no existing Chrome installation or system chromium was
+      found to fall back on.
+  when: not chrome_metadata_available and not chrome_existing_usable and not system_chromium_available
 
 - name: keep existing chrome when metadata is unavailable
   debug:
@@ -68,7 +126,7 @@
       WARNING: Could not fetch Chrome for Testing version metadata; keeping the
       already-installed Chrome at {{ fworch_home }}/bin/chrome and skipping the
       version check/update.
-  when: not chrome_metadata_available and chrome_existing_usable
+  when: not chrome_metadata_available and chrome_existing_usable and not system_chromium_available
 
 # Everything below depends on the fetched version metadata. Skip the whole
 # block when we are falling back to an already-installed Chrome.
