@@ -260,16 +260,17 @@ else
 
             foreach (NetworkObject candidate in SelectedDuplicateGroup.Objects)
             {
-                await apiConnection.SendQueryAsync<NetworkObject>(FlowMutations.upsertFlowNwGroupMapping, new
+                NetworkObject updatedObject = await apiConnection.SendQueryAsync<NetworkObject>(FlowMutations.upsertFlowNwGroupMapping, new
                 {
                     objId = candidate.Id,
                     flowNwgrpId = SelectedDuplicateGroup.FlowNwGroupId,
                     activeOnMgm = candidate.Id == selectedObject.Id
                 });
+                UpdateCustomObjectInCatalog(updatedObject);
             }
 
             CloseDuplicateResolver();
-            await Refresh();
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowNwGroups, customObjectManagements);
             workInProgress = false;
         }
         catch (Exception exception)
@@ -330,5 +331,18 @@ else
         FlowNwGroup? flowNwGroup = flowNwGroups.FirstOrDefault(item => item.Id == flowNwGroupId);
         string details = flowNwGroup == null ? "" : FlowAdminHelper.FormatFlowNwGroupTechnicalDetails(flowNwGroup, userConfig.GetText("members"));
         return string.IsNullOrWhiteSpace(details) ? "-" : details;
+    }
+
+    private void UpdateCustomObjectInCatalog(NetworkObject updatedObject)
+    {
+        foreach (Management management in customObjectManagements)
+        {
+            int objectIndex = Array.FindIndex(management.Objects, nwObject => nwObject.Id == updatedObject.Id);
+            if (objectIndex >= 0)
+            {
+                management.Objects[objectIndex] = updatedObject;
+                return;
+            }
+        }
     }
 }

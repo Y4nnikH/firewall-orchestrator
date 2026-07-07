@@ -260,16 +260,17 @@ else
 
             foreach (NetworkService candidate in SelectedDuplicateGroup.Services)
             {
-                await apiConnection.SendQueryAsync<NetworkService>(FlowMutations.upsertFlowSvcGroupMapping, new
+                NetworkService updatedService = await apiConnection.SendQueryAsync<NetworkService>(FlowMutations.upsertFlowSvcGroupMapping, new
                 {
                     svcId = candidate.Id,
                     flowSvcgrpId = SelectedDuplicateGroup.FlowSvcGroupId,
                     activeOnMgm = candidate.Id == selectedService.Id
                 });
+                UpdateCustomServiceInCatalog(updatedService);
             }
 
             CloseDuplicateResolver();
-            await Refresh();
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowSvcGroups, customServiceManagements);
             workInProgress = false;
         }
         catch (Exception exception)
@@ -330,5 +331,18 @@ else
         FlowSvcGroup? flowSvcGroup = flowSvcGroups.FirstOrDefault(item => item.Id == flowSvcGroupId);
         string details = flowSvcGroup == null ? "" : FlowAdminHelper.FormatFlowSvcGroupTechnicalDetails(flowSvcGroup, userConfig.GetText("members"));
         return string.IsNullOrWhiteSpace(details) ? "-" : details;
+    }
+
+    private void UpdateCustomServiceInCatalog(NetworkService updatedService)
+    {
+        foreach (Management management in customServiceManagements)
+        {
+            int objectIndex = Array.FindIndex(management.Services, service => service.Id == updatedService.Id);
+            if (objectIndex >= 0)
+            {
+                management.Services[objectIndex] = updatedService;
+                return;
+            }
+        }
     }
 }

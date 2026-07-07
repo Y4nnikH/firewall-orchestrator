@@ -663,7 +663,7 @@ else
             }
 
             CloseDuplicateResolver();
-            await Refresh();
+            duplicateGroups = BuildDuplicateGroups();
             workInProgress = false;
         }
         catch (Exception exception)
@@ -759,7 +759,13 @@ else
 
     private void UpdateCustomObjectInCatalog(NetworkObject updatedObject)
     {
-        foreach (Management management in customObjectManagements)
+        UpdateCustomObjectInManagements(customObjectManagements, updatedObject);
+        UpdateCustomObjectInManagements(namingCustomObjectManagements, updatedObject);
+    }
+
+    private static void UpdateCustomObjectInManagements(List<Management> managements, NetworkObject updatedObject)
+    {
+        foreach (Management management in managements)
         {
             int objectIndex = Array.FindIndex(management.Objects, nwObject => nwObject.Id == updatedObject.Id);
             if (objectIndex >= 0)

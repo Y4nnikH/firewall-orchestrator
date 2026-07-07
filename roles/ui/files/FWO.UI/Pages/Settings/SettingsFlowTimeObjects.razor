@@ -262,16 +262,17 @@ else
 
             foreach (TimeObject candidate in SelectedDuplicateGroup.TimeObjects)
             {
-                await apiConnection.SendQueryAsync<TimeObject>(FlowMutations.upsertFlowTimeObjectMapping, new
+                TimeObject updatedTimeObject = await apiConnection.SendQueryAsync<TimeObject>(FlowMutations.upsertFlowTimeObjectMapping, new
                 {
                     timeObjId = candidate.Id,
                     flowTimeobjId = SelectedDuplicateGroup.FlowTimeObjectId,
                     activeOnMgm = candidate.Id == selectedTimeObject.Id
                 });
+                UpdateCustomTimeObjectInCatalog(updatedTimeObject);
             }
 
             CloseDuplicateResolver();
-            await Refresh();
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowTimeObjects, customTimeManagements);
             workInProgress = false;
         }
         catch (Exception exception)
@@ -333,5 +334,18 @@ else
         FlowTimeObject? flowTimeObject = flowTimeObjects.FirstOrDefault(item => item.Id == flowTimeObjectId);
         string details = flowTimeObject == null ? "" : FlowAdminHelper.FormatFlowTimeObjectTechnicalDetails(flowTimeObject);
         return string.IsNullOrWhiteSpace(details) ? "-" : details;
+    }
+
+    private void UpdateCustomTimeObjectInCatalog(TimeObject updatedTimeObject)
+    {
+        foreach (Management management in customTimeManagements)
+        {
+            int objectIndex = Array.FindIndex(management.TimeObjects, timeObject => timeObject.Id == updatedTimeObject.Id);
+            if (objectIndex >= 0)
+            {
+                management.TimeObjects[objectIndex] = updatedTimeObject;
+                return;
+            }
+        }
     }
 }

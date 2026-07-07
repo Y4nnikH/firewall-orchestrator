@@ -223,6 +223,7 @@ namespace FWO.Test
                     (11, 100, false),
                     (12, 100, true)
                 }));
+                Assert.That(apiConnection.Queries.Count(query => query == FlowQueries.getFlowServiceObjects), Is.EqualTo(1));
             });
         }
 

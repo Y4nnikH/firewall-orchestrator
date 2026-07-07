@@ -391,16 +391,17 @@ else
 
             foreach (NetworkService candidate in SelectedDuplicateGroup.Services)
             {
-                await apiConnection.SendQueryAsync<NetworkService>(FlowMutations.upsertFlowSvcObjectMapping, new
+                NetworkService updatedService = await apiConnection.SendQueryAsync<NetworkService>(FlowMutations.upsertFlowSvcObjectMapping, new
                 {
                     svcId = candidate.Id,
                     flowSvcobjId = SelectedDuplicateGroup.FlowSvcObjectId,
                     activeOnMgm = candidate.Id == selectedService.Id
                 });
+                UpdateCustomServiceInCatalog(updatedService);
             }
 
             CloseDuplicateResolver();
-            await Refresh();
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowSvcObjects, customServiceManagements);
             workInProgress = false;
         }
         catch (Exception exception)
