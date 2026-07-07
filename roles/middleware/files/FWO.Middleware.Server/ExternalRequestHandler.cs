@@ -634,7 +634,6 @@ namespace FWO.Middleware.Server
             ExternalTicketSystem system = extTicketSystems.FirstOrDefault(s => s.Id == externalTicketSystemId)
                 ?? throw new InvalidOperationException($"No matching external ticket system found for id {externalTicketSystemId}.");
 
-            extSystemType = system.TypeId;
             actSystem = system;
         }
 

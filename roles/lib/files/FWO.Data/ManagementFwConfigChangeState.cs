@@ -6,6 +6,7 @@ namespace FWO.Data
     public static class ManagementFwConfigChangeTargets
     {
         public const string Disabled = "Disabled";
+        public const string InternalWork = "InternalWork";
     }
 
     public static class ManagementFwConfigChangeCategories
@@ -18,12 +19,6 @@ namespace FWO.Data
             ObjectChanges,
             RuleChanges
         ];
-    }
-
-    public static class ManagementFwConfigChangeTargets
-    {
-        public const string Disabled = "Disabled";
-        public const string InternalWork = "InternalWork";
     }
 
     public class ManagementFwConfigChangeState
