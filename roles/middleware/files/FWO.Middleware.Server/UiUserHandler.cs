@@ -151,6 +151,8 @@ namespace FWO.Middleware.Server
         public static async Task<UiUser> SynchronizeUiUserContext(ApiConnection apiConnection, UiUser user, bool updateLastLogin = true, bool createIfMissing = true)
         {
             bool userSetInDb = false;
+            bool workflowVisibilityGroupsLoaded = false;
+            bool workflowVisibilityGroupsAttempted = false;
             try
             {
                 UiUser[] existingUsers = await apiConnection.SendQueryAsync<UiUser[]>(AuthQueries.getUserByDn, new { dn = user.Dn });
@@ -168,11 +170,17 @@ namespace FWO.Middleware.Server
                     Log.WriteDebug("User not found", $"Couldn't find {user.Name} in internal database");
                 }
                 await GetOwnershipsFromOwnerLdap(apiConnection, user);
-                await GetWorkflowVisibilityGroupIds(apiConnection, user);
+                workflowVisibilityGroupsAttempted = true;
+                workflowVisibilityGroupsLoaded = await GetWorkflowVisibilityGroupIds(apiConnection, user);
             }
             catch (Exception exeption)
             {
                 Log.WriteError("Get User Error", $"Error while trying to find {user.Name} in database.", exeption);
+            }
+
+            if (workflowVisibilityGroupsAttempted && !workflowVisibilityGroupsLoaded)
+            {
+                throw new InvalidOperationException($"Workflow visibility groups could not be determined for User {user.Name}.");
             }
 
             if (!userSetInDb)
@@ -253,7 +261,7 @@ namespace FWO.Middleware.Server
         /// <summary>
         /// Resolves workflow visibility group memberships for the given user from the database.
         /// </summary>
-        public static async Task GetWorkflowVisibilityGroupIds(ApiConnection apiConn, UiUser user)
+        public static async Task<bool> GetWorkflowVisibilityGroupIds(ApiConnection apiConn, UiUser user)
         {
             try
             {
@@ -285,10 +293,12 @@ namespace FWO.Middleware.Server
                 user.WorkflowVisibilityGroupIds = user.WorkflowVisibilityGroupIds.Distinct().ToList();
                 Log.WriteDebug("Get workflow visibility groups",
                     $"User {user.Name} resolved workflow visibility group ids: [{string.Join(", ", user.WorkflowVisibilityGroupIds)}]");
+                return true;
             }
             catch (Exception exeption)
             {
                 Log.WriteError("Get workflow visibility groups", $"Workflow visibility groups could not be determined for User {user.Name}.", exeption);
+                return false;
             }
         }
 

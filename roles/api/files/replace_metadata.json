@@ -34803,6 +34803,18 @@
                   "comment": ""
                 },
                 {
+                  "role": "modeller",
+                  "permission": {
+                    "columns": [
+                      "derived_state_id",
+                      "from_state_id",
+                      "phase_matrix_id"
+                    ],
+                    "filter": {}
+                  },
+                  "comment": ""
+                },
+                {
                   "role": "planner",
                   "permission": {
                     "columns": [
@@ -34949,6 +34961,22 @@
                   "comment": ""
                 },
                 {
+                  "role": "modeller",
+                  "permission": {
+                    "columns": [
+                      "active",
+                      "name",
+                      "phase",
+                      "id",
+                      "lowest_end_state",
+                      "lowest_input_state",
+                      "lowest_start_state"
+                    ],
+                    "filter": {}
+                  },
+                  "comment": ""
+                },
+                {
                   "role": "planner",
                   "permission": {
                     "columns": [
@@ -35067,6 +35095,18 @@
                   "comment": ""
                 },
                 {
+                  "role": "modeller",
+                  "permission": {
+                    "columns": [
+                      "phase_matrix_id",
+                      "sort_order",
+                      "transition_group_id"
+                    ],
+                    "filter": {}
+                  },
+                  "comment": ""
+                },
+                {
                   "role": "planner",
                   "permission": {
                     "columns": [
@@ -35171,6 +35211,19 @@
                 },
                 {
                   "role": "middleware-server",
+                  "permission": {
+                    "columns": [
+                      "from_state_id",
+                      "sort_order",
+                      "to_state_id",
+                      "transition_group_id"
+                    ],
+                    "filter": {}
+                  },
+                  "comment": ""
+                },
+                {
+                  "role": "modeller",
                   "permission": {
                     "columns": [
                       "from_state_id",
@@ -35317,6 +35370,21 @@
                       "id",
                       "visibility_group_id",
                       "exclusive",
+                      "description"
+                    ],
+                    "filter": {}
+                  },
+                  "comment": ""
+                },
+                {
+                  "role": "modeller",
+                  "permission": {
+                    "columns": [
+                      "exclusive",
+                      "name",
+                      "phase",
+                      "id",
+                      "visibility_group_id",
                       "description"
                     ],
                     "filter": {}
@@ -36228,6 +36296,19 @@
                   "comment": ""
                 },
                 {
+                  "role": "modeller",
+                  "permission": {
+                    "columns": [
+                      "is_active",
+                      "name",
+                      "id",
+                      "description"
+                    ],
+                    "filter": {}
+                  },
+                  "comment": ""
+                },
+                {
                   "role": "planner",
                   "permission": {
                     "columns": [
@@ -36329,6 +36410,19 @@
                 },
                 {
                   "role": "middleware-server",
+                  "permission": {
+                    "columns": [
+                      "phase",
+                      "task_type",
+                      "configuration_id",
+                      "phase_matrix_id"
+                    ],
+                    "filter": {}
+                  },
+                  "comment": ""
+                },
+                {
+                  "role": "modeller",
                   "permission": {
                     "columns": [
                       "phase",

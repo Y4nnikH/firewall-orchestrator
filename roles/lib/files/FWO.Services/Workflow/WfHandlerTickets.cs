@@ -166,24 +166,24 @@ namespace FWO.Services.Workflow
             return 0;
         }
 
-        private bool CanViewTicket(WfTicket ticket)
+        private bool CanViewTicket(WfTicket ticket, HashSet<int> exclusiveVisibilityGroupIds)
         {
-            return CanViewStatefulObject(ticket, MasterStateMatrix, "ticket", ticket.Id.ToString());
+            return CanViewStatefulObject(ticket, MasterStateMatrix, "ticket", ticket.Id.ToString(), exclusiveVisibilityGroupIds);
         }
 
-        private bool CanViewReqTask(WfReqTask reqTask)
+        private bool CanViewReqTask(WfReqTask reqTask, HashSet<int> exclusiveVisibilityGroupIds)
         {
             StateMatrix stateMatrix = StateMatrix(reqTask.TaskType);
-            return CanViewStatefulObject(reqTask, stateMatrix, "request-task", $"{reqTask.TaskType}/{reqTask.Id}");
+            return CanViewStatefulObject(reqTask, stateMatrix, "request-task", $"{reqTask.TaskType}/{reqTask.Id}", exclusiveVisibilityGroupIds);
         }
 
-        private bool CanViewImplTask(WfImplTask implTask)
+        private bool CanViewImplTask(WfImplTask implTask, HashSet<int> exclusiveVisibilityGroupIds)
         {
             StateMatrix stateMatrix = StateMatrix(implTask.TaskType);
-            return CanViewStatefulObject(implTask, stateMatrix, "impl-task", $"{implTask.TaskType}/{implTask.Id}");
+            return CanViewStatefulObject(implTask, stateMatrix, "impl-task", $"{implTask.TaskType}/{implTask.Id}", exclusiveVisibilityGroupIds);
         }
 
-        private bool CanViewApproval(WfApproval approval, StateMatrix reqTaskMatrix)
+        private bool CanViewApproval(WfApproval approval, StateMatrix reqTaskMatrix, HashSet<int> exclusiveVisibilityGroupIds)
         {
             if (!userConfig.ReqVisibilityBased)
             {
@@ -191,12 +191,13 @@ namespace FWO.Services.Workflow
             }
 
             bool visible = WorkflowVisibilityHelper.CanAccessStatefulObject(approval, reqTaskMatrix, userConfig.User.WorkflowVisibilityGroupIds,
-                GetWorkflowExclusiveVisibilityGroupIds()) || IsExplicitlyAssigned(approval);
-            LogVisibilityDecision("approval", approval.StateId, approval.Id.ToString(), reqTaskMatrix, visible);
+                exclusiveVisibilityGroupIds) || IsExplicitlyAssigned(approval);
+            LogVisibilityDecision("approval", approval.StateId, approval.Id.ToString(), reqTaskMatrix, visible, exclusiveVisibilityGroupIds);
             return visible;
         }
 
-        private bool CanViewStatefulObject(WfStatefulObject statefulObject, StateMatrix stateMatrix, string objectType, string objectId)
+        private bool CanViewStatefulObject(WfStatefulObject statefulObject, StateMatrix stateMatrix, string objectType, string objectId,
+            HashSet<int> exclusiveVisibilityGroupIds)
         {
             if (!userConfig.ReqVisibilityBased)
             {
@@ -204,8 +205,8 @@ namespace FWO.Services.Workflow
             }
 
             bool visible = WorkflowVisibilityHelper.CanAccessStatefulObject(statefulObject, stateMatrix, userConfig.User.WorkflowVisibilityGroupIds,
-                GetWorkflowExclusiveVisibilityGroupIds()) || IsExplicitlyAssigned(statefulObject);
-            LogVisibilityDecision(objectType, statefulObject.StateId, objectId, stateMatrix, visible);
+                exclusiveVisibilityGroupIds) || IsExplicitlyAssigned(statefulObject);
+            LogVisibilityDecision(objectType, statefulObject.StateId, objectId, stateMatrix, visible, exclusiveVisibilityGroupIds);
             return visible;
         }
 
@@ -244,17 +245,18 @@ namespace FWO.Services.Workflow
                 return true;
             }
 
-            bool ticketVisible = CanViewTicket(ticket);
+            HashSet<int> exclusiveVisibilityGroupIds = GetWorkflowExclusiveVisibilityGroupIds();
+            bool ticketVisible = CanViewTicket(ticket, exclusiveVisibilityGroupIds);
             bool hadRequestTasks = ticket.Tasks.Count > 0;
             List<WfReqTask> visibleReqTasks = [];
 
             foreach (WfReqTask reqTask in ticket.Tasks)
             {
                 StateMatrix reqTaskMatrix = StateMatrix(reqTask.TaskType);
-                reqTask.ImplementationTasks = [.. reqTask.ImplementationTasks.Where(CanViewImplTask)];
-                reqTask.Approvals = [.. reqTask.Approvals.Where(approval => CanViewApproval(approval, reqTaskMatrix))];
+                reqTask.ImplementationTasks = [.. reqTask.ImplementationTasks.Where(implTask => CanViewImplTask(implTask, exclusiveVisibilityGroupIds))];
+                reqTask.Approvals = [.. reqTask.Approvals.Where(approval => CanViewApproval(approval, reqTaskMatrix, exclusiveVisibilityGroupIds))];
 
-                bool taskVisible = CanViewReqTask(reqTask) || reqTask.ImplementationTasks.Count > 0 || reqTask.Approvals.Count > 0;
+                bool taskVisible = CanViewReqTask(reqTask, exclusiveVisibilityGroupIds) || reqTask.ImplementationTasks.Count > 0 || reqTask.Approvals.Count > 0;
                 if (!taskVisible)
                 {
                     continue;
@@ -268,7 +270,7 @@ namespace FWO.Services.Workflow
             {
                 Log.WriteDebug("Workflow visibility",
                     $"Denied ticket {ticket.Id} in state {ticket.StateId} because no visible request tasks remain. " +
-                    $"user groups: [{string.Join(", ", userConfig.User.WorkflowVisibilityGroupIds)}], exclusive groups: [{string.Join(", ", GetWorkflowExclusiveVisibilityGroupIds())}]");
+                    $"user groups: [{string.Join(", ", userConfig.User.WorkflowVisibilityGroupIds)}], exclusive groups: [{string.Join(", ", exclusiveVisibilityGroupIds)}]");
                 return false;
             }
 
@@ -285,7 +287,8 @@ namespace FWO.Services.Workflow
             return userConfig.ReqVisibilityBased ? ApplyVisibilityRestrictions : null;
         }
 
-        private void LogVisibilityDecision(string objectType, int stateId, string objectId, StateMatrix stateMatrix, bool visible)
+        private void LogVisibilityDecision(string objectType, int stateId, string objectId, StateMatrix stateMatrix, bool visible,
+            HashSet<int> exclusiveVisibilityGroupIds)
         {
             if (visible)
             {
@@ -293,10 +296,9 @@ namespace FWO.Services.Workflow
             }
 
             List<int> requiredGroupIds = stateMatrix.GetVisibilityGroupIds(stateId);
-            HashSet<int> exclusiveGroupIds = GetWorkflowExclusiveVisibilityGroupIds();
             Log.WriteDebug("Workflow visibility",
                 $"Denied {objectType} {objectId} in state {stateId}. Required groups: [{string.Join(", ", requiredGroupIds)}], " +
-                $"user groups: [{string.Join(", ", userConfig.User.WorkflowVisibilityGroupIds)}], exclusive groups: [{string.Join(", ", exclusiveGroupIds)}]");
+                $"user groups: [{string.Join(", ", userConfig.User.WorkflowVisibilityGroupIds)}], exclusive groups: [{string.Join(", ", exclusiveVisibilityGroupIds)}]");
         }
 
         public async Task ConfAddCommentToTicket(string commentText)

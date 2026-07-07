@@ -164,6 +164,77 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task StateMatrixConfigurationRepository_Load_FillsMissingWorkflowPhasesWithPlaceholders()
+        {
+            RecordingWorkflowApiConnection api = new();
+            api.Respond(RequestQueries.getActiveStateMatrixConfiguration, new List<WorkflowConfiguration>
+            {
+                new()
+                {
+                    Id = 17,
+                    Name = "Legacy",
+                    Phases =
+                    [
+                        new()
+                        {
+                            TaskType = WfTaskType.master.ToString(),
+                            Phase = WorkflowPhases.request.ToString(),
+                            PhaseMatrix = new StateMatrixPhase
+                            {
+                                Id = 101,
+                                Name = "Legacy_request",
+                                Phase = WorkflowPhases.request.ToString(),
+                                Active = true,
+                                LowestInputState = 1,
+                                LowestStartState = 2,
+                                LowestEndState = 3
+                            }
+                        }
+                    ]
+                }
+            });
+
+            StateMatrixConfigurationSnapshot snapshot = await StateMatrixConfigurationRepository.Load(api, WfTaskType.master);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(snapshot.Matrices, Has.Count.EqualTo(Enum.GetValues<WorkflowPhases>().Length));
+                Assert.That(snapshot.Matrices[WorkflowPhases.request].Active, Is.True);
+                Assert.That(snapshot.Matrices[WorkflowPhases.approval].Active, Is.False);
+                Assert.That(snapshot.PhaseBindings[WorkflowPhases.approval].PhaseMatrixId, Is.Zero);
+            });
+        }
+
+        [Test]
+        public void StateMatrixConfigurationRepository_Update_RejectsEditingPlaceholderPhases()
+        {
+            GlobalStateMatrix stateMatrix = GlobalStateMatrix.Create();
+            stateMatrix.GlobalMatrix = new Dictionary<WorkflowPhases, StateMatrix>
+            {
+                [WorkflowPhases.approval] = new StateMatrix
+                {
+                    Active = true
+                }
+            };
+            SetPrivateProperty(stateMatrix, "PhaseBindings", new Dictionary<WorkflowPhases, StateMatrixPhaseBinding>
+            {
+                [WorkflowPhases.approval] = new StateMatrixPhaseBinding(0, "Legacy_approval_missing", [], [])
+            });
+            SetPrivateProperty(stateMatrix, "OriginalGlobalMatrix", new Dictionary<WorkflowPhases, StateMatrix>
+            {
+                [WorkflowPhases.approval] = new StateMatrix
+                {
+                    Active = false
+                }
+            });
+
+            InvalidOperationException exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await StateMatrixConfigurationRepository.Update(new RecordingWorkflowApiConnection(), stateMatrix))!;
+
+            Assert.That(exception.Message, Does.Contain("missing a persistence binding"));
+        }
+
+        [Test]
         public void StateMatrix_DerivedStateEditorAddsAndRemovesSparseMapping()
         {
             SettingsStateMatrix component = new();
@@ -205,9 +276,25 @@ namespace FWO.Test
         /// </summary>
         private static T GetProperty<T>(object instance, string propertyName)
         {
-            PropertyInfo property = instance.GetType().GetProperty(propertyName, BindingFlags.NonPublic | BindingFlags.Instance)
+            PropertyInfo property = instance.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                 ?? throw new MissingMemberException(instance.GetType().FullName, propertyName);
             return (T)(property.GetValue(instance) ?? throw new InvalidOperationException($"Property {propertyName} is null."));
+        }
+
+        /// <summary>
+        /// Sets a private component property for focused workflow state tests.
+        /// </summary>
+        private static void SetPrivateProperty(object instance, string propertyName, object value)
+        {
+            PropertyInfo property = instance.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                ?? throw new MissingMemberException(instance.GetType().FullName, propertyName);
+            MethodInfo? setter = property.GetSetMethod(true);
+            if (setter == null)
+            {
+                throw new MissingMethodException(instance.GetType().FullName, $"set_{propertyName}");
+            }
+
+            setter.Invoke(instance, [value]);
         }
 
         /// <summary>

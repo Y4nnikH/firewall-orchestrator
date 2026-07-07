@@ -328,9 +328,16 @@ namespace FWO.Middleware.Server.Controllers
 
         private static bool CallerCanAccessVisibility(ClaimsPrincipal user, WfHandler wfHandler, WfObjectScopes scope, WfStatefulObject statefulObject)
         {
+            if (!wfHandler.userConfig.ReqVisibilityBased)
+            {
+                return true;
+            }
+
             StateMatrix stateMatrix = scope == WfObjectScopes.Ticket ? wfHandler.MasterStateMatrix : wfHandler.ActStateMatrix;
             HashSet<int> visibilityGroupIds = GetClaimIds(user, "x-hasura-workflow-visibility-groups");
-            return WorkflowVisibilityHelper.CanAccessStatefulObject(statefulObject, stateMatrix, visibilityGroupIds, wfHandler.GetWorkflowExclusiveVisibilityGroupIds());
+            List<string> userGroups = GetClaimStrings(user, "x-hasura-groups");
+            return WorkflowVisibilityHelper.CanAccessStatefulObject(statefulObject, stateMatrix, visibilityGroupIds, wfHandler.GetWorkflowExclusiveVisibilityGroupIds())
+                || IsExplicitlyAssigned(user, userGroups, statefulObject);
         }
 
         private static bool CallerCanUseRole(ClaimsPrincipal user, string executionMode, string role)
@@ -367,6 +374,48 @@ namespace FWO.Middleware.Server.Controllers
         private static int? GetClaimInt(ClaimsPrincipal user, string claimName)
         {
             return int.TryParse(GetClaimValue(user, claimName), out int value) ? value : null;
+        }
+
+        private static List<string> GetClaimStrings(ClaimsPrincipal user, string claimName)
+        {
+            string? claimValue = GetClaimValue(user, claimName);
+            if (string.IsNullOrWhiteSpace(claimValue))
+            {
+                return [];
+            }
+
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(claimValue) ?? [];
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return [];
+            }
+        }
+
+        private static bool IsExplicitlyAssigned(ClaimsPrincipal user, List<string> userGroups, WfStatefulObject statefulObject)
+        {
+            return IsAssignedToCurrentUser(user, statefulObject.CurrentHandler)
+                || IsAssignedToCurrentUserGroup(userGroups, statefulObject.AssignedGroup)
+                || (statefulObject is WfApproval approval && (IsAssignedToCurrentUserDn(user, approval.ApproverDn)
+                    || IsAssignedToCurrentUserGroup(userGroups, approval.ApproverGroup)));
+        }
+
+        private static bool IsAssignedToCurrentUser(ClaimsPrincipal user, UiUser? handler)
+        {
+            int? userId = GetClaimInt(user, "x-hasura-user-id");
+            return handler != null && ((userId != null && handler.DbId == userId) || IsAssignedToCurrentUserDn(user, handler.Dn));
+        }
+
+        private static bool IsAssignedToCurrentUserDn(ClaimsPrincipal user, string? dn)
+        {
+            return DistName.DnEquals(dn, GetClaimValue(user, "x-hasura-uuid"));
+        }
+
+        private static bool IsAssignedToCurrentUserGroup(List<string> userGroups, string? groupDn)
+        {
+            return !string.IsNullOrWhiteSpace(groupDn) && userGroups.Any(group => DistName.DnEquals(group, groupDn));
         }
 
         private static string? GetClaimValue(ClaimsPrincipal user, string claimName)

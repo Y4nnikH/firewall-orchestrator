@@ -102,18 +102,7 @@ namespace FWO.Services.Workflow
                     toState = endState
                 };
                 tickets = await ApiConnection.SendQueryAsync<List<WfTicket>>(RequestQueries.getTicketsByParameters, Variables);
-                if (ticketFilter != null)
-                {
-                    List<WfTicket> filteredTickets = [];
-                    foreach (WfTicket ticket in tickets)
-                    {
-                        if (ticketFilter(ticket))
-                        {
-                            filteredTickets.Add(ticket);
-                        }
-                    }
-                    tickets = filteredTickets;
-                }
+                tickets = ApplyTicketFilter(tickets, ticketFilter);
             }
             catch (Exception exception)
             {

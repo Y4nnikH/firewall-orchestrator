@@ -68,12 +68,32 @@ namespace FWO.Services.Workflow
             }
 
             List<WorkflowPhases> missingPhases = Enum.GetValues<WorkflowPhases>().Where(phase => !matrices.ContainsKey(phase)).ToList();
-            if (missingPhases.Count > 0)
+            foreach (WorkflowPhases missingPhase in missingPhases)
             {
-                throw new InvalidOperationException($"Workflow configuration '{configuration.Name}' is missing phases: {string.Join(", ", missingPhases)}.");
+                (StateMatrix matrix, StateMatrixPhaseBinding binding) = CreateMissingPhaseSnapshot(configuration.Name, missingPhase);
+                matrices.Add(missingPhase, matrix);
+                bindings.Add(missingPhase, binding);
             }
 
             return new(configuration.Id, configuration.Name, matrices, bindings);
+        }
+
+        private static (StateMatrix Matrix, StateMatrixPhaseBinding Binding) CreateMissingPhaseSnapshot(string configurationName, WorkflowPhases phase)
+        {
+            StateMatrix matrix = new()
+            {
+                Active = false,
+                LowestInputState = 0,
+                LowestStartedState = 0,
+                LowestEndState = 0,
+                DerivedStates = new Dictionary<int, int> { [0] = 0 }
+            };
+
+            return (matrix, new(
+                0,
+                $"{configurationName}_{phase}_missing",
+                [],
+                []));
         }
 
         private static (WorkflowPhases Phase, StateMatrix Matrix, StateMatrixPhaseBinding Binding) BuildPhaseSnapshot(WorkflowConfigurationPhase configurationPhase)
@@ -177,6 +197,18 @@ namespace FWO.Services.Workflow
             {
                 StateMatrix original = stateMatrix.OriginalGlobalMatrix[phase];
                 StateMatrixPhaseBinding binding = stateMatrix.PhaseBindings[phase];
+                if (binding.PhaseMatrixId <= 0)
+                {
+                    if (!HasEqualPhaseValues(matrix, original)
+                        || !HasEqualTransitionValues(matrix, original)
+                        || !HasEqualDerivedStateValues(matrix, original))
+                    {
+                        throw new InvalidOperationException(
+                            $"Workflow phase '{phase}' is missing a persistence binding and cannot be edited directly.");
+                    }
+
+                    continue;
+                }
                 if (!HasEqualPhaseValues(matrix, original))
                 {
                     changes.PhaseMatrices.Add(new
@@ -305,6 +337,19 @@ namespace FWO.Services.Workflow
                 && left.LowestInputState == right.LowestInputState
                 && left.LowestStartedState == right.LowestStartedState
                 && left.LowestEndState == right.LowestEndState;
+        }
+
+        private static bool HasEqualDerivedStateValues(StateMatrix left, StateMatrix right)
+        {
+            Dictionary<int, int> leftStates = left.DerivedStates
+                .Where(entry => entry.Key != entry.Value)
+                .ToDictionary(entry => entry.Key, entry => entry.Value);
+            Dictionary<int, int> rightStates = right.DerivedStates
+                .Where(entry => entry.Key != entry.Value)
+                .ToDictionary(entry => entry.Key, entry => entry.Value);
+
+            return leftStates.Count == rightStates.Count && leftStates.All(entry =>
+                rightStates.TryGetValue(entry.Key, out int rightStateId) && rightStateId == entry.Value);
         }
 
         private static bool HasEqualTransitionValues(StateMatrix left, StateMatrix right)
