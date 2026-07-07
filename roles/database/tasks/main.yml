@@ -59,6 +59,7 @@
           host  all         dbadmin              127.0.0.0/8            md5
           host  all         dbadmin              ::1/128                md5
           host  all         {{ api_user }}       127.0.0.0/8            md5
+          host  all         {{ api_user }}       ::1/128                md5
           host  all         {{ fwo_db_ro_user }} 127.0.0.0/8            trust
           host  all         {{ fwo_db_ro_user }} ::1/128                trust
           host  all         {{ fworch_user }}    127.0.0.0/8            trust
