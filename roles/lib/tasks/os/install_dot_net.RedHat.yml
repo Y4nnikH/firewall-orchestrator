@@ -7,30 +7,39 @@
       set_fact:
         dotnet_package_name: "dotnet-sdk-{{ dotnet_version }}"
 
-    - name: get package list from microsoft for RedHat
-      get_url:
-        url: "https://packages.microsoft.com/config/rhel/{{ distribution_version }}/{{ dotnet_rpm_name }}"
-        dest: "{{ lib_tmp_dir }}/{{ dotnet_rpm_name }}"
-        mode: "0644"
-      register: dotnet_ms_repo_download_redhat
-      until: dotnet_ms_repo_download_redhat is succeeded
-      retries: 3
-      delay: 5
+    - name: check whether {{ dotnet_package_name }} is available from configured repos
+      command: "dnf list {{ dotnet_package_name }}"
+      register: dotnet_local_repo_check
+      changed_when: false
+      failed_when: false
 
-    - name: import Microsoft RPM GPG key for RedHat
-      rpm_key:
-        state: present
-        key: "https://packages.microsoft.com/keys/microsoft.asc"
+    - name: add microsoft package repo only when {{ dotnet_package_name }} is not available locally
+      when: dotnet_local_repo_check.rc != 0
+      block:
+        - name: get package list from microsoft for RedHat
+          get_url:
+            url: "https://packages.microsoft.com/config/rhel/{{ distribution_version }}/{{ dotnet_rpm_name }}"
+            dest: "{{ lib_tmp_dir }}/{{ dotnet_rpm_name }}"
+            mode: "0644"
+          register: dotnet_ms_repo_download_redhat
+          until: dotnet_ms_repo_download_redhat is succeeded
+          retries: 3
+          delay: 5
 
-    - name: install ms package list for RedHat
-      yum:
-        name: "{{ lib_tmp_dir }}/{{ dotnet_rpm_name }}"
-        state: present
+        - name: import Microsoft RPM GPG key for RedHat
+          rpm_key:
+            state: present
+            key: "https://packages.microsoft.com/keys/microsoft.asc"
 
-    - name: remove package list file for RedHat
-      file:
-        dest: "{{ lib_tmp_dir }}/{{ dotnet_rpm_name }}"
-        state: absent
+        - name: install ms package list for RedHat
+          yum:
+            name: "{{ lib_tmp_dir }}/{{ dotnet_rpm_name }}"
+            state: present
+
+        - name: remove package list file for RedHat
+          file:
+            dest: "{{ lib_tmp_dir }}/{{ dotnet_rpm_name }}"
+            state: absent
 
     - name: Install dotnet-sdk-{{ dotnet_version }} on RedHat
       package:

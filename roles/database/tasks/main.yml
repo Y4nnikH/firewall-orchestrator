@@ -81,8 +81,18 @@
         src: "./"
         dest: "{{ database_install_dir }}"
         rsync_opts:
-          - "--chown={{ fworch_user }}:{{ fworch_group }}"   
+          # postgres user needs group read access to sql files regardless of system umask
+          - "--chown={{ fworch_user }}:{{ postgres_group }}"
+          - "--chmod=D0750,F0640"
       tags: [ 'test' ]
+
+    - name: ensure database dir is accessible for postgres user
+      file:
+        path: "{{ database_install_dir }}"
+        state: directory
+        owner: "{{ fworch_user }}"
+        group: "{{ postgres_group }}"
+        mode: "0750"
 
     - name: create tablespace directory 
       file:
