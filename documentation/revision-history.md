@@ -536,6 +536,6 @@ This PR hardens FWO installation and security-sensitive workflows. It restricts 
 ## 9.1.15 - 06.07.2026
 - make offered protocols configurable
 
-## 9.1.14 - 30.06.2026
+## 9.1.16 - 07.07.2026
 - credentials field in management for writing on Firewalls
 - migrate old Tufin template to list entry
