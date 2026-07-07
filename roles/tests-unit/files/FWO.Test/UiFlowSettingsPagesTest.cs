@@ -246,6 +246,48 @@ namespace FWO.Test
             component.WaitForAssertion(() => Assert.That(component.Markup, Does.Contain("Flow Time Object")));
         }
 
+        [Test]
+        public async Task FlowNetworkObjectsPage_RecalculateNames_UsesNamingManagementCandidates()
+        {
+            await using BunitContext context = CreateNetworkObjectsContext(out FlowNetworkObjectsNamingApiConn apiConnection);
+
+            IRenderedComponent<SettingsFlowNetworkObjects> component = RenderPage<SettingsFlowNetworkObjects>(context);
+            FieldInfo? namingManagementField = typeof(SettingsFlowNetworkObjects).GetField("namingCustomObjectManagements", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(namingManagementField, Is.Not.Null);
+            component.WaitForAssertion(() =>
+            {
+                List<Management> namingManagements = (List<Management>)namingManagementField!.GetValue(component.Instance)!;
+                Assert.That(namingManagements, Has.Count.EqualTo(2));
+            });
+
+            MethodInfo? saveNamingSource = typeof(SettingsFlowNetworkObjects).GetMethod("SaveNamingSource", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(saveNamingSource, Is.Not.Null);
+            await component.InvokeAsync(async () => await (Task)saveNamingSource!.Invoke(component.Instance, null)!);
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(apiConnection.Queries, Does.Contain(FlowQueries.getFlowCustomObjectNamingCandidates));
+                Assert.That(apiConnection.UpdatedFlowObjectNames, Is.EquivalentTo(new[] { "Global Object Name" }));
+            });
+        }
+
+        [Test]
+        public async Task FlowNetworkObjectsPage_ShowsSpinnerOnBusySaveButton()
+        {
+            await using BunitContext context = CreateNetworkObjectsContext(out _);
+
+            IRenderedComponent<SettingsFlowNetworkObjects> component = RenderPage<SettingsFlowNetworkObjects>(context);
+            SetMember(component.Instance, "workInProgress", true);
+            component.Render();
+
+            component.WaitForAssertion(() =>
+            {
+                var saveButton = component.FindAll("button.btn.btn-sm.btn-primary").First();
+                Assert.That(saveButton.InnerHtml, Does.Contain("spinner-border"));
+                Assert.That(saveButton.GetAttribute("disabled"), Is.Not.Null);
+            });
+        }
+
         private static BunitContext CreateContext()
         {
             BunitContext context = new();
@@ -309,6 +351,25 @@ namespace FWO.Test
             apiConnection = new FlowServiceObjectsDuplicateResolverApiConn();
             context.Services.AddSingleton<ApiConnection>(apiConnection);
             context.Services.AddScoped<DomEventService>();
+            context.Services.AddSingleton<UserConfig>(new SimulatedUserConfig
+            {
+                User = { Roles = [Roles.Admin] }
+            });
+            context.Services.AddSingleton<AuthenticationStateProvider>(new FlowSettingsPagesAuthStateProvider(Roles.Admin));
+            return context;
+        }
+
+        private static BunitContext CreateNetworkObjectsContext(out FlowNetworkObjectsNamingApiConn apiConnection)
+        {
+            BunitContext context = new();
+            context.JSInterop.Mode = JSRuntimeMode.Loose;
+            context.Services.AddAuthorizationCore();
+            context.Services.AddLocalization();
+            context.Services.AddSingleton<IAuthorizationService>(new AllowAllAuthorizationService());
+            apiConnection = new FlowNetworkObjectsNamingApiConn();
+            context.Services.AddSingleton<ApiConnection>(apiConnection);
+            context.Services.AddScoped<DomEventService>();
+            context.Services.AddSingleton<GlobalConfig>(new SimulatedGlobalConfig());
             context.Services.AddSingleton<UserConfig>(new SimulatedUserConfig
             {
                 User = { Roles = [Roles.Admin] }
@@ -394,6 +455,128 @@ namespace FWO.Test
             {
                 return Task.FromResult(new AuthenticationState(principal));
             }
+        }
+    }
+
+    internal sealed class FlowNetworkObjectsNamingApiConn : SimulatedApiConnection
+    {
+        public List<string> Queries { get; } = [];
+        public List<string> UpdatedFlowObjectNames { get; } = [];
+
+        private readonly FlowNwObject flowNwObject = new()
+        {
+            Id = 100,
+            Name = "",
+            IpStart = null,
+            IpEnd = null,
+            Hash = "hash-100",
+            State = FlowState.Requested,
+            ShowInRequestModule = false,
+            Objects = []
+        };
+
+        private readonly Management localManagement = new()
+        {
+            Id = 10,
+            Name = "A Management",
+            Objects =
+            [
+                new NetworkObject
+                {
+                    Id = 1,
+                    Name = "",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "local-1",
+                    Active = true,
+                    FlowNetworkObjectId = 100,
+                    FlowActive = false,
+                    Type = new NetworkObjectType { Id = 1, Name = "host" }
+                }
+            ]
+        };
+
+        private readonly Management globalManagement = new()
+        {
+            Id = 20,
+            Name = "Global Management",
+            Objects =
+            [
+                new NetworkObject
+                {
+                    Id = 2,
+                    Name = "Global Object Name",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "global-1",
+                    Active = true,
+                    FlowNetworkObjectId = 100,
+                    FlowActive = false,
+                    Type = new NetworkObjectType { Id = 1, Name = "host" }
+                }
+            ]
+        };
+
+        public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
+        {
+            Queries.Add(query);
+            if (query == FlowQueries.getFlowSelectableManagements)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<Management>
+                {
+                    localManagement,
+                    globalManagement
+                });
+            }
+            if (query == FlowQueries.getFlowNwObjectCatalog)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<FlowNwObject> { flowNwObject });
+            }
+            if (query == FlowQueries.getFlowCustomObjectCandidates)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<Management> { localManagement });
+            }
+            if (query == FlowQueries.getFlowCustomObjectNamingCandidates)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<Management>
+                {
+                    localManagement,
+                    globalManagement
+                });
+            }
+            if (query == FlowMutations.updateFlowNwObject && typeof(QueryResponseType) == typeof(FlowNwObject))
+            {
+                string name = GetAnonymousProperty<string>(variables, "name");
+                UpdatedFlowObjectNames.Add(name);
+                return Task.FromResult((QueryResponseType)(object)new FlowNwObject
+                {
+                    Id = flowNwObject.Id,
+                    Name = name,
+                    IpStart = null,
+                    IpEnd = null,
+                    Hash = flowNwObject.Hash,
+                    State = flowNwObject.State,
+                    ShowInRequestModule = flowNwObject.ShowInRequestModule,
+                    Objects = []
+                });
+            }
+            if (query == ConfigQueries.upsertConfigItems)
+            {
+                return Task.FromResult((QueryResponseType)(object)new object());
+            }
+
+            throw new InvalidOperationException($"Unexpected query: {query}");
+        }
+
+        private static T GetAnonymousProperty<T>(object? variables, string propertyName)
+        {
+            if (variables == null)
+            {
+                throw new InvalidOperationException($"Missing variables for {propertyName}");
+            }
+
+            return (T)(variables.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)?.GetValue(variables)
+                ?? throw new InvalidOperationException($"Missing property {propertyName}"));
         }
     }
 

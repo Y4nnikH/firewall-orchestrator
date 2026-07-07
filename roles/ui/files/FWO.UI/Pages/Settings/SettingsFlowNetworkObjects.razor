@@ -60,8 +60,14 @@
         }
         <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
             <div class="btn-group">
-                <button type="button" class="btn btn-sm btn-primary" @onclick="SaveNamingSource">@(DisplayService.DisplayButton(userConfig, "save", Icons.Save))</button>
-                <button type="button" class="btn btn-sm btn-warning" @onclick="OpenRecalculateConfirm">@(DisplayService.DisplayButton(userConfig, "recalculate_flow_names", Icons.Refresh))</button>
+                <button type="button" class="btn btn-sm btn-primary" disabled="@workInProgress" @onclick="SaveNamingSource">
+                    @if (workInProgress)
+                    {
+                        <Loading CssClass="me-1" />
+                    }
+                    @(DisplayService.DisplayButton(userConfig, "save", Icons.Save))
+                </button>
+                <button type="button" class="btn btn-sm btn-warning" disabled="@workInProgress" @onclick="OpenRecalculateConfirm">@(DisplayService.DisplayButton(userConfig, "recalculate_flow_names", Icons.Refresh))</button>
             </div>
             <div class="text-muted small">
                 @($"{userConfig.GetText("current")}: {SelectedNamingManagement?.Name ?? "-"}")
@@ -74,7 +80,7 @@
 <div class="mb-2">
     <label class="form-label form-label-sm mb-1">@(userConfig.GetText("reset_flow_db")):</label>
     <div class="d-flex flex-wrap align-items-center gap-2">
-        <button type="button" class="btn btn-sm btn-danger" @onclick="OpenResetFlowDbConfirm">
+        <button type="button" class="btn btn-sm btn-danger" disabled="@workInProgress" @onclick="OpenResetFlowDbConfirm">
             @(DisplayService.DisplayButton(userConfig, "reset_flow_db", Icons.Refresh))
         </button>
         <div class="text-muted small">
@@ -135,10 +141,18 @@ else
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-4 mb-2">
     <h4 class="mb-0">@(userConfig.GetText("flow_objects"))</h4>
     <div class="btn-group">
-        <button type="button" class="btn btn-sm btn-success" @onclick="() => SetShowInRequestModuleForObjects(FilteredFlowNwObjects, true)">
+        <button type="button" class="btn btn-sm btn-success" disabled="@workInProgress" @onclick="() => SetShowInRequestModuleForObjects(FilteredFlowNwObjects, true)">
+            @if (workInProgress)
+            {
+                <Loading CssClass="me-1" />
+            }
             @(DisplayService.DisplayButton(userConfig, "show_in_request_module", Icons.Check))
         </button>
-        <button type="button" class="btn btn-sm btn-secondary" @onclick="() => SetShowInRequestModuleForObjects(FilteredFlowNwObjects, false)">
+        <button type="button" class="btn btn-sm btn-secondary" disabled="@workInProgress" @onclick="() => SetShowInRequestModuleForObjects(FilteredFlowNwObjects, false)">
+            @if (workInProgress)
+            {
+                <Loading CssClass="me-1" />
+            }
             @(DisplayService.DisplayButton(userConfig, "disable", Icons.Cancel))
         </button>
     </div>
@@ -203,7 +217,13 @@ else
     </Body>
     <Footer>
         <div class="btn-group">
-            <button type="button" class="btn btn-sm btn-primary" @onclick="SaveNwObject">@(DisplayService.DisplayButton(userConfig, "save", Icons.Save))</button>
+            <button type="button" class="btn btn-sm btn-primary" disabled="@workInProgress" @onclick="SaveNwObject">
+                @if (workInProgress)
+                {
+                    <Loading CssClass="me-1" />
+                }
+                @(DisplayService.DisplayButton(userConfig, "save", Icons.Save))
+            </button>
             <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseNwObjectEditor">@(DisplayService.DisplayButton(userConfig, "cancel", Icons.Cancel))</button>
         </div>
     </Footer>
@@ -319,7 +339,11 @@ else
     </Body>
     <Footer>
         <div class="btn-group">
-            <button type="button" class="btn btn-sm btn-primary" @onclick="SaveCustomObject">
+            <button type="button" class="btn btn-sm btn-primary" disabled="@workInProgress" @onclick="SaveCustomObject">
+                @if (workInProgress)
+                {
+                    <Loading CssClass="me-1" />
+                }
                 @(DisplayService.DisplayButton(userConfig, "save", Icons.Save))
             </button>
             <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseCreateCustomObject">
@@ -346,6 +370,7 @@ else
     private List<Management> selectableManagements = [];
     private List<Management> namingManagementRanking = [];
     private List<Management> customObjectManagements = [];
+    private List<Management> namingCustomObjectManagements = [];
     private List<FlowNwObjectDuplicateGroup> duplicateGroups = [];
     private List<CustomObjectManagementSelection> customObjectSelections = [];
     private ConfigData? configData;
@@ -385,6 +410,7 @@ else
             InitializeNamingManagementRanking();
             flowNwObjects = await apiConnection.SendQueryAsync<List<FlowNwObject>>(FlowQueries.getFlowNwObjectCatalog);
             await LoadCustomObjectManagements();
+            await LoadNamingCustomObjectManagements();
             duplicateGroups = BuildDuplicateGroups();
             customObjectSelections = [];
 
@@ -408,6 +434,9 @@ else
                 return;
             }
 
+            workInProgress = true;
+            StateHasChanged();
+
             await SaveNamingManagementRankingAsync();
 
             List<FlowNwObject> objectsToBackfill = [.. flowNwObjects.Where(nwObject => string.IsNullOrWhiteSpace(nwObject.Name))];
@@ -429,11 +458,15 @@ else
             }
 
             DisplayMessageInUi(null, userConfig.GetText("flow_naming"), userConfig.GetText("U5301"), false);
+            workInProgress = false;
         }
         catch (Exception exception)
         {
+            workInProgress = false;
             DisplayMessageInUi(exception, userConfig.GetText("flow_naming"), "", true);
         }
+
+        StateHasChanged();
     }
 
     private async Task SaveNamingManagementRankingAsync()
@@ -695,6 +728,26 @@ else
         });
     }
 
+    private async Task LoadNamingCustomObjectManagements()
+    {
+        if (namingCustomObjectManagements.Count > 0)
+        {
+            return;
+        }
+
+        List<int> managementIds = [.. selectableManagements.Select(management => management.Id)];
+        if (managementIds.Count == 0)
+        {
+            namingCustomObjectManagements = [];
+            return;
+        }
+
+        namingCustomObjectManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomObjectNamingCandidates, new
+        {
+            management_id = managementIds
+        });
+    }
+
     private void ReplaceFlowObjectInCatalog(FlowNwObject updatedObject)
     {
         int objectIndex = flowNwObjects.FindIndex(flowObject => flowObject.Id == updatedObject.Id);
@@ -719,7 +772,7 @@ else
 
     private List<NetworkObject> GetLinkedCustomObjects(long flowNwObjectId)
     {
-        return [.. customObjectManagements.SelectMany(management => management.Objects)
+        return [.. namingCustomObjectManagements.SelectMany(management => management.Objects)
             .Where(nwObject => nwObject.FlowNetworkObjectId == flowNwObjectId)];
     }
 
@@ -801,7 +854,7 @@ else
 
     private string? GetBestNameForManagement(IEnumerable<NetworkObject> linkedObjects, int managementId)
     {
-        Management? management = customObjectManagements.FirstOrDefault(item => item.Id == managementId);
+        Management? management = namingCustomObjectManagements.FirstOrDefault(item => item.Id == managementId);
         if (management == null)
         {
             return null;

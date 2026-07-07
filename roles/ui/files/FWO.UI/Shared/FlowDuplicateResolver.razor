@@ -37,7 +37,11 @@
     </Body>
     <Footer>
         <div class="btn-group">
-            <button type="button" class="btn btn-sm btn-warning" disabled="@(!CanResolve || selectedItem is null)" @onclick="ResolveAsync">
+            <button type="button" class="btn btn-sm btn-warning" disabled="@(!CanResolve || selectedItem is null || Resolving)" @onclick="ResolveAsync">
+                @if (Resolving)
+                {
+                    <Loading CssClass="me-1" />
+                }
                 @(DisplayService.DisplayButton(UserConfig, "save", Icons.Save))
             </button>
             <button type="button" class="btn btn-sm btn-secondary" @onclick="OnClose">
@@ -83,6 +87,7 @@
     public RenderFragment<DuplicateResolverState<TItem>>? ChildContent { get; set; }
 
     private TItem? selectedItem;
+    private bool Resolving = false;
 
     protected override void OnParametersSet()
     {
@@ -123,7 +128,26 @@
             return Task.CompletedTask;
         }
 
-        return OnResolve.Invoke(selectedItem);
+        return ResolveSelectedItemAsync();
+    }
+
+    private async Task ResolveSelectedItemAsync()
+    {
+        if (selectedItem is null || Resolving)
+        {
+            return;
+        }
+
+        Resolving = true;
+        StateHasChanged();
+        try
+        {
+            await OnResolve.Invoke(selectedItem);
+        }
+        finally
+        {
+            Resolving = false;
+        }
     }
 
     public sealed record DuplicateResolverState<TContextItem>(TContextItem? SelectedItem, Func<TContextItem, bool> IsSelected);

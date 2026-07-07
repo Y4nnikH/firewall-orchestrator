@@ -18,6 +18,16 @@ namespace FWO.Test
         }
 
         [Test]
+        public void FlowQueries_LoadCustomObjectNamingCandidatesQuery()
+        {
+            Assert.That(FlowQueries.getFlowCustomObjectNamingCandidates, Does.Contain("query getFlowCustomObjectNamingCandidates"));
+            Assert.That(FlowQueries.getFlowCustomObjectNamingCandidates, Does.Contain("networkObjects: objects"));
+            Assert.That(FlowQueries.getFlowCustomObjectNamingCandidates, Does.Contain("hide_in_gui: { _eq: false }"));
+            Assert.That(FlowQueries.getFlowCustomObjectNamingCandidates, Does.Contain("is_pure_routing_device: { _eq: false }"));
+            Assert.That(FlowQueries.getFlowCustomObjectNamingCandidates, Does.Not.Contain("dev_typ_is_multi_mgmt"));
+        }
+
+        [Test]
         public void FlowQueries_LoadFlowCatalogQueries()
         {
             Assert.That(FlowQueries.getFlowAddressObjects, Does.Contain("query getAddressObjects"));

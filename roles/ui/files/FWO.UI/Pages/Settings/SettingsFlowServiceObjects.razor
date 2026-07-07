@@ -121,7 +121,13 @@ else
     </Body>
     <Footer>
         <div class="btn-group">
-            <button type="button" class="btn btn-sm btn-primary" @onclick="SaveSvcObject">@(DisplayService.DisplayButton(userConfig, "save", Icons.Save))</button>
+            <button type="button" class="btn btn-sm btn-primary" disabled="@workInProgress" @onclick="SaveSvcObject">
+                @if (workInProgress)
+                {
+                    <Loading CssClass="me-1" />
+                }
+                @(DisplayService.DisplayButton(userConfig, "save", Icons.Save))
+            </button>
             <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseEditor">@(DisplayService.DisplayButton(userConfig, "cancel", Icons.Cancel))</button>
         </div>
     </Footer>
@@ -198,7 +204,11 @@ else
     </Body>
     <Footer>
         <div class="btn-group">
-            <button type="button" class="btn btn-sm btn-primary" @onclick="SaveCustomObject">
+            <button type="button" class="btn btn-sm btn-primary" disabled="@workInProgress" @onclick="SaveCustomObject">
+                @if (workInProgress)
+                {
+                    <Loading CssClass="me-1" />
+                }
                 @(DisplayService.DisplayButton(userConfig, "save", Icons.Save))
             </button>
             <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseCreateCustomObject">

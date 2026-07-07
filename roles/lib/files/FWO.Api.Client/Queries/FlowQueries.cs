@@ -13,6 +13,7 @@ namespace FWO.Api.Client.Queries
         public static readonly string getFlowAddressObjectId;
         public static readonly string getFlowAddressObjects;
         public static readonly string getFlowCustomObjectCandidates;
+        public static readonly string getFlowCustomObjectNamingCandidates;
         public static readonly string getFlowCustomServiceCandidates;
         public static readonly string getFlowCustomTimeObjectCandidates;
         public static readonly string getFlowNwObjectCatalog;
@@ -75,6 +76,8 @@ namespace FWO.Api.Client.Queries
 
                 getFlowCustomObjectCandidates =
                     GetQueryText("flow/getFlowCustomObjectCandidates.graphql");
+                getFlowCustomObjectNamingCandidates =
+                    GetQueryText("flow/getFlowCustomObjectNamingCandidates_management.graphql");
                 getFlowCustomServiceCandidates =
                     GetQueryText("flow/getFlowCustomServiceCandidates.graphql");
                 getFlowCustomTimeObjectCandidates =

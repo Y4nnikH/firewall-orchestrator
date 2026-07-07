@@ -104,6 +104,60 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task SaveButton_ShowsSpinnerWhileResolveIsRunning()
+        {
+            using BunitContext context = new();
+            context.JSInterop.Mode = JSRuntimeMode.Loose;
+            context.Services.AddBlazorTable();
+            context.Services.AddSingleton<UserConfig>(new SimulatedUserConfig());
+
+            List<NetworkObject> items =
+            [
+                new NetworkObject
+                {
+                    Id = 1,
+                    Name = "one",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "uid-1",
+                    FlowActive = false
+                }
+            ];
+
+            TaskCompletionSource<object?> resolveStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource<object?> releaseResolve = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            IRenderedComponent<FlowDuplicateResolver<NetworkObject>> cut = context.Render<FlowDuplicateResolver<NetworkObject>>(parameters => parameters
+                .Add(p => p.Title, "Duplicate objects")
+                .Add(p => p.Show, true)
+                .Add(p => p.Size, PopupSize.Auto)
+                .Add(p => p.Items, items)
+                .Add(p => p.OnResolve, async _ =>
+                {
+                    resolveStarted.TrySetResult(null);
+                    await releaseResolve.Task;
+                })
+                .Add(p => p.SummaryContent, (RenderFragment)(builder => builder.AddMarkupContent(0, "<div>Flow object: test</div>"))));
+
+            try
+            {
+                cut.Find("button.btn.btn-sm.btn-warning").Click();
+                await resolveStarted.Task;
+
+                cut.WaitForAssertion(() =>
+                {
+                    var saveButton = cut.Find("button.btn.btn-sm.btn-warning");
+                    Assert.That(saveButton.InnerHtml, Does.Contain("spinner-border"));
+                    Assert.That(saveButton.GetAttribute("disabled"), Is.Not.Null);
+                });
+            }
+            finally
+            {
+                releaseResolve.TrySetResult(null);
+            }
+        }
+
+        [Test]
         public void RendersSelectedRowClassFromInternalSelection()
         {
             using BunitContext context = new();
