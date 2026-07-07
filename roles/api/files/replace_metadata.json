@@ -18819,18 +18819,6 @@
                   "using": {
                     "foreign_key_constraint_on": "last_change_admin"
                   }
-                },
-                {
-                  "name": "zone",
-                  "using": {
-                    "foreign_key_constraint_on": "rule_from_zone"
-                  }
-                },
-                {
-                  "name": "zoneByRuleToZone",
-                  "using": {
-                    "foreign_key_constraint_on": "rule_to_zone"
-                  }
                 }
               ],
               "array_relationships": [
@@ -19116,9 +19104,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19170,9 +19155,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19226,9 +19208,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19282,9 +19261,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19338,9 +19314,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19394,9 +19367,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19450,9 +19420,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19519,9 +19486,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19588,9 +19552,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19809,9 +19770,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19859,9 +19817,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19909,9 +19864,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19959,9 +19911,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -20009,9 +19958,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -20067,9 +20013,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -20125,9 +20068,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -20183,9 +20123,6 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
-                      "rule_from_zone",
-                      "rule_num",
-                      "rule_to_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -29528,38 +29465,7 @@
                 "name": "view_rule_with_owner",
                 "schema": "public"
               },
-              "object_relationships": [
-                {
-                  "name": "dst_zone",
-                  "using": {
-                    "manual_configuration": {
-                      "column_mapping": {
-                        "rule_to_zone": "zone_id"
-                      },
-                      "insertion_order": null,
-                      "remote_table": {
-                        "name": "zone",
-                        "schema": "public"
-                      }
-                    }
-                  }
-                },
-                {
-                  "name": "src_zone",
-                  "using": {
-                    "manual_configuration": {
-                      "column_mapping": {
-                        "rule_from_zone": "zone_id"
-                      },
-                      "insertion_order": null,
-                      "remote_table": {
-                        "name": "zone",
-                        "schema": "public"
-                      }
-                    }
-                  }
-                }
-              ],
+              "object_relationships": [],
               "array_relationships": [
                 {
                   "name": "rule_froms",
@@ -29626,8 +29532,6 @@
                       "mgm_id",
                       "owner_id",
                       "recert_interval",
-                      "rule_from_zone",
-                      "rule_to_zone",
                       "track_id",
                       "rule_num_numeric",
                       "matches",
@@ -29660,8 +29564,6 @@
                       "mgm_id",
                       "owner_id",
                       "recert_interval",
-                      "rule_from_zone",
-                      "rule_to_zone",
                       "track_id",
                       "rule_num_numeric",
                       "matches",
@@ -29702,8 +29604,6 @@
                       "mgm_id",
                       "owner_id",
                       "recert_interval",
-                      "rule_from_zone",
-                      "rule_to_zone",
                       "track_id",
                       "rule_num_numeric",
                       "matches",
@@ -29744,8 +29644,6 @@
                       "mgm_id",
                       "owner_id",
                       "recert_interval",
-                      "rule_from_zone",
-                      "rule_to_zone",
                       "track_id",
                       "rule_num_numeric",
                       "matches",
@@ -29825,30 +29723,6 @@
                       "column": "zone_id",
                       "table": {
                         "name": "rule_to_zone",
-                        "schema": "public"
-                      }
-                    }
-                  }
-                },
-                {
-                  "name": "rules",
-                  "using": {
-                    "foreign_key_constraint_on": {
-                      "column": "rule_from_zone",
-                      "table": {
-                        "name": "rule",
-                        "schema": "public"
-                      }
-                    }
-                  }
-                },
-                {
-                  "name": "rulesByRuleToZone",
-                  "using": {
-                    "foreign_key_constraint_on": {
-                      "column": "rule_to_zone",
-                      "table": {
-                        "name": "rule",
                         "schema": "public"
                       }
                     }
