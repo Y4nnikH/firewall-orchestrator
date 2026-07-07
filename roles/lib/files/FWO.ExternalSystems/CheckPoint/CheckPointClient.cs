@@ -152,7 +152,7 @@ namespace FWO.ExternalSystems.CheckPoint
 
         private bool HasLoginCredentials()
         {
-            return Management.ExportCredential != null 
+            return Management.ExportCredential != null
                 && !string.IsNullOrWhiteSpace(Management.ExportCredential.ImportUser)
                 && !string.IsNullOrWhiteSpace(Management.ExportCredential.Secret);
         }

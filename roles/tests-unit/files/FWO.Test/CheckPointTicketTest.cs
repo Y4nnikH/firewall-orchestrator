@@ -68,7 +68,7 @@ namespace FWO.Test
             JsonElement members = addMemberBody.GetProperty("members");
             ClassicAssert.AreEqual("member-host", members.GetProperty("add")[0].GetString());
         }
-      
+
         [Test]
         public async Task CreateExternalTicketRetriesGroupMemberObjectCreationWithIgnoreWarnings()
         {

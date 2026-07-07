@@ -114,6 +114,5 @@ namespace FWO.Test
             ClassicAssert.AreEqual(0, localApiConnection.UpdateExtRequestProcess.Count);
             ClassicAssert.AreEqual(0, localApiConnection.TriedToGetLdapsForHandleStateChange);
         }
-        
     }
 }
