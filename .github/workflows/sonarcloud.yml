@@ -81,4 +81,16 @@ jobs:
             sleep $((attempt * 30))
           done
           dotnet build roles/FWO.sln --configuration Debug --no-incremental
-          .sonar/scanner/dotnet-sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
+          for attempt in 1 2 3; do
+            if .sonar/scanner/dotnet-sonarscanner end /d:sonar.token="${SONAR_TOKEN}"; then
+              break
+            else
+              status=$?
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              exit "$status"
+            fi
+
+            sleep $((attempt * 30))
+          done
