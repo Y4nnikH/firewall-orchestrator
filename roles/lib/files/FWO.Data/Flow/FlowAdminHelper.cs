@@ -25,9 +25,7 @@ namespace FWO.Data.Flow
                 {
                     FlowNwObjectId = flowObject.Id,
                     FlowNwObjectName = flowObject.Name ?? "",
-                    Objects = [.. linkedObjects
-                        .OrderBy(nwObject => nwObject.Name ?? "", StringComparer.OrdinalIgnoreCase)
-                        .ThenBy(nwObject => nwObject.Id)]
+                    Objects = linkedObjects
                 });
             }
 
@@ -71,9 +69,7 @@ namespace FWO.Data.Flow
                         FlowNwGroupName = flowGroup.Name,
                         ManagementId = management.Id,
                         ManagementName = management.Name,
-                        Objects = [.. linkedObjects
-                            .OrderBy(nwObject => nwObject.Name ?? "", StringComparer.OrdinalIgnoreCase)
-                            .ThenBy(nwObject => nwObject.Id)]
+                        Objects = linkedObjects
                     });
                 }
             }
@@ -119,9 +115,7 @@ namespace FWO.Data.Flow
                         FlowSvcObjectName = flowObject.Name,
                         ManagementId = management.Id,
                         ManagementName = management.Name,
-                        Services = [.. linkedServices
-                            .OrderBy(service => service.Name ?? "", StringComparer.OrdinalIgnoreCase)
-                            .ThenBy(service => service.Id)]
+                        Services = linkedServices
                     });
                 }
             }
@@ -167,9 +161,7 @@ namespace FWO.Data.Flow
                         FlowSvcGroupName = flowGroup.Name,
                         ManagementId = management.Id,
                         ManagementName = management.Name,
-                        Services = [.. linkedServices
-                            .OrderBy(service => service.Name ?? "", StringComparer.OrdinalIgnoreCase)
-                            .ThenBy(service => service.Id)]
+                        Services = linkedServices
                     });
                 }
             }
@@ -215,9 +207,7 @@ namespace FWO.Data.Flow
                         FlowTimeObjectName = flowObject.Name,
                         ManagementId = management.Id,
                         ManagementName = management.Name,
-                        TimeObjects = [.. linkedTimeObjects
-                            .OrderBy(timeObject => timeObject.Name ?? "", StringComparer.OrdinalIgnoreCase)
-                            .ThenBy(timeObject => timeObject.Id)]
+                        TimeObjects = linkedTimeObjects
                     });
                 }
             }

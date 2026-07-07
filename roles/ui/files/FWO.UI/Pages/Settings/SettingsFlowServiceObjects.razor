@@ -214,10 +214,8 @@ else
                        Size=PopupSize.Auto
                        OnClose="CloseDuplicateResolver"
                        OnResolve="ResolveDuplicateMapping"
-                       CanResolve="@(SelectedDuplicateService != null)"
                        Items="@(SelectedDuplicateGroup?.Services ?? [])"
-                       PageSize="10"
-                       TableRowClass="@(service => service == SelectedDuplicateService ? "table-warning" : "")">
+                       PageSize="10">
     <SummaryContent>
         @if (SelectedDuplicateGroup != null)
         {
@@ -226,11 +224,11 @@ else
             <div><span class="fw-bold">@(userConfig.GetText("management")):</span> @SelectedDuplicateGroup.ManagementName</div>
         }
     </SummaryContent>
-    <ChildContent>
+    <ChildContent Context="resolver">
         <Column TableItem="NetworkService" Title="@(userConfig.GetText("uid"))" Field="@(service => service.Uid)" Sortable="true" Filterable="true" />
         <Column TableItem="NetworkService" Title="@(userConfig.GetText("details"))" Field="@(service => service.Name)" Sortable="false" Filterable="false" Context="service">
             <Template>
-                <span class="d-inline-block rounded px-2 py-1 @(service == SelectedDuplicateService ? "bg-warning-subtle fw-bold" : "")">
+                <span class="d-inline-block rounded px-2 py-1 @(resolver.IsSelected(service) ? "bg-warning-subtle fw-bold" : "")">
                     @FlowAdminHelper.FormatNetworkServiceTechnicalDetails(service)
                 </span>
             </Template>
@@ -238,13 +236,6 @@ else
         <Column TableItem="NetworkService" Title="@(userConfig.GetText("state"))" Field="@(service => service.FlowActive)" Sortable="true" Filterable="true" Context="service">
             <Template>
                 @service.FlowActive.ShowAsHtml()
-            </Template>
-        </Column>
-        <Column TableItem="NetworkService" Title="@(userConfig.GetText("actions"))" Field="@(service => service.Id)" Sortable="false" Filterable="false" Context="service">
-            <Template>
-                <button type="button" class="btn btn-sm @(service == SelectedDuplicateService ? "btn-success" : "btn-outline-primary")" @onclick:stopPropagation="true" @onclick="() => SelectDuplicateService(service)">
-                    @(DisplayService.DisplayButton(userConfig, "select", Icons.Select))
-                </button>
             </Template>
         </Column>
         <Pager ShowPageNumber="true" ShowTotalCount="true" />
@@ -260,9 +251,9 @@ else
     private List<IpProtocol> ipProtos = [];
     private List<Management> selectableManagements = [];
     private List<Management> customServiceManagements = [];
+    private List<FlowSvcObjectDuplicateGroup> duplicateGroups = [];
     private List<CustomObjectManagementSelection> customServiceObjectSelections = [];
     private FlowSvcObjectDuplicateGroup? SelectedDuplicateGroup;
-    private NetworkService? SelectedDuplicateService;
     private FlowSvcObject NewCustomFlowSvcObject = new();
     private bool workInProgress = false;
     private bool EditMode = false;
@@ -294,6 +285,7 @@ else
                 {
                     management_id = managementIds
                 }) ?? [];
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowSvcObjects, customServiceManagements);
             customServiceObjectSelections = [];
 
             workInProgress = false;
@@ -338,7 +330,7 @@ else
     }
 
     private List<FlowSvcObjectDuplicateGroup> DuplicateGroups =>
-        FlowAdminHelper.BuildDuplicateGroups(flowSvcObjects, customServiceManagements);
+        duplicateGroups;
 
     private List<FlowSvcObject> FilteredFlowSvcObjects =>
         string.IsNullOrWhiteSpace(objectSearchText)
@@ -371,7 +363,6 @@ else
     private void OpenDuplicateResolver(FlowSvcObjectDuplicateGroup group)
     {
         SelectedDuplicateGroup = group;
-        SelectedDuplicateService = group.Services.FirstOrDefault();
         ResolveDuplicateMode = true;
     }
 
@@ -379,19 +370,13 @@ else
     {
         ResolveDuplicateMode = false;
         SelectedDuplicateGroup = null;
-        SelectedDuplicateService = null;
     }
 
-    private void SelectDuplicateService(NetworkService service)
-    {
-        SelectedDuplicateService = service;
-    }
-
-    private async Task ResolveDuplicateMapping()
+    private async Task ResolveDuplicateMapping(NetworkService selectedService)
     {
         try
         {
-            if (SelectedDuplicateGroup == null || SelectedDuplicateService == null)
+            if (SelectedDuplicateGroup == null)
             {
                 return;
             }
@@ -405,7 +390,7 @@ else
                 {
                     svcId = candidate.Id,
                     flowSvcobjId = SelectedDuplicateGroup.FlowSvcObjectId,
-                    activeOnMgm = candidate.Id == SelectedDuplicateService.Id
+                    activeOnMgm = candidate.Id == selectedService.Id
                 });
             }
 

@@ -126,10 +126,8 @@ else
                        Size=PopupSize.Auto
                        OnClose="CloseDuplicateResolver"
                        OnResolve="ResolveDuplicateMapping"
-                       CanResolve="@(SelectedDuplicateTimeObject != null)"
                        Items="@(SelectedDuplicateGroup?.TimeObjects ?? [])"
-                       PageSize="10"
-                       TableRowClass="@(timeObject => timeObject == SelectedDuplicateTimeObject ? "table-warning" : "")">
+                       PageSize="10">
     <SummaryContent>
         @if (SelectedDuplicateGroup != null)
         {
@@ -138,11 +136,11 @@ else
             <div><span class="fw-bold">@(userConfig.GetText("management")):</span> @SelectedDuplicateGroup.ManagementName</div>
         }
     </SummaryContent>
-    <ChildContent>
+    <ChildContent Context="resolver">
         <Column TableItem="TimeObject" Title="@(userConfig.GetText("uid"))" Field="@(timeObject => timeObject.Uid)" Sortable="true" Filterable="true" />
         <Column TableItem="TimeObject" Title="@(userConfig.GetText("details"))" Field="@(timeObject => timeObject.Name)" Sortable="false" Filterable="false" Context="timeObject">
             <Template>
-                <span class="d-inline-block rounded px-2 py-1 @(timeObject == SelectedDuplicateTimeObject ? "bg-warning-subtle fw-bold" : "")">
+                <span class="d-inline-block rounded px-2 py-1 @(resolver.IsSelected(timeObject) ? "bg-warning-subtle fw-bold" : "")">
                     @FlowAdminHelper.FormatTimeObjectTechnicalDetails(timeObject)
                 </span>
             </Template>
@@ -150,13 +148,6 @@ else
         <Column TableItem="TimeObject" Title="@(userConfig.GetText("state"))" Field="@(timeObject => timeObject.FlowActive)" Sortable="true" Filterable="true" Context="timeObject">
             <Template>
                 @timeObject.FlowActive.ShowAsHtml()
-            </Template>
-        </Column>
-        <Column TableItem="TimeObject" Title="@(userConfig.GetText("actions"))" Field="@(timeObject => timeObject.Id)" Sortable="false" Filterable="false" Context="timeObject">
-            <Template>
-                <button type="button" class="btn btn-sm @(timeObject == SelectedDuplicateTimeObject ? "btn-success" : "btn-outline-primary")" @onclick:stopPropagation="true" @onclick="() => SelectDuplicateTimeObject(timeObject)">
-                    @(DisplayService.DisplayButton(userConfig, "select", Icons.Select))
-                </button>
             </Template>
         </Column>
         <Pager ShowPageNumber="true" ShowTotalCount="true" />
@@ -171,8 +162,8 @@ else
     private List<FlowTimeObject> flowTimeObjects = [];
     private List<Management> selectableManagements = [];
     private List<Management> customTimeManagements = [];
+    private List<FlowTimeObjectDuplicateGroup> duplicateGroups = [];
     private FlowTimeObjectDuplicateGroup? SelectedDuplicateGroup;
-    private TimeObject? SelectedDuplicateTimeObject;
     private bool workInProgress = false;
     private bool EditMode = false;
     private bool ResolveDuplicateMode = false;
@@ -201,6 +192,7 @@ else
                 {
                     management_id = managementIds
                 }) ?? [];
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowTimeObjects, customTimeManagements);
 
             workInProgress = false;
         }
@@ -214,7 +206,7 @@ else
     }
 
     private List<FlowTimeObjectDuplicateGroup> DuplicateGroups =>
-        FlowAdminHelper.BuildDuplicateGroups(flowTimeObjects, customTimeManagements);
+        duplicateGroups;
 
     private List<FlowTimeObject> FilteredFlowTimeObjects =>
         string.IsNullOrWhiteSpace(objectSearchText)
@@ -246,7 +238,6 @@ else
     private void OpenDuplicateResolver(FlowTimeObjectDuplicateGroup group)
     {
         SelectedDuplicateGroup = group;
-        SelectedDuplicateTimeObject = group.TimeObjects.FirstOrDefault();
         ResolveDuplicateMode = true;
     }
 
@@ -254,19 +245,13 @@ else
     {
         ResolveDuplicateMode = false;
         SelectedDuplicateGroup = null;
-        SelectedDuplicateTimeObject = null;
     }
 
-    private void SelectDuplicateTimeObject(TimeObject timeObject)
-    {
-        SelectedDuplicateTimeObject = timeObject;
-    }
-
-    private async Task ResolveDuplicateMapping()
+    private async Task ResolveDuplicateMapping(TimeObject selectedTimeObject)
     {
         try
         {
-            if (SelectedDuplicateGroup == null || SelectedDuplicateTimeObject == null)
+            if (SelectedDuplicateGroup == null)
             {
                 return;
             }
@@ -280,7 +265,7 @@ else
                 {
                     timeObjId = candidate.Id,
                     flowTimeobjId = SelectedDuplicateGroup.FlowTimeObjectId,
-                    activeOnMgm = candidate.Id == SelectedDuplicateTimeObject.Id
+                    activeOnMgm = candidate.Id == selectedTimeObject.Id
                 });
             }
 

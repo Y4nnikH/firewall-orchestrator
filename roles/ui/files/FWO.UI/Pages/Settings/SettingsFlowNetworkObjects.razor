@@ -215,10 +215,8 @@ else
                        Size=PopupSize.Auto
                        OnClose="CloseDuplicateResolver"
                        OnResolve="ResolveDuplicateMapping"
-                       CanResolve="@(SelectedDuplicateObject != null)"
                        Items="@(SelectedDuplicateGroup?.Objects ?? [])"
-                       PageSize="10"
-                       TableRowClass="@(nwObject => nwObject == SelectedDuplicateObject ? "table-warning" : "")">
+                       PageSize="10">
     <SummaryContent>
         @if (SelectedDuplicateGroup != null)
         {
@@ -227,11 +225,11 @@ else
             <div><span class="fw-bold">@(userConfig.GetText("management")):</span> @SelectedDuplicateGroup.ManagementName</div>
         }
     </SummaryContent>
-    <ChildContent>
+    <ChildContent Context="resolver">
         <Column TableItem="NetworkObject" Title="@(userConfig.GetText("uid"))" Field="@(nwObject => nwObject.Uid)" Sortable="true" Filterable="true" />
         <Column TableItem="NetworkObject" Title="@(userConfig.GetText("details"))" Sortable="false" Filterable="false" Context="nwObject">
             <Template>
-                <span class="d-inline-block rounded px-2 py-1 @(nwObject == SelectedDuplicateObject ? "bg-warning-subtle fw-bold" : "")">
+                <span class="d-inline-block rounded px-2 py-1 @(resolver.IsSelected(nwObject) ? "bg-warning-subtle fw-bold" : "")">
                     @FlowAdminHelper.FormatNetworkObjectTechnicalDetails(nwObject)
                 </span>
             </Template>
@@ -239,13 +237,6 @@ else
         <Column TableItem="NetworkObject" Title="@(userConfig.GetText("state"))" Field="@(nwObject => nwObject.FlowActive)" Sortable="true" Filterable="true" Context="nwObject">
             <Template>
                 @nwObject.FlowActive.ShowAsHtml()
-            </Template>
-        </Column>
-        <Column TableItem="NetworkObject" Title="@(userConfig.GetText("actions"))" Field="@(nwObject => nwObject.Id)" Sortable="false" Filterable="false" Context="nwObject">
-            <Template>
-                <button type="button" class="btn btn-sm @(nwObject == SelectedDuplicateObject ? "btn-success" : "btn-outline-primary")" @onclick:stopPropagation="true" @onclick="() => SelectDuplicateObject(nwObject)">
-                    @(DisplayService.DisplayButton(userConfig, "select", Icons.Select))
-                </button>
             </Template>
         </Column>
         <Pager ShowPageNumber="true" ShowTotalCount="true" />
@@ -360,10 +351,10 @@ else
     private List<Management> selectableManagements = [];
     private List<Management> namingManagementRanking = [];
     private List<Management> customObjectManagements = [];
+    private List<FlowNwObjectDuplicateGroup> duplicateGroups = [];
     private List<CustomObjectManagementSelection> customObjectSelections = [];
     private ConfigData? configData;
     private FlowNwObjectDuplicateGroup? SelectedDuplicateGroup;
-    private NetworkObject? SelectedDuplicateObject;
     private FlowNwObject NewCustomFlowNwObject = new();
     private bool workInProgress = false;
     private string objectSearchText = "";
@@ -399,6 +390,7 @@ else
             InitializeNamingManagementRanking();
             flowNwObjects = await apiConnection.SendQueryAsync<List<FlowNwObject>>(FlowQueries.getFlowNwObjectCatalog);
             await LoadCustomObjectManagements();
+            duplicateGroups = BuildDuplicateGroups();
             customObjectSelections = [];
 
             workInProgress = false;
@@ -577,7 +569,7 @@ else
     }
 
     private List<FlowNwObjectDuplicateGroup> DuplicateGroups =>
-        BuildDuplicateGroups();
+        duplicateGroups;
 
     private List<FlowNwObject> FilteredFlowNwObjects =>
         string.IsNullOrWhiteSpace(objectSearchText)
@@ -610,7 +602,6 @@ else
     private void OpenDuplicateResolver(FlowNwObjectDuplicateGroup group)
     {
         SelectedDuplicateGroup = group;
-        SelectedDuplicateObject = group.Objects.FirstOrDefault();
         ResolveDuplicateMode = true;
     }
 
@@ -618,19 +609,13 @@ else
     {
         ResolveDuplicateMode = false;
         SelectedDuplicateGroup = null;
-        SelectedDuplicateObject = null;
     }
 
-    private void SelectDuplicateObject(NetworkObject nwObject)
-    {
-        SelectedDuplicateObject = nwObject;
-    }
-
-    private async Task ResolveDuplicateMapping()
+    private async Task ResolveDuplicateMapping(NetworkObject selectedObject)
     {
         try
         {
-            if (SelectedDuplicateGroup == null || SelectedDuplicateObject == null)
+            if (SelectedDuplicateGroup == null)
             {
                 return;
             }
@@ -644,7 +629,7 @@ else
                 {
                     objId = candidate.Id,
                     flowNwobjId = SelectedDuplicateGroup.FlowNwObjectId,
-                    activeOnMgm = candidate.Id == SelectedDuplicateObject.Id
+                    activeOnMgm = candidate.Id == selectedObject.Id
                 });
                 UpdateCustomObjectInCatalog(updatedObject);
             }

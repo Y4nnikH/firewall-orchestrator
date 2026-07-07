@@ -17,7 +17,7 @@ namespace FWO.Test
     internal class UiFlowDuplicateResolverTest
     {
         [Test]
-        public void SaveButton_IsDisabledWhenResolveDisallowed()
+        public void SaveButton_IsEnabledWhenInitialSelectionExists()
         {
             using BunitContext context = new();
             context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -40,39 +40,20 @@ namespace FWO.Test
             IRenderedComponent<FlowDuplicateResolver<NetworkObject>> cut = context.Render<FlowDuplicateResolver<NetworkObject>>(parameters => parameters
                 .Add(p => p.Title, "Duplicate objects")
                 .Add(p => p.Show, true)
-                .Add(p => p.CanResolve, false)
                 .Add(p => p.Size, PopupSize.Auto)
                 .Add(p => p.Items, items)
-                .Add(p => p.OnResolve, () => Task.CompletedTask)
-                .Add(p => p.SummaryContent, (RenderFragment)(builder => builder.AddMarkupContent(0, "<div>Flow object: test</div>")))
-                .AddChildContent<Column<NetworkObject>>(column => column
-                    .Add(p => p.Title, "Id")
-                    .Add(p => p.Field, (Expression<Func<NetworkObject, object>>)(x => x.Id))
-                    .Add(p => p.Sortable, true)
-                    .Add(p => p.Filterable, true))
-                .AddChildContent<Column<NetworkObject>>(column => column
-                    .Add(p => p.Title, "Uid")
-                    .Add(p => p.Field, (Expression<Func<NetworkObject, object>>)(x => x.Uid))
-                    .Add(p => p.Sortable, true)
-                    .Add(p => p.Filterable, true))
-                .AddChildContent<Column<NetworkObject>>(column => column
-                    .Add(p => p.Title, "Details")
-                    .Add(p => p.Sortable, false)
-                    .Add(p => p.Filterable, false))
-                .AddChildContent<Column<NetworkObject>>(column => column
-                    .Add(p => p.Title, "Actions")
-                    .Add(p => p.Sortable, false)
-                    .Add(p => p.Filterable, false)));
+                .Add(p => p.OnResolve, _ => Task.CompletedTask)
+                .Add(p => p.SummaryContent, (RenderFragment)(builder => builder.AddMarkupContent(0, "<div>Flow object: test</div>"))));
 
             Assert.That(cut.Markup, Does.Contain("Duplicate objects"));
             Assert.That(cut.Markup, Does.Contain("Flow object: test"));
             Assert.That(cut.Markup, Does.Contain("Save"));
             Assert.That(cut.Markup, Does.Contain("Cancel"));
-            Assert.That(cut.Find("button.btn.btn-sm.btn-warning").GetAttribute("disabled"), Is.Not.Null);
+            Assert.That(cut.Find("button.btn.btn-sm.btn-warning").GetAttribute("disabled"), Is.Null);
         }
 
         [Test]
-        public void SaveButton_InvokesResolveWhenAllowed()
+        public void SaveButton_InvokesResolveWithSelectedItem()
         {
             using BunitContext context = new();
             context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -89,49 +70,41 @@ namespace FWO.Test
                     IpEnd = "",
                     Uid = "uid-1",
                     FlowActive = false
+                },
+                new NetworkObject
+                {
+                    Id = 2,
+                    Name = "two",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "uid-2",
+                    FlowActive = false
                 }
             ];
 
-            bool resolved = false;
+            NetworkObject? resolvedItem = null;
 
             IRenderedComponent<FlowDuplicateResolver<NetworkObject>> cut = context.Render<FlowDuplicateResolver<NetworkObject>>(parameters => parameters
                 .Add(p => p.Title, "Duplicate objects")
                 .Add(p => p.Show, true)
-                .Add(p => p.CanResolve, true)
                 .Add(p => p.Size, PopupSize.Auto)
                 .Add(p => p.Items, items)
-                .Add(p => p.OnResolve, () =>
+                .Add(p => p.OnResolve, item =>
                 {
-                    resolved = true;
+                    resolvedItem = item;
                     return Task.CompletedTask;
                 })
-                .Add(p => p.SummaryContent, (RenderFragment)(builder => builder.AddMarkupContent(0, "<div>Flow object: test</div>")))
-                .AddChildContent<Column<NetworkObject>>(column => column
-                    .Add(p => p.Title, "Id")
-                    .Add(p => p.Field, (Expression<Func<NetworkObject, object>>)(x => x.Id))
-                    .Add(p => p.Sortable, true)
-                    .Add(p => p.Filterable, true))
-                .AddChildContent<Column<NetworkObject>>(column => column
-                    .Add(p => p.Title, "Uid")
-                    .Add(p => p.Field, (Expression<Func<NetworkObject, object>>)(x => x.Uid))
-                    .Add(p => p.Sortable, true)
-                    .Add(p => p.Filterable, true))
-                .AddChildContent<Column<NetworkObject>>(column => column
-                    .Add(p => p.Title, "Details")
-                    .Add(p => p.Sortable, false)
-                    .Add(p => p.Filterable, false))
-                .AddChildContent<Column<NetworkObject>>(column => column
-                    .Add(p => p.Title, "Actions")
-                    .Add(p => p.Sortable, false)
-                    .Add(p => p.Filterable, false)));
+                .Add(p => p.SummaryContent, (RenderFragment)(builder => builder.AddMarkupContent(0, "<div>Flow object: test</div>"))));
 
+            cut.FindAll("button.btn.btn-sm.btn-outline-primary").Last().Click();
             cut.Find("button.btn.btn-sm.btn-warning").Click();
 
-            Assert.That(resolved, Is.True);
+            Assert.That(resolvedItem, Is.Not.Null);
+            Assert.That(resolvedItem!.Id, Is.EqualTo(2));
         }
 
         [Test]
-        public void RendersSelectedRowClassFromParent()
+        public void RendersSelectedRowClassFromInternalSelection()
         {
             using BunitContext context = new();
             context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -163,17 +136,11 @@ namespace FWO.Test
             IRenderedComponent<FlowDuplicateResolver<NetworkObject>> cut = context.Render<FlowDuplicateResolver<NetworkObject>>(parameters => parameters
                 .Add(p => p.Title, "Duplicate objects")
                 .Add(p => p.Show, true)
-                .Add(p => p.CanResolve, false)
                 .Add(p => p.Size, PopupSize.Auto)
                 .Add(p => p.Items, items)
-                .Add(p => p.OnClose, () => { })
-                .Add(p => p.TableRowClass, item => item.Id == 2 ? "table-warning" : "")
-                .AddChildContent<Column<NetworkObject>>(column => column
-                    .Add(p => p.Title, "Id")
-                    .Add(p => p.Field, (Expression<Func<NetworkObject, object>>)(x => x.Id))
-                    .Add(p => p.Sortable, true)
-                    .Add(p => p.Filterable, true)));
+                .Add(p => p.OnClose, () => { }));
 
+            cut.FindAll("button.btn.btn-sm.btn-outline-primary").Last().Click();
             Assert.That(cut.Markup, Does.Contain("table-warning"));
         }
     }

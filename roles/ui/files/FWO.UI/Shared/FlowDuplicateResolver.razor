@@ -16,14 +16,28 @@
                    Items="Items"
                    PageSize="PageSize"
                    ColumnReorder="true"
-                   TableRowClass="@(TableRowClass)">
-                @ChildContent
+                   TableRowClass="@(GetTableRowClass)">
+                @if (ChildContent != null)
+                {
+                    @ChildContent(new DuplicateResolverState<TItem>(selectedItem, IsSelected))
+                }
+                <Column TableItem="TItem"
+                        Title="@UserConfig.GetText("actions")"
+                        Sortable="false"
+                        Filterable="false"
+                        Context="item">
+                    <Template>
+                        <button type="button" class="btn btn-sm @(IsSelected(item) ? "btn-success" : "btn-outline-primary")" @onclick:stopPropagation="true" @onclick="() => SelectItem(item)">
+                            @(DisplayService.DisplayButton(UserConfig, "select", Icons.Select))
+                        </button>
+                    </Template>
+                </Column>
             </Table>
         }
     </Body>
     <Footer>
         <div class="btn-group">
-            <button type="button" class="btn btn-sm btn-warning" disabled="@(!CanResolve)" @onclick="OnResolve">
+            <button type="button" class="btn btn-sm btn-warning" disabled="@(!CanResolve || selectedItem is null)" @onclick="ResolveAsync">
                 @(DisplayService.DisplayButton(UserConfig, "save", Icons.Save))
             </button>
             <button type="button" class="btn btn-sm btn-secondary" @onclick="OnClose">
@@ -48,10 +62,10 @@
     public Action OnClose { get; set; } = new Action(() => { });
 
     [Parameter]
-    public Func<Task> OnResolve { get; set; } = () => Task.CompletedTask;
+    public Func<TItem, Task> OnResolve { get; set; } = _ => Task.CompletedTask;
 
     [Parameter]
-    public bool CanResolve { get; set; }
+    public bool CanResolve { get; set; } = true;
 
     [Parameter, EditorRequired]
     public IEnumerable<TItem> Items { get; set; } = [];
@@ -63,11 +77,54 @@
     public string TableClass { get; set; } = "table table-sm table-bordered th-bg-secondary table-responsive overflow-auto sticky-header";
 
     [Parameter]
-    public Func<TItem, string>? TableRowClass { get; set; }
-
-    [Parameter]
     public RenderFragment? SummaryContent { get; set; }
 
     [Parameter]
-    public RenderFragment? ChildContent { get; set; }
+    public RenderFragment<DuplicateResolverState<TItem>>? ChildContent { get; set; }
+
+    private TItem? selectedItem;
+
+    protected override void OnParametersSet()
+    {
+        List<TItem> items = [.. (Items ?? [])];
+        if (items.Count == 0)
+        {
+            selectedItem = default;
+            return;
+        }
+
+        if (selectedItem is null || !items.Contains(selectedItem))
+        {
+            selectedItem = items.First();
+        }
+    }
+
+    private string GetTableRowClass(TItem item)
+    {
+        return EqualityComparer<TItem>.Default.Equals(item, selectedItem)
+            ? "table-warning"
+            : "";
+    }
+
+    private void SelectItem(TItem item)
+    {
+        selectedItem = item;
+    }
+
+    private bool IsSelected(TItem item)
+    {
+        return EqualityComparer<TItem>.Default.Equals(item, selectedItem);
+    }
+
+    private Task ResolveAsync()
+    {
+        if (selectedItem is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        return OnResolve.Invoke(selectedItem);
+    }
+
+    public sealed record DuplicateResolverState<TContextItem>(TContextItem? SelectedItem, Func<TContextItem, bool> IsSelected);
 }
