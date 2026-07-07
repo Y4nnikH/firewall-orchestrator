@@ -42,7 +42,7 @@
                                 </div>
                                 <div class="col-2">
                                     <Dropdown ElementType="FwConfigChangeSelection" Elements="GetAvailableSelections()" SelectedElement="GetSelectedSelection(management, change)"
-                                              SelectedElementChanged="@(val => SetSelectedSelection(management, change, val))" ElementToString="selection => selection.DisplayName" Id="@($"dropdown-{management.Id}-{change}")">
+                                              SelectedElementChanged="@(val => SetSelectedSelection(management, change, val))" ElementToString="selection => selection.DisplayName" Id="@($"dropdown-{management.Id}-{change.Replace(" ", "-")}")">
                                         <ElementTemplate Context="selection">
                                             @selection.DisplayName
                                         </ElementTemplate>

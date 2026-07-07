@@ -299,7 +299,8 @@ namespace FWO.Test
             await handler.HandleStateChange(externalRequest);
 
             StringAssert.Contains("taskNumber = 4", localApiConnection.AddExtRequestVars ?? "");
-            StringAssert.Contains("extQueryVariables = {\"BundledTasks\":[4,5]}", localApiConnection.AddExtRequestVars ?? "");
+            StringAssert.Contains("\"ManagementId\":[1]", localApiConnection.AddExtRequestVars ?? "");
+            StringAssert.Contains("\"BundledTasks\":[4,5]", localApiConnection.AddExtRequestVars ?? "");
             ClassicAssert.IsTrue(localApiConnection.History.Any(h => h.Contains("changeType = 11") && h.Contains("Task2")));
             ClassicAssert.IsTrue(localApiConnection.History.Any(h => h.Contains("changeType = 11") && h.Contains("Task3")));
         }
@@ -405,7 +406,8 @@ namespace FWO.Test
             // \u0022name\u0022: \u0022Anwendungs-ID\u0022,\u0022text\u0022: \u0022\u0022},{\u0022@xsi.type\u0022: \u0022checkbox\u0022,\u0022name\u0022: \u0022hinterlegt\u0022,\u0022value\u0022: true}]}}}}]}}}}","TicketId":""}, extQueryVariables = , extRequestState = ExtReqInitialized, waitCycles = 0 }
             ClassicAssert.IsNotNull(localApiConnection.AddExtRequestVars);
             StringAssert.Contains("taskNumber = 2", localApiConnection.AddExtRequestVars ?? "");
-            StringAssert.Contains("extQueryVariables = {\"BundledTasks\":[2,3]}", localApiConnection.AddExtRequestVars ?? "");
+            StringAssert.Contains("\"ManagementId\":[1]", localApiConnection.AddExtRequestVars ?? "");
+            StringAssert.Contains("\"BundledTasks\":[2,3]", localApiConnection.AddExtRequestVars ?? "");
 
             externalRequest.Id = 2;
             externalRequest.TaskNumber = 2;
@@ -422,7 +424,8 @@ namespace FWO.Test
             ClassicAssert.IsTrue(localApiConnection.History[6].Contains("changeType = 10"));
             ClassicAssert.IsTrue(localApiConnection.History[6].Contains("Task5"));
             StringAssert.Contains("taskNumber = 4", localApiConnection.AddExtRequestVars ?? "");
-            StringAssert.Contains("extQueryVariables = {\"BundledTasks\":[4,5]}", localApiConnection.AddExtRequestVars ?? "");
+            StringAssert.Contains("\"ManagementId\":[1]", localApiConnection.AddExtRequestVars ?? "");
+            StringAssert.Contains("\"BundledTasks\":[4,5]", localApiConnection.AddExtRequestVars ?? "");
             StringAssert.Contains("AR4", localApiConnection.AddExtRequestVars ?? "");
             StringAssert.DoesNotContain("AR5", localApiConnection.AddExtRequestVars ?? "");
 
@@ -443,7 +446,8 @@ namespace FWO.Test
             ClassicAssert.IsTrue(localApiConnection.History[11].Contains("changeType = 10"));
             ClassicAssert.IsTrue(localApiConnection.History[11].Contains("Task8"));
             StringAssert.Contains("taskNumber = 6", localApiConnection.AddExtRequestVars ?? "");
-            StringAssert.Contains("extQueryVariables = {\"BundledTasks\":[6,7,8]}", localApiConnection.AddExtRequestVars ?? "");
+            StringAssert.Contains("\"ManagementId\":[1]", localApiConnection.AddExtRequestVars ?? "");
+            StringAssert.Contains("\"BundledTasks\":[6,7,8]", localApiConnection.AddExtRequestVars ?? "");
             StringAssert.Contains("AR6", localApiConnection.AddExtRequestVars ?? "");
             StringAssert.DoesNotContain("AR7", localApiConnection.AddExtRequestVars ?? "");
             StringAssert.Contains("AR8", localApiConnection.AddExtRequestVars ?? "");

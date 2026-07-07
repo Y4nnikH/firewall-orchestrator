@@ -407,7 +407,7 @@ namespace FWO.Middleware.Server
         {
             Dictionary<string, List<int>> extQueryVariables = [];
 
-            int? managementId = tasks.FirstOrDefault()?.OnManagement?.Id;
+            int? managementId = tasks.FirstOrDefault()?.OnManagement?.Id ?? tasks.FirstOrDefault()?.ManagementId;
             if (managementId != null)
             {
                 extQueryVariables[ExternalVarKeys.ManagementId] = [managementId.Value];

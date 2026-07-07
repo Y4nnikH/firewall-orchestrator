@@ -260,7 +260,7 @@ namespace FWO.ExternalSystems.CheckPoint
 
                 if (!string.IsNullOrWhiteSpace(lastResponse.Content))
                 {
-                    Log.WriteInfo("CheckPoint RESPONSE BODY", lastResponse.Content);
+                    Log.WriteDebug("CheckPoint RESPONSE BODY", lastResponse.Content);
                 }
                 else
                 {
@@ -321,13 +321,7 @@ namespace FWO.ExternalSystems.CheckPoint
             RestRequest request = new(endpoint, Method.Post);
             request.AddStringBody(requestBody.ToJsonString(), ContentType.Json);
 
-            Log.WriteInfo("CheckPoint REQUEST", endpoint);
-            Log.WriteInfo("CheckPoint BODY", requestBody.ToJsonString());
-
             RestResponse response = await checkPointClient!.RestCall(request, endpoint);
-
-            Log.WriteInfo("CheckPoint RESPONSE STATUS", $"{(int)response.StatusCode} {response.StatusCode}");
-            Log.WriteInfo("CheckPoint RESPONSE BODY", string.IsNullOrWhiteSpace(response.Content) ? "<empty>" : response.Content);
 
             CheckPointResponseCategory category = CategorizeResponse(response);
 
@@ -386,7 +380,7 @@ namespace FWO.ExternalSystems.CheckPoint
             retryBody["ignore-warnings"] = true;
 
             Log.WriteInfo("CheckPoint RETRY", $"Retrying {endpoint} with ignore-warnings=true");
-            Log.WriteInfo("CheckPoint RETRY BODY", retryBody.ToJsonString());
+            Log.WriteDebug("CheckPoint RETRY BODY", retryBody.ToJsonString());
 
             RestRequest retryRequest = new(endpoint, Method.Post);
             retryRequest.AddStringBody(retryBody.ToJsonString(), ContentType.Json);
@@ -394,7 +388,7 @@ namespace FWO.ExternalSystems.CheckPoint
             RestResponse retryResponse = await checkPointClient!.RestCall(retryRequest, endpoint);
 
             Log.WriteInfo("CheckPoint RETRY RESPONSE STATUS", $"{(int)retryResponse.StatusCode} {retryResponse.StatusCode}");
-            Log.WriteInfo("CheckPoint RETRY RESPONSE BODY", string.IsNullOrWhiteSpace(retryResponse.Content) ? "<empty>" : retryResponse.Content);
+            Log.WriteDebug("CheckPoint RETRY RESPONSE BODY", string.IsNullOrWhiteSpace(retryResponse.Content) ? "<empty>" : retryResponse.Content);
 
             return retryResponse;
         }

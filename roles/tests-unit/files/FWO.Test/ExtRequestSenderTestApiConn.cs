@@ -157,6 +157,21 @@ namespace FWO.Test
                 GraphQLResponse<dynamic> response = new() { Data = extStates };
                 return response.Data;
             }
+            else if (responseType == typeof(List<Management>) && query == DeviceQueries.getManagementById)
+            {
+                List<Management> managements =
+                [
+                    new()
+                    {
+                        Id = 1,
+                        Name = "ExtCP",
+                        ExtMgtData = "{\"id\":\"1\",\"name\":\"ExtCP\"}"
+                    }
+                ];
+
+                GraphQLResponse<dynamic> response = new() { Data = managements };
+                return response.Data;
+            }
             else if (responseType == typeof(List<Ldap>))
             {
                 TriedToGetLdapsForHandleStateChange++;

@@ -65,12 +65,17 @@ namespace FWO.Test
         }
 
         [Test]
-        [Ignore("Temporarily disabled")]
         public async Task TestExternalRequestSender()
         {
             try
             {
                 SimulatedSCClient simulatedSCClient = new(ticketSystem);
+                simulatedSCClient.EnqueueResponse("tickets.json", new(new()) { StatusCode = HttpStatusCode.OK, Content = "{\"ticket\": {\"id\": 1, \"status\": \"In Progress\" } }" });
+                simulatedSCClient.EnqueueResponse("tickets.json", new(new()) { StatusCode = HttpStatusCode.OK, Content = "{\"ticket\": {\"id\": 2, \"status\": \"In Progress\" } }" });
+
+                simulatedSCClient.EnqueueResponse("tickets/4711", new(new()) { StatusCode = HttpStatusCode.BadRequest, ErrorMessage = "poll failed 4711", Content = "{}" });
+                simulatedSCClient.EnqueueResponse("tickets/4712", new(new()) { StatusCode = HttpStatusCode.BadRequest, ErrorMessage = "poll failed 4712", Content = "{}" });
+
                 ExternalRequestSender externalRequestSender = new(apiConnection, globalConfig, simulatedSCClient);
                 List<string> FailedRequests = await externalRequestSender.Run();
                 if (FailedRequests.Count > 0)
@@ -86,16 +91,14 @@ namespace FWO.Test
             ClassicAssert.IsTrue(ExceptionMessage.Contains("External Request(s) failed:"));
             ClassicAssert.IsTrue(ExceptionMessage.Contains("Request Id: 4"));
             ClassicAssert.IsTrue(ExceptionMessage.Contains("Request Id: 5"));
-            ClassicAssert.AreEqual(3, apiConnection.UpdateExtRequestCreation.Count);
+            ClassicAssert.AreEqual(2, apiConnection.UpdateExtRequestCreation.Count);
             ClassicAssert.IsFalse(apiConnection.UpdateExtRequestCreation[0].Contains("id = 1"));
             ClassicAssert.IsTrue(apiConnection.UpdateExtRequestCreation[0].Contains("id = 2"));
             ClassicAssert.IsTrue(apiConnection.UpdateExtRequestCreation[1].Contains("id = 3"));
-            ClassicAssert.IsTrue(apiConnection.UpdateExtRequestCreation[2].Contains("id = 3"));
-            ClassicAssert.AreEqual(2, apiConnection.UpdateExtRequestProcess.Count);
             ClassicAssert.AreEqual(2, apiConnection.UpdateExtRequestProcess.Count);
             ClassicAssert.IsTrue(apiConnection.UpdateExtRequestProcess[0].Contains("id = 4"));
             ClassicAssert.IsTrue(apiConnection.UpdateExtRequestProcess[1].Contains("id = 5"));
-            ClassicAssert.AreEqual(5, apiConnection.TriedToGetLdapsForHandleStateChange);
+            ClassicAssert.AreEqual(0, apiConnection.TriedToGetLdapsForHandleStateChange);
         }
 
         [Test]
