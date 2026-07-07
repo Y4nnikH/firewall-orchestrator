@@ -246,6 +246,11 @@ namespace FWO.Data.Flow
                    string.IsNullOrWhiteSpace(candidate.IpEnd);
         }
 
+        private static bool IsGroupObject(NetworkObject candidate)
+        {
+            return string.Equals(candidate.Type?.Name, "Group", StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>
         /// Formats the technical details of a network object for duplicate resolution views.
         /// </summary>
@@ -384,7 +389,8 @@ namespace FWO.Data.Flow
         /// </summary>
         public static List<NetworkObject> FilterCustomObjectCandidates(IEnumerable<NetworkObject>? candidates, string? searchText)
         {
-            IEnumerable<NetworkObject> filteredCandidates = candidates ?? [];
+            IEnumerable<NetworkObject> filteredCandidates = (candidates ?? [])
+                .Where(candidate => HasNoTechnicalAddress(candidate) && !IsGroupObject(candidate));
 
             if (!string.IsNullOrWhiteSpace(searchText))
             {

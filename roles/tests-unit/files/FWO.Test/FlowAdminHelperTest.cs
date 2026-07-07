@@ -363,7 +363,7 @@ namespace FWO.Test
                 {
                     Id = 10,
                     Name = "thisisatestobject",
-                    IP = "10.0.0.1",
+                    IP = "",
                     IpEnd = "",
                     Uid = "uid-10",
                     Active = false,
@@ -373,7 +373,7 @@ namespace FWO.Test
                 {
                     Id = 20,
                     Name = "another-object",
-                    IP = "192.0.2.1",
+                    IP = "",
                     IpEnd = "",
                     Uid = "uid-20",
                     Active = true,
@@ -382,18 +382,51 @@ namespace FWO.Test
             ];
 
             List<NetworkObject> byName = FlowAdminHelper.FilterCustomObjectCandidates(candidates, "test");
-            List<NetworkObject> byIp = FlowAdminHelper.FilterCustomObjectCandidates(candidates, "10.0.0.1");
+            List<NetworkObject> byId = FlowAdminHelper.FilterCustomObjectCandidates(candidates, "10");
             List<NetworkObject> byUid = FlowAdminHelper.FilterCustomObjectCandidates(candidates, "uid-10");
             List<NetworkObject> byType = FlowAdminHelper.FilterCustomObjectCandidates(candidates, "host");
 
             Assert.That(byName, Has.Count.EqualTo(1));
             Assert.That(byName[0].Id, Is.EqualTo(10));
-            Assert.That(byIp, Has.Count.EqualTo(1));
-            Assert.That(byIp[0].Id, Is.EqualTo(10));
+            Assert.That(byId, Has.Count.EqualTo(1));
+            Assert.That(byId[0].Id, Is.EqualTo(10));
             Assert.That(byUid, Has.Count.EqualTo(1));
             Assert.That(byUid[0].Id, Is.EqualTo(10));
             Assert.That(byType, Has.Count.EqualTo(1));
             Assert.That(byType[0].Id, Is.EqualTo(10));
+        }
+
+        [Test]
+        public void FilterCustomObjectCandidates_SkipsGroupObjectsWithoutTechnicalAddress()
+        {
+            List<NetworkObject> candidates =
+            [
+                new NetworkObject
+                {
+                    Id = 10,
+                    Name = "host-object",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "uid-10",
+                    Active = false,
+                    Type = new NetworkObjectType { Id = 1, Name = "host" }
+                },
+                new NetworkObject
+                {
+                    Id = 20,
+                    Name = "group-object",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "uid-20",
+                    Active = false,
+                    Type = new NetworkObjectType { Id = 2, Name = "Group" }
+                }
+            ];
+
+            List<NetworkObject> filtered = FlowAdminHelper.FilterCustomObjectCandidates(candidates, null);
+
+            Assert.That(filtered, Has.Count.EqualTo(1));
+            Assert.That(filtered[0].Id, Is.EqualTo(10));
         }
 
         [Test]

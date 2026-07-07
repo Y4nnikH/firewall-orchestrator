@@ -656,8 +656,9 @@ else
                 .. selectableManagements.Select(management => new CustomObjectManagementSelection
                 {
                     Management = management,
-                    Candidates = [.. (customObjectManagements.FirstOrDefault(candidateManagement => candidateManagement.Id == management.Id)?.Objects ?? [])
-                        .Where(FlowAdminHelper.HasNoTechnicalAddress)],
+                    Candidates = FlowAdminHelper.FilterCustomObjectCandidates(
+                        customObjectManagements.FirstOrDefault(candidateManagement => candidateManagement.Id == management.Id)?.Objects,
+                        null),
                     SelectedObject = null
                 })
             ];
