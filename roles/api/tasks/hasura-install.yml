@@ -493,12 +493,76 @@
   become: true
 
 - name: wait for hasura port to become available
-  wait_for:
-    port: "{{ api_port }}"
-    host: "{{ api_local_listening_ip_address }}"
-    connect_timeout: 1
-    delay: 3
-    timeout: 30
+  block:
+    - name: wait for hasura port to become available
+      wait_for:
+        port: "{{ api_port }}"
+        host: "{{ api_local_listening_ip_address }}"
+        connect_timeout: 1
+        delay: 3
+        timeout: "{{ api_hasura_startup_timeout }}"
+  rescue:
+    - name: read Hasura systemd status after startup timeout
+      command:
+        argv:
+          - systemctl
+          - status
+          - "{{ api_service_name }}"
+          - --no-pager
+          - -l
+      register: api_hasura_service_status
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: read Hasura journal after startup timeout
+      command:
+        argv:
+          - journalctl
+          - -u
+          - "{{ api_service_name }}"
+          - --no-pager
+          - -n
+          - "120"
+      register: api_hasura_journal
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: list Hasura containers after startup timeout
+      command:
+        argv:
+          - podman
+          - ps
+          - -a
+          - --filter
+          - "name={{ api_container_name }}"
+      register: api_hasura_container_list
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: read Hasura container logs after startup timeout
+      command:
+        argv:
+          - podman
+          - logs
+          - --tail
+          - "120"
+          - "{{ api_container_name }}"
+      register: api_hasura_container_logs
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: fail with Hasura startup diagnostics
+      fail:
+        msg:
+          - "Hasura did not listen on {{ api_local_listening_ip_address }}:{{ api_port }} within {{ api_hasura_startup_timeout }} seconds."
+          - "systemctl status {{ api_service_name }}: {{ api_hasura_service_status.stdout | default(api_hasura_service_status.stderr | default('')) }}"
+          - "journalctl -u {{ api_service_name }}: {{ api_hasura_journal.stdout | default(api_hasura_journal.stderr | default('')) }}"
+          - "podman ps: {{ api_hasura_container_list.stdout | default(api_hasura_container_list.stderr | default('')) }}"
+          - "podman logs {{ api_container_name }}: {{ api_hasura_container_logs.stdout | default(api_hasura_container_logs.stderr | default('')) }}"
 
 - name: import API metadata via metadata API directly from local file
   uri:
