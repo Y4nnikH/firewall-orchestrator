@@ -23,6 +23,12 @@ namespace FWO.Test
     [TestFixture]
     internal class WorkflowMiddlewareUnitTest
     {
+        private static readonly string[] kExpectedParsedGroups =
+        [
+            "cn=a,dc=fworch,dc=internal",
+            "cn=b,dc=fworch,dc=internal"
+        ];
+
         private sealed class RecipientResolverApiConn : SimulatedApiConnection
         {
             public List<string> Queries { get; } = [];
@@ -887,11 +893,7 @@ namespace FWO.Test
             {
                 Assert.That(ids, Is.EquivalentTo([2, 4, 9]));
                 Assert.That(userId, Is.EqualTo(17));
-                Assert.That(groups, Is.EqualTo(new[]
-                {
-                    "cn=a,dc=fworch,dc=internal",
-                    "cn=b,dc=fworch,dc=internal"
-                }));
+                Assert.That(groups, Is.EqualTo(kExpectedParsedGroups));
                 Assert.That(uuid, Is.EqualTo("uid=test,dc=fworch,dc=internal"));
             });
         }
