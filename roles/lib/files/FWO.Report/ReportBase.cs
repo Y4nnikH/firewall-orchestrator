@@ -103,6 +103,8 @@ namespace FWO.Report
         protected int Levelshift = 0;
 
         protected string htmlExport = "";
+        protected string htmlBodyExport = "";
+        protected bool htmlBodyExportValid = false;
 
         private string TocHTMLTemplate = "<div id=\"toc_container\"><h2>##ToCHeader##</h2><ul class=\"toc_list\">##ToCList##</ul></div><style>#toc_container {background: #f9f9f9 none repeat scroll 0 0;border: 1px solid #aaa;display: table;font-size: 95%;margin-bottom: 1em;padding: 10px;width: 100%;}#toc_container ul{list-style-type: none;}.subli {list-style-type: square;}.toc_list ul li {margin-bottom: 4px;}.toc_list a {color: black;font-family: 'Arial';font-size: 12pt;}</style>";
 
@@ -146,6 +148,11 @@ namespace FWO.Report
         public abstract string ExportToJson();
 
         public abstract string ExportToHtml();
+
+        public virtual string ExportToHtmlBody()
+        {
+            return htmlBodyExport;
+        }
 
         public abstract string SetDescription();
 
@@ -264,6 +271,8 @@ namespace FWO.Report
                 HtmlTemplate = HtmlTemplate.Replace("##ToC##", htmlToC);
                 HtmlTemplate = HtmlTemplate.Replace("##Body##", htmlReport.ToString());
                 htmlExport = HtmlTemplate.ToString();
+                htmlBodyExport = htmlReport.ToString();
+                htmlBodyExportValid = true;
             }
             return htmlExport;
         }

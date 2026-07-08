@@ -61,8 +61,8 @@ namespace FWO.Services
 
             return layout switch
             {
-                NotificationLayout.PdfAsAttachment => EmailHelper.CreateAttachment(await ToPdf(content.Html), GlobalConst.kPdf, subject),
-                NotificationLayout.HtmlAsAttachment => EmailHelper.CreateAttachment(content.Html, GlobalConst.kHtml, subject),
+                NotificationLayout.PdfAsAttachment => EmailHelper.CreateAttachment(await ToPdf(NotificationTableBodyBuilder.BuildHtmlDocument(content.Html)), GlobalConst.kPdf, subject),
+                NotificationLayout.HtmlAsAttachment => EmailHelper.CreateAttachment(NotificationTableBodyBuilder.BuildHtmlDocument(content.Html), GlobalConst.kHtml, subject),
                 NotificationLayout.JsonAsAttachment => EmailHelper.CreateAttachment(content.Json, GlobalConst.kJson, subject),
                 NotificationLayout.CsvAsAttachment => EmailHelper.CreateAttachment(content.Csv, GlobalConst.kCsv, subject),
                 _ => null

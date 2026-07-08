@@ -73,7 +73,7 @@ namespace FWO.Middleware.Server
                 htmlRuleTable = BuildHtmlReportSection(frameTitle, htmlRuleTable, owner);
             }
 
-            return NotificationTableBodyBuilder.BuildHtmlDocument(NotificationTableBodyBuilder.BuildHtmlBody(introText, htmlRuleTable));
+            return NotificationTableBodyBuilder.BuildHtmlBody(introText, htmlRuleTable);
         }
 
         /// <summary>
