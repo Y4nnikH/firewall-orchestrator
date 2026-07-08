@@ -54,10 +54,10 @@ Install the required Ansible collections before running the playbook. This is re
 ansible-galaxy collection install -r collections/requirements.yml -p collections --force
 ```
 
-If using RedHat-like systems and `collections/requirements.txt` exists in your checkout, install those Python dependencies as well:
+If using RedHat-like systems and `scripts/requirements.txt` exists in your checkout, install those Python dependencies as well:
 
 ```console
-pip install -r collections/requirements.txt
+pip install -r scripts/requirements.txt
 ```
 
 Note that if your server is behind a proxy, you will have to set the proxy for pip as follows (to allow for ansible venv download):
