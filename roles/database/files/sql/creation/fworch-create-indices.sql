@@ -62,7 +62,6 @@ Create index "IX_relationship24" on "rule" ("track_id");
 Create index "IX_Relationship33" on firewall."nw_service" ("ip_proto_id");
 Create index "IX_Relationship36" on firewall."nw_service" ("svc_typ_id");
 Create index "IX_Relationship37" on firewall."nw_object" ("zone_id");
-Create index "IX_Relationship90" on "rule" ("rule_from_zone");
 Create index "IX_Relationship95" on "rule_from" ("user_id");
 Create index "IX_relationship26" on "rule_from" ("obj_id");
 Create index "IX_relationship28" on "rule_to" ("obj_id");
