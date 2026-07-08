@@ -468,6 +468,68 @@ namespace FWO.Test
             }
         }
 
+        [Test]
+        public void Test_TryBuildRuleTree_ReplacesScopedRuleTreeCacheBetweenReports()
+        {
+            ManagementReport CreateManagement(int managementId, int firstDeviceId, int deviceCount)
+            {
+                RulebaseReport rulebase = MockReportRules.CreateRulebaseReport($"RB{managementId}", 1);
+                DeviceReport[] devices = [.. Enumerable.Range(firstDeviceId, deviceCount).Select(deviceId =>
+                    MockReportRules.CreateDeviceReport(deviceId, $"Device{deviceId}",
+                    [
+                        new RulebaseLink
+                        {
+                            GatewayId = deviceId,
+                            IsInitial = true,
+                            FromRulebaseId = 0,
+                            NextRulebaseId = rulebase.Id,
+                            LinkType = 2
+                        }
+                    ]))];
+
+                return new ManagementReport
+                {
+                    Id = managementId,
+                    Name = $"Management{managementId}",
+                    Devices = devices,
+                    Rulebases = [rulebase]
+                };
+            }
+
+            IServiceProvider? originalServices = FWO.Services.ServiceProvider.Services;
+            ServiceCollection services = new();
+            services.AddSingleton<IRuleTreeBuilder>(_ruleTreeBuilder);
+            FWO.Services.ServiceProvider.Services = services.BuildServiceProvider();
+
+            try
+            {
+                MockReportRules firstReport = new(new DynGraphqlQuery(""), new SimulatedUserConfig(), ReportType.ResolvedRules, () =>
+                [
+                    CreateManagement(1, 1, 2)
+                ]);
+                firstReport.TryBuildMockRuleTree();
+
+                Assert.That(_ruleTreeBuilder.RuleTreeCache, Has.Count.EqualTo(2));
+                Assert.That(_ruleTreeBuilder.FlattenedRules, Has.Count.EqualTo(2));
+
+                MockReportRules secondReport = new(new DynGraphqlQuery(""), new SimulatedUserConfig(), ReportType.ResolvedRules, () =>
+                [
+                    CreateManagement(2, 10, 1)
+                ]);
+                secondReport.TryBuildMockRuleTree();
+
+                Assert.That(_ruleTreeBuilder.RuleTreeCache, Has.Count.EqualTo(1));
+                Assert.That(_ruleTreeBuilder.FlattenedRules, Has.Count.EqualTo(1));
+                Assert.That(_ruleTreeBuilder.RuleTreeCache.ContainsKey((1, 1)), Is.False);
+                Assert.That(_ruleTreeBuilder.RuleTreeCache.ContainsKey((1, 2)), Is.False);
+                Assert.That(_ruleTreeBuilder.RuleTreeCache.ContainsKey((2, 10)), Is.True);
+            }
+            finally
+            {
+                FWO.Services.ServiceProvider.Services = originalServices;
+            }
+        }
+
         [TestCase(PreferredCollapseState.Collapsed, false)]
         [TestCase(PreferredCollapseState.Expanded, true)]
         [TestCase(PreferredCollapseState.Intermediate, true)]
