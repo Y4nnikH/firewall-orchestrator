@@ -1,5 +1,6 @@
 using FWO.Middleware.Server.Controllers;
 using FWO.Middleware.Server.OpenApi;
+using FWO.Middleware.Server.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
@@ -10,6 +11,8 @@ using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using NUnit.Framework;
 using System.Reflection;
+using System.Security.Claims;
+using System.Text.Json;
 
 namespace FWO.Test;
 
@@ -56,7 +59,7 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
         OpenApiOperation operation = CreateOperation();
         OpenApiOperationTransformerContext context = CreateOwnerContext();
         OpenApiApiExampleOperationTransformer transformer = CreateTransformer();
-        IEnumerable<string> authorizedRoles = GetOwnerEndpointRoles();
+        string[] authorizedRoles = GetOwnerEndpointRoles();
 
         await transformer.TransformAsync(operation, context, CancellationToken.None);
 
@@ -89,6 +92,92 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
                 Assert.That(operation.Responses, Does.ContainKey(key));
                 Assert.That(operation.Responses![key].Description, Is.Not.Empty);
             }
+        });
+    }
+
+    /// <summary>
+    /// Verifies documented wildcard behavior stays aligned with generated GraphQL filters.
+    /// </summary>
+    [Test]
+    public async Task TransformAsync_WithOwnerEndpoint_DocumentsWildcardBehavior()
+    {
+        OpenApiOperation operation = CreateOperation();
+        OpenApiApiExampleOperationTransformer transformer = CreateTransformer();
+
+        await transformer.TransformAsync(operation, CreateOwnerContext(), CancellationToken.None);
+
+        string wildcardVariables = SerializeOwnerQueryVariables(new GetOwnersRequest
+        {
+            Name = "Finance*",
+            AppIdExternal = "APP-?"
+        });
+        string containsVariables = SerializeOwnerQueryVariables(new GetOwnersRequest { Name = "Accounting" });
+        string escapedVariables = SerializeOwnerQueryVariables(new GetOwnersRequest
+        {
+            Name = "APP_1",
+            AppIdExternal = "50%"
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(operation.Description, Does.Contain("Plain text filters are matched as contains."));
+            Assert.That(containsVariables, Does.Contain("\"name\":{\"_ilike\":\"%Accounting%\"}"));
+            Assert.That(operation.Description, Does.Contain("`*` matches any character sequence"));
+            Assert.That(wildcardVariables, Does.Contain("\"name\":{\"_ilike\":\"Finance%\"}"));
+            Assert.That(operation.Description, Does.Contain("`?` matches one character"));
+            Assert.That(wildcardVariables, Does.Contain("\"app_id_external\":{\"_ilike\":\"APP-_\"}"));
+            Assert.That(operation.Description, Does.Contain("Literal `%`, `_`, and `\\` characters are matched verbatim."));
+            Assert.That(escapedVariables, Does.Contain($"\"name\":{{\"_ilike\":{JsonSerializer.Serialize("%APP\\_1%")}}}"));
+            Assert.That(escapedVariables, Does.Contain($"\"app_id_external\":{{\"_ilike\":{JsonSerializer.Serialize("%50\\%%")}}}"));
+        });
+    }
+
+    /// <summary>
+    /// Verifies documented active lifecycle defaults stay aligned with generated GraphQL filters.
+    /// </summary>
+    [Test]
+    public async Task TransformAsync_WithOwnerEndpoint_DocumentsActiveLifecycleDefault()
+    {
+        OpenApiOperation operation = CreateOperation();
+        OpenApiApiExampleOperationTransformer transformer = CreateTransformer();
+
+        await transformer.TransformAsync(operation, CreateOwnerContext(), CancellationToken.None);
+
+        string defaultVariables = SerializeOwnerQueryVariables(new GetOwnersRequest());
+        string disabledVariables = SerializeOwnerQueryVariables(new GetOwnersRequest { ShowOnlyActiveState = false });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(operation.Description, Does.Contain("`showOnlyActiveState` defaults to `true`"));
+            Assert.That(defaultVariables, Does.Contain("\"owner_lifecycle_state\":{\"active_state\":{\"_eq\":true}}"));
+            Assert.That(defaultVariables, Does.Contain("\"owner_lifecycle_state_id\":{\"_is_null\":true}"));
+            Assert.That(operation.Description, Does.Contain("Set it to `false` to include inactive lifecycle states."));
+            Assert.That(disabledVariables, Does.Not.Contain("active_state"));
+        });
+    }
+
+    /// <summary>
+    /// Verifies documented showDetails behavior stays aligned with response mapping.
+    /// </summary>
+    [Test]
+    public async Task TransformAsync_WithOwnerEndpoint_DocumentsDetailFieldBehavior()
+    {
+        OpenApiOperation operation = CreateOperation();
+        OpenApiApiExampleOperationTransformer transformer = CreateTransformer();
+
+        await transformer.TransformAsync(operation, CreateOwnerContext(), CancellationToken.None);
+
+        string coreResponse = JsonSerializer.Serialize(MapOwnerResponse(false));
+        string detailResponse = JsonSerializer.Serialize(MapOwnerResponse(true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(operation.Description, Does.Contain("`showDetails` defaults to `false`"));
+            Assert.That(operation.Description, Does.Contain("Detail fields are omitted unless `showDetails` is `true`."));
+            Assert.That(coreResponse, Does.Not.Contain("\"tenantId\""));
+            Assert.That(coreResponse, Does.Not.Contain("\"criticality\""));
+            Assert.That(detailResponse, Does.Contain("\"tenantId\""));
+            Assert.That(detailResponse, Does.Contain("\"criticality\""));
         });
     }
 
@@ -173,7 +262,7 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
         };
     }
 
-    private static IEnumerable<string> GetOwnerEndpointRoles()
+    private static string[] GetOwnerEndpointRoles()
     {
         MethodInfo getMethod = typeof(OwnersController).GetMethod(nameof(OwnersController.Get))!;
         AuthorizeAttribute authorize = getMethod.GetCustomAttribute<AuthorizeAttribute>()!;
@@ -192,5 +281,37 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
         FieldInfo maxFilterTextLength = typeof(OwnersController).GetField("kMaxFilterTextLength", BindingFlags.NonPublic | BindingFlags.Static)!
             ?? throw new InvalidOperationException("Owner filter length constant is missing.");
         return (int)maxFilterTextLength.GetRawConstantValue()!;
+    }
+
+    private static string SerializeOwnerQueryVariables(GetOwnersRequest request)
+    {
+        MethodInfo buildQueryVariables = typeof(OwnersController).GetMethod("BuildQueryVariables", BindingFlags.NonPublic | BindingFlags.Static)!
+            ?? throw new InvalidOperationException("Owner query variable builder is missing.");
+
+        object variables = buildQueryVariables.Invoke(null, [request, new ClaimsPrincipal(new ClaimsIdentity())])!
+            ?? throw new InvalidOperationException("Owner query variable builder returned null.");
+
+        return JsonSerializer.Serialize(variables);
+    }
+
+    private static object MapOwnerResponse(bool showDetails)
+    {
+        MethodInfo toResponse = typeof(OwnersController).GetMethod("ToResponse", BindingFlags.NonPublic | BindingFlags.Static)!
+            ?? throw new InvalidOperationException("Owner response mapper is missing.");
+
+        object response = toResponse.Invoke(null,
+        [
+            new FWO.Data.FwoOwner
+            {
+                Id = 1,
+                Name = "Application",
+                ExtAppId = "APP-0001",
+                TenantId = 7,
+                Criticality = "high"
+            },
+            showDetails
+        ]) ?? throw new InvalidOperationException("Owner response mapper returned null.");
+
+        return response;
     }
 }
