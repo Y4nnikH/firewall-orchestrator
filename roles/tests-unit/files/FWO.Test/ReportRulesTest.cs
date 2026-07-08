@@ -499,7 +499,8 @@ namespace FWO.Test
             IServiceProvider? originalServices = FWO.Services.ServiceProvider.Services;
             ServiceCollection services = new();
             services.AddSingleton<IRuleTreeBuilder>(_ruleTreeBuilder);
-            FWO.Services.ServiceProvider.Services = services.BuildServiceProvider();
+            using var scopedServices = services.BuildServiceProvider();
+            FWO.Services.ServiceProvider.Services = scopedServices;
 
             try
             {
