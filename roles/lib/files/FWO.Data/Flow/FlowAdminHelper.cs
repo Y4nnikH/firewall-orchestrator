@@ -292,11 +292,18 @@ namespace FWO.Data.Flow
             string portRange = DisplayBase.DisplayPort(candidate.PortStart, candidate.PortEnd);
             string protocol = protocols?.FirstOrDefault(protocol => protocol.Id == candidate.ProtoId)?.Name
                 ?? (candidate.ProtoId > 0 ? candidate.ProtoId.ToString(CultureInfo.InvariantCulture) : "");
-            return string.IsNullOrWhiteSpace(protocol)
-                ? portRange
-                : string.IsNullOrWhiteSpace(portRange)
-                    ? protocol
-                    : $"{portRange}/{protocol}";
+
+            if (string.IsNullOrWhiteSpace(protocol))
+            {
+                return portRange;
+            }
+
+            if (string.IsNullOrWhiteSpace(portRange))
+            {
+                return protocol;
+            }
+
+            return $"{portRange}/{protocol}";
         }
 
         /// <summary>

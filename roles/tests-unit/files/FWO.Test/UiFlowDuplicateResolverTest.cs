@@ -96,7 +96,7 @@ namespace FWO.Test
                 })
                 .Add(p => p.SummaryContent, (RenderFragment)(builder => builder.AddMarkupContent(0, "<div>Flow object: test</div>"))));
 
-            cut.FindAll("button.btn.btn-sm.btn-outline-primary").Last().Click();
+            cut.FindAll("button.btn.btn-sm.btn-outline-primary")[^1].Click();
             cut.Find("button.btn.btn-sm.btn-warning").Click();
 
             Assert.That(resolvedItem, Is.Not.Null);
@@ -194,7 +194,7 @@ namespace FWO.Test
                 .Add(p => p.Items, items)
                 .Add(p => p.OnClose, () => { }));
 
-            cut.FindAll("button.btn.btn-sm.btn-outline-primary").Last().Click();
+            cut.FindAll("button.btn.btn-sm.btn-outline-primary")[^1].Click();
             Assert.That(cut.Markup, Does.Contain("table-warning"));
         }
     }

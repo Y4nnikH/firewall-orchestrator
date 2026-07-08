@@ -792,7 +792,7 @@ else
 
     private List<FlowNwObjectDuplicateGroup> BuildDuplicateGroups()
     {
-        List<FlowNwObjectDuplicateGroup> duplicateGroups = [];
+        List<FlowNwObjectDuplicateGroup> flowNwObjectDuplicateGroups = [];
 
         foreach (FlowNwObject flowObject in flowNwObjects)
         {
@@ -804,7 +804,7 @@ else
                     continue;
                 }
 
-                duplicateGroups.Add(new FlowNwObjectDuplicateGroup
+                flowNwObjectDuplicateGroups.Add(new FlowNwObjectDuplicateGroup
                 {
                     FlowNwObjectId = flowObject.Id,
                     FlowNwObjectName = flowObject.Name ?? "",
@@ -817,11 +817,11 @@ else
             }
         }
 
-        return [.. duplicateGroups
-            .OrderBy(group => group.FlowNwObjectName, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(group => group.ManagementName, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(group => group.FlowNwObjectId)
-            .ThenBy(group => group.ManagementId)];
+        return [.. flowNwObjectDuplicateGroups
+                .OrderBy(group => group.FlowNwObjectName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(group => group.ManagementName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(group => group.FlowNwObjectId)
+                .ThenBy(group => group.ManagementId)];
     }
 
     private string ResolveFlowObjectName(FlowNwObject nwObject, IReadOnlyList<int> preferredManagementRanking, string fallbackName)

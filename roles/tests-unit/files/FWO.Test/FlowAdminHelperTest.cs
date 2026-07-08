@@ -259,7 +259,8 @@ namespace FWO.Test
             List<FlowSvcObjectDuplicateGroup> groups = FlowAdminHelper.BuildDuplicateGroups(flowObjects, managements);
 
             Assert.That(groups, Has.Count.EqualTo(2));
-            Assert.That(groups.Select(group => group.ManagementName), Is.EqualTo(new[] { "mgm-2", "mgm-3" }));
+            Assert.That(groups[0].ManagementName, Is.EqualTo("mgm-2"));
+            Assert.That(groups[1].ManagementName, Is.EqualTo("mgm-3"));
         }
 
         [Test]

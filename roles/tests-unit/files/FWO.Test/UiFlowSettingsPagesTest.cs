@@ -55,13 +55,13 @@ namespace FWO.Test
             IRenderedComponent<SettingsFlowServiceObjects> component = RenderPage<SettingsFlowServiceObjects>(context);
             component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-primary"), Is.Not.Empty));
 
-            component.FindAll("button.btn.btn-sm.btn-primary").First().Click();
+            component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
             component.WaitForAssertion(() => Assert.That(component.FindAll("input.form-control.form-control-sm"), Is.Not.Empty));
 
-            component.FindAll("input.form-control.form-control-sm").First().Change("Custom Service");
-            component.FindAll("button.btn-outline-primary").First().Click();
+            component.FindAll("input.form-control.form-control-sm")[0].Change("Custom Service");
+            component.FindAll("button.btn-outline-primary")[0].Click();
             component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-success"), Is.Not.Empty));
-            component.FindAll("button.btn.btn-sm.btn-primary").Last().Click();
+            component.FindAll("button.btn.btn-sm.btn-primary")[^1].Click();
 
             component.WaitForAssertion(() =>
             {
@@ -93,13 +93,13 @@ namespace FWO.Test
             }));
             component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-primary"), Is.Not.Empty));
 
-            component.FindAll("button.btn.btn-sm.btn-primary").First().Click();
+            component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
             component.WaitForAssertion(() => Assert.That(component.FindAll("input.form-control.form-control-sm"), Is.Not.Empty));
 
-            component.FindAll("input.form-control.form-control-sm").First().Change("Custom Service");
-            component.FindAll("button.btn-outline-primary").First().Click();
-            component.FindAll("button.btn-outline-primary").Last().Click();
-            component.FindAll("button.btn.btn-sm.btn-primary").Last().Click();
+            component.FindAll("input.form-control.form-control-sm")[0].Change("Custom Service");
+            component.FindAll("button.btn-outline-primary")[0].Click();
+            component.FindAll("button.btn-outline-primary")[^1].Click();
+            component.FindAll("button.btn.btn-sm.btn-primary")[^1].Click();
 
             component.WaitForAssertion(() =>
             {
@@ -124,10 +124,10 @@ namespace FWO.Test
             }));
             component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-primary"), Is.Not.Empty));
 
-            component.FindAll("button.btn.btn-sm.btn-primary").First().Click();
+            component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
             component.WaitForAssertion(() => Assert.That(component.FindAll("input.form-control.form-control-sm"), Is.Not.Empty));
 
-            component.FindAll("button.btn.btn-sm.btn-primary").Last().Click();
+            component.FindAll("button.btn.btn-sm.btn-primary")[^1].Click();
 
             component.WaitForAssertion(() =>
             {
@@ -150,11 +150,11 @@ namespace FWO.Test
             }));
             component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-primary"), Is.Not.Empty));
 
-            component.FindAll("button.btn.btn-sm.btn-primary").First().Click();
+            component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
             component.WaitForAssertion(() => Assert.That(component.FindAll("input.form-control.form-control-sm"), Is.Not.Empty));
 
-            component.FindAll("input.form-control.form-control-sm").First().Change("Custom Service");
-            component.FindAll("button.btn.btn-sm.btn-primary").Last().Click();
+            component.FindAll("input.form-control.form-control-sm")[0].Change("Custom Service");
+            component.FindAll("button.btn.btn-sm.btn-primary")[^1].Click();
 
             component.WaitForAssertion(() =>
             {
@@ -177,12 +177,12 @@ namespace FWO.Test
             }));
             component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-primary"), Is.Not.Empty));
 
-            component.FindAll("button.btn.btn-sm.btn-primary").First().Click();
+            component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
             component.WaitForAssertion(() => Assert.That(component.FindAll("input.form-control.form-control-sm"), Is.Not.Empty));
 
-            component.FindAll("input.form-control.form-control-sm").First().Change("Protocol Only");
-            component.FindAll("button.btn-outline-primary").First().Click();
-            component.FindAll("button.btn.btn-sm.btn-primary").Last().Click();
+            component.FindAll("input.form-control.form-control-sm")[0].Change("Protocol Only");
+            component.FindAll("button.btn-outline-primary")[0].Click();
+            component.FindAll("button.btn.btn-sm.btn-primary")[^1].Click();
 
             component.WaitForAssertion(() =>
             {
@@ -210,10 +210,10 @@ namespace FWO.Test
             IRenderedComponent<SettingsFlowServiceObjects> component = RenderPage<SettingsFlowServiceObjects>(context);
             component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-warning"), Is.Not.Empty));
 
-            component.FindAll("button.btn.btn-sm.btn-warning").First().Click();
+            component.FindAll("button.btn.btn-sm.btn-warning")[0].Click();
             component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-outline-primary"), Is.Not.Empty));
-            component.FindAll("button.btn-outline-primary").Last().Click();
-            component.FindAll("button.btn.btn-sm.btn-warning").Last().Click();
+            component.FindAll("button.btn-outline-primary")[^1].Click();
+            component.FindAll("button.btn.btn-sm.btn-warning")[^1].Click();
 
             component.WaitForAssertion(() =>
             {
@@ -268,7 +268,7 @@ namespace FWO.Test
             component.WaitForAssertion(() =>
             {
                 Assert.That(apiConnection.Queries, Does.Contain(FlowQueries.getFlowCustomObjectNamingCandidates));
-                Assert.That(apiConnection.UpdatedFlowObjectNames, Is.EquivalentTo(new[] { "Global Object Name" }));
+                Assert.That(apiConnection.UpdatedFlowObjectNames, Has.Count.EqualTo(1).And.Contains("Global Object Name"));
             });
         }
 
@@ -283,7 +283,7 @@ namespace FWO.Test
 
             component.WaitForAssertion(() =>
             {
-                var saveButton = component.FindAll("button.btn.btn-sm.btn-primary").First();
+                var saveButton = component.FindAll("button.btn.btn-sm.btn-primary")[0];
                 Assert.That(saveButton.InnerHtml, Does.Contain("spinner-border"));
                 Assert.That(saveButton.GetAttribute("disabled"), Is.Not.Null);
             });
@@ -447,7 +447,7 @@ namespace FWO.Test
         private sealed class FlowSettingsPagesAuthStateProvider(params string[] roles) : AuthenticationStateProvider
         {
             private readonly ClaimsPrincipal principal = new(new ClaimsIdentity(
-                roles.Select(role => new Claim(ClaimTypes.Role, role)),
+                Array.ConvertAll(roles, role => new Claim(ClaimTypes.Role, role)),
                 authenticationType: "Test",
                 nameType: ClaimTypes.Name,
                 roleType: ClaimTypes.Role));
