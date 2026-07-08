@@ -39,6 +39,7 @@ CREATE UNIQUE index if not exists only_one_default_owner on owner(is_default) wh
 CREATE UNIQUE index if not exists owner_responsible_owner_dn_type_unique on owner_responsible(owner_id, dn, responsible_type);
 CREATE index if not exists owner_responsible_dn_idx on owner_responsible(dn);
 CREATE UNIQUE index if not exists owner_responsible_type_name_unique on owner_responsible_type(name);
+CREATE UNIQUE INDEX IF NOT EXISTS request_workflow_configuration_single_active ON request.workflow_configuration (is_active) WHERE is_active;
 
 Create index "IX_Relationship68" on "changelog_object" ("control_id");
 Create index "IX_Relationship76" on "changelog_service" ("control_id");
@@ -57,11 +58,9 @@ Create index "IX_relationship24" on "rule" ("track_id");
 Create index "IX_Relationship33" on "service" ("ip_proto_id");
 Create index "IX_Relationship36" on "service" ("svc_typ_id");
 Create index "IX_Relationship37" on "object" ("zone_id");
-Create index "IX_Relationship90" on "rule" ("rule_from_zone");
 Create index "IX_Relationship95" on "rule_from" ("user_id");
 Create index "IX_relationship26" on "rule_from" ("obj_id");
 Create index "IX_relationship28" on "rule_to" ("obj_id");
-Create index "IX_Relationship91" on "rule" ("rule_to_zone");
 
 Create index "IX_Relationship65" on "changelog_object" ("old_obj_id");
 Create index "IX_Relationship66" on "changelog_object" ("new_obj_id");
