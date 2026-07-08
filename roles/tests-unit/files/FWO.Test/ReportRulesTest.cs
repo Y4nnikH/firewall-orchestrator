@@ -9,7 +9,6 @@ using FWO.Test.Mocks;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
-using System.Reflection;
 
 namespace FWO.Test
 {
@@ -104,20 +103,7 @@ namespace FWO.Test
 
             _managementReport = _managementReports.First();
 
-            // Cache manuell fill mit der Reihenfolge: RB2 (initial) zuerst
             _rules = _rb2.Rules.Concat(_rb1.Rules).Concat(_rb3.Rules).ToArray();
-            typeof(ReportRules)
-                .GetField("_rulesCache", BindingFlags.NonPublic | BindingFlags.Static)!
-                .SetValue(null, new Dictionary<(int, int), Rule[]> { [(_deviceReport.Id, _managementReport.Id)] = _rules });
-
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            typeof(ReportRules)
-                .GetField("_rulesCache", BindingFlags.NonPublic | BindingFlags.Static)!
-                .SetValue(null, new Dictionary<(int, int), Rule[]>());
         }
 
         [Test]
@@ -258,11 +244,6 @@ namespace FWO.Test
             var management = new ManagementReport();
             management.Id = 1;
             var rules = new Rule[] { new Rule { Id = 1, RulebaseId = 1 } };
-
-            // Cache manuell setzen
-            typeof(ReportRules)
-                .GetField("_rulesCache", BindingFlags.NonPublic | BindingFlags.Static)!
-                .SetValue(null, new Dictionary<(int, int), Rule[]> { [(device.Id, management.Id)] = rules });
 
             RuleTreeBuilder ruleTreeBuilder = new RuleTreeBuilder();
             ruleTreeBuilder.RuleTreeCache[(management.Id, device.Id)] = ruleTreeBuilder.RuleTree;
