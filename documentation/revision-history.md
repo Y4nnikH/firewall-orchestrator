@@ -536,6 +536,9 @@ This PR hardens FWO installation and security-sensitive workflows. It restricts 
 ## 9.1.15 - 06.07.2026
 - make offered protocols configurable
 
+## 9.1.16 - 06.07.2026
+- move workflow state matrices to own database tables
+
 ## 9.1.17 - 08.07.2026
 - credentials field in management for writing on Firewalls
 - migrate old Tufin template to list entry
