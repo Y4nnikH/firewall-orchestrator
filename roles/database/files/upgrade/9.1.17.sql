@@ -4,6 +4,7 @@ DO $$
 DECLARE
     rec RECORD;
     migrated_value text;
+    max_existing_id integer;
 BEGIN
     FOR rec IN
         SELECT config_user, config_value
@@ -12,6 +13,13 @@ BEGIN
           AND config_value IS NOT NULL
           AND config_value <> ''
     LOOP
+        SELECT COALESCE(MAX((elem->>'Id')::int), 0)
+        INTO max_existing_id
+        FROM jsonb_array_elements(rec.config_value::jsonb) AS elem
+        WHERE jsonb_typeof(elem) = 'object'
+          AND COALESCE(elem->>'Id', '') ~ '^\d+$'
+          AND (elem->>'Id')::int > 0;
+
         SELECT jsonb_agg(
             CASE
                 WHEN jsonb_typeof(elem) = 'object' THEN
@@ -19,34 +27,35 @@ BEGIN
                         elem
                         - 'ExternalTicketSystemType'
                         ||
-                    CASE
-                        WHEN elem ? 'TypeId' THEN
-                            '{}'::jsonb
-                        WHEN elem ? 'ExternalTicketSystemType' THEN
-                            jsonb_build_object(
-                                'TypeId',
-                                CASE (elem->>'ExternalTicketSystemType')::int
-                                    WHEN 0 THEN 1
-                                    WHEN 1 THEN 2
-                                    WHEN 2 THEN 3
-                                    WHEN 3 THEN 4
-                                    ELSE 1
-                                END
-                            )
-                        WHEN COALESCE(elem->>'TicketTemplate', '') <> ''
-                          OR COALESCE(elem->>'TasksTemplate', '') <> '' THEN
-                            jsonb_build_object('TypeId', 2)
-                        ELSE
-                            '{}'::jsonb
-                    END
-                    ||
-                    CASE
-                        WHEN COALESCE(elem->>'Id', '') <> '' AND elem->>'Id' <> '0' THEN
-                            '{}'::jsonb
-                        ELSE
-                            jsonb_build_object('Id', ordinality)
-                    END
-                    ||
+                        CASE
+                            WHEN elem ? 'TypeId' THEN
+                                '{}'::jsonb
+                            WHEN elem ? 'ExternalTicketSystemType' THEN
+                                jsonb_build_object(
+                                    'TypeId',
+                                    CASE (elem->>'ExternalTicketSystemType')::int
+                                        WHEN 0 THEN 1
+                                        WHEN 1 THEN 2
+                                        WHEN 2 THEN 3
+                                        WHEN 3 THEN 4
+                                        ELSE 1
+                                    END
+                                )
+                            WHEN COALESCE(elem->>'TicketTemplate', '') <> ''
+                              OR COALESCE(elem->>'TasksTemplate', '') <> '' THEN
+                                jsonb_build_object('TypeId', 2)
+                            ELSE
+                                '{}'::jsonb
+                        END
+                        ||
+                        CASE
+                            WHEN COALESCE(elem->>'Id', '') ~ '^\d+$'
+                                 AND (elem->>'Id')::int > 0 THEN
+                                '{}'::jsonb
+                            ELSE
+                                jsonb_build_object('Id', max_existing_id + ordinality)
+                        END
+                        ||
                         CASE
                             WHEN COALESCE(elem->>'Name', '') <> '' THEN
                                 '{}'::jsonb
