@@ -435,7 +435,7 @@ namespace FWO.ExternalSystems.CheckPoint
 
         private ExternalTicketTemplate? GetTemplate(string taskType)
         {
-            return TicketSystem.Templates.FirstOrDefault(template => template.TaskType == taskType); //group create, template Networkmodify / immer fallback nutzen
+            return TicketSystem.Templates.FirstOrDefault(template => template.TaskType == taskType);
         }
 
         private string RenderTemplate(string template, WfReqTask? reqTask)

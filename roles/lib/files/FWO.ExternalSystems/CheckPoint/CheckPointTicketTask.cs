@@ -46,11 +46,19 @@ namespace FWO.ExternalSystems.CheckPoint
                 .Replace(Placeholder.MANAGEMENT_NAME, managementName)
                 .Replace(Placeholder.MEMBERS, "[]");
 
-            if (!string.IsNullOrWhiteSpace(TaskText))
+            if (string.IsNullOrWhiteSpace(TaskText))
             {
-                TaskBody = JsonNode.Parse(TaskText) ?? throw new ConfigException("TaskText could not be parsed into valid JSON.");
+                throw new ConfigException("Template error. Empty Check Point task template.");
             }
 
+            try
+            {
+                TaskBody = JsonNode.Parse(TaskText) ?? throw new ConfigException("Template error. Rendered Check Point task body is null.");
+            }
+            catch (JsonException exception)
+            {
+                throw new ConfigException("Template error. Invalid Check Point task JSON.", exception);
+            }
         }
 
         private string MapActionType()

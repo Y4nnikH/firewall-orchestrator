@@ -12,7 +12,6 @@ namespace FWO.ExternalSystems.CheckPoint
 {
     public class CheckPointClient : RestApiClient
     {
-        private readonly ExternalTicketSystem TicketSystem;
         private readonly Management Management;
 
         private string? SessionId;
@@ -21,7 +20,6 @@ namespace FWO.ExternalSystems.CheckPoint
         public CheckPointClient(ExternalTicketSystem ticketSystem, Management management)
             : base(BuildBaseUrl(ticketSystem, management), ticketSystem.ResponseTimeout)
         {
-            TicketSystem = ticketSystem;
             Management = management;
         }
 
@@ -159,20 +157,12 @@ namespace FWO.ExternalSystems.CheckPoint
 
         private void AddAuthHeader(RestRequest request)
         {
-            if (!string.IsNullOrWhiteSpace(SessionId))
+            if (string.IsNullOrWhiteSpace(SessionId))
             {
-                request.AddHeader("X-chkp-sid", SessionId);
-                return;
+                throw new ProcessingFailedException("CheckPoint session missing.");
             }
 
-            var auth = TicketSystem.Authorization;
-
-            if (string.IsNullOrWhiteSpace(auth))
-            {
-                return;
-            }
-
-            request.AddHeader("Authorization", auth.Trim());
+            request.AddHeader("X-chkp-sid", SessionId);
         }
 
         // =========================================================
