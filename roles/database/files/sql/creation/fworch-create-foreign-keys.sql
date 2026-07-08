@@ -57,20 +57,35 @@ Alter table "ldap_connection" add foreign key ("tenant_id") references "tenant" 
 Alter table "management" add  foreign key ("dev_typ_id") references "stm_dev_typ" ("dev_typ_id") on update restrict on delete cascade;
 ALTER TABLE "management" ADD CONSTRAINT management_multi_device_manager_id_fkey FOREIGN KEY ("multi_device_manager_id") REFERENCES "management" ("mgm_id") ON UPDATE RESTRICT;
 ALTER TABLE "management" ADD CONSTRAINT management_import_credential_id_foreign_key FOREIGN KEY (import_credential_id) REFERENCES import_credential(id) ON UPDATE RESTRICT ON DELETE CASCADE;
-Alter table firewall."nw_object" add  foreign key ("last_change_admin") references "uiuser" ("uiuser_id") on update restrict on delete cascade;
-Alter table firewall."nw_object" add  foreign key ("mgm_id") references "management" ("mgm_id") on update restrict on delete cascade;
-Alter table firewall."nw_object" add  foreign key ("obj_color_id") references "stm_color" ("color_id") on update restrict on delete cascade;
-Alter table firewall."nw_object" add  foreign key ("obj_create") references "import_control" ("control_id") on update restrict on delete cascade;
-Alter table firewall."nw_object" add  foreign key ("obj_nat_install") references "device" ("dev_id") on update restrict on delete cascade;
-Alter table firewall."nw_object" add  foreign key ("obj_typ_id") references "stm_obj_typ" ("obj_typ_id") on update restrict on delete cascade;
-Alter table firewall."nw_object" add  foreign key ("zone_id") references "zone" ("zone_id") on update restrict on delete cascade;
-Alter table firewall."nw_object" add constraint "flow_nwobj_id_foreign_key" foreign key ("flow_nwobj_id") references "flow"."nwobject" ("nwobj_id") on update restrict on delete set null;
-Alter table firewall."nw_object" add constraint "flow_nwgrp_id_foreign_key" foreign key ("flow_nwgrp_id") references "flow"."nwgroup" ("nwgrp_id") on update restrict on delete set null;
-Alter table firewall."nw_object_group" add  foreign key ("import_created") references "import_control" ("control_id") on update restrict on delete cascade;
-Alter table firewall."nw_object_group" add  foreign key ("objgrp_id") references firewall."nw_object" ("obj_id") on update restrict on delete cascade;
-Alter table firewall."nw_object_group" add  foreign key ("objgrp_member_id") references firewall."nw_object" ("obj_id") on update restrict on delete cascade;
-Alter table "objgrp_flat" add  foreign key ("import_created") references "import_control" ("control_id") on update restrict on delete cascade;
-Alter table "objgrp_flat" add  foreign key ("objgrp_flat_id") references firewall."nw_object" ("obj_id") on update restrict on delete cascade;
+ALTER TABLE "management" ADD CONSTRAINT management_export_credential_id_foreign_key FOREIGN KEY ("export_credential_id") REFERENCES import_credential(id)ON UPDATE RESTRICT ON DELETE SET NULL;
+Alter table firewall."nw_object"
+add foreign key ("last_change_admin") references "uiuser" ("uiuser_id") on update restrict on delete cascade;
+Alter table firewall."nw_object"
+add foreign key ("mgm_id") references "management" ("mgm_id") on update restrict on delete cascade;
+Alter table firewall."nw_object"
+    add foreign key ("obj_color_id") references "stm_color" ("color_id") on update restrict on delete cascade;
+Alter table firewall."nw_object"
+    add foreign key ("obj_create") references "import_control" ("control_id") on update restrict on delete cascade;
+Alter table firewall."nw_object"
+    add foreign key ("obj_typ_id") references "stm_obj_typ" ("obj_typ_id") on update restrict on delete cascade;
+Alter table firewall."nw_object"
+    add foreign key ("zone_id") references "zone" ("zone_id") on update restrict on delete cascade;
+Alter table firewall."nw_object"
+    add constraint "flow_nwobj_id_foreign_key" foreign key ("flow_nwobj_id") references "flow"."nwobject" ("nwobj_id") on update restrict on delete set null;
+Alter table firewall."nw_object"
+    add constraint "flow_nwgrp_id_foreign_key" foreign key ("flow_nwgrp_id") references "flow"."nwgroup" ("nwgrp_id") on update restrict on delete set null;
+Alter table firewall."nw_object_group"
+    add foreign key ("import_created") references "import_control" ("control_id") on update restrict on delete cascade;
+Alter table firewall."nw_object_group"
+    add foreign key ("objgrp_id") references firewall."nw_object" ("obj_id") on update restrict on delete cascade;
+Alter table firewall."nw_object_group"
+    add foreign key ("objgrp_member_id") references firewall."nw_object" ("obj_id") on update restrict on delete cascade;
+Alter table firewall."nw_object"
+    add foreign key ("obj_nat_install") references "device" ("dev_id") on update restrict on delete cascade;
+Alter table "objgrp_flat"
+    add foreign key ("import_created") references "import_control" ("control_id") on update restrict on delete cascade;
+Alter table "objgrp_flat"
+    add foreign key ("objgrp_flat_id") references firewall."nw_object" ("obj_id") on update restrict on delete cascade;
 Alter table "objgrp_flat" add  foreign key ("objgrp_flat_member_id") references firewall."nw_object" ("obj_id") on update restrict on delete cascade;
 Alter table "report" add foreign key ("report_template_id") references "report_template" ("report_template_id") on update restrict on delete cascade;
 Alter table "report" add foreign key ("report_owner_id") references "uiuser" ("uiuser_id") on update restrict on delete cascade;
