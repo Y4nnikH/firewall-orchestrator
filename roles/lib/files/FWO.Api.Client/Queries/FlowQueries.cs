@@ -77,7 +77,7 @@ namespace FWO.Api.Client.Queries
                 getFlowCustomObjectCandidates =
                     GetQueryText("flow/getFlowCustomObjectCandidates.graphql");
                 getFlowCustomObjectNamingCandidates =
-                    GetQueryText("flow/getFlowCustomObjectNamingCandidates_management.graphql");
+                    GetQueryText("flow/getFlowCustomObjectNamingCandidates.graphql");
                 getFlowCustomServiceCandidates =
                     GetQueryText("flow/getFlowCustomServiceCandidates.graphql");
                 getFlowCustomTimeObjectCandidates =
