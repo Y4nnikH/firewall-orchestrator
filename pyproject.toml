@@ -138,3 +138,13 @@ pythonpath = [
     "roles/importer/files/importer",
     "roles/importer/files/importer/test",
 ]
+
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = [
+    "roles/importer/files/importer",
+]
+omit = [
+    "roles/importer/files/importer/test/*",
+]
