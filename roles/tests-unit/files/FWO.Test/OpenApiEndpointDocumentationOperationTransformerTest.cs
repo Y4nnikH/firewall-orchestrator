@@ -41,12 +41,48 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
         Assert.Multiple(() =>
         {
             Assert.That(operation.Description, Does.Contain("Request body examples"));
-            Assert.That(operation.Description, Does.Contain("\"showDetails\":true"));
+            Assert.That(operation.Description, Does.Contain("```json"));
+            Assert.That(operation.Description, Does.Contain("\"showDetails\": true"));
             Assert.That(operation.Description, Does.Contain("Response behavior"));
             Assert.That(operation.Description, Does.Contain(GetMaxFilterTextLength().ToString()));
             Assert.That(operation.RequestBody!.Description, Does.Contain("Optional owner lookup filters"));
             Assert.That(operation.Responses!["200"].Description, Does.Contain("JSON array"));
             Assert.That(operation.Responses["400"].Description, Does.Contain("unsupported property"));
+        });
+    }
+
+    /// <summary>
+    /// Verifies owner documentation examples are rendered as readable JSON code blocks.
+    /// </summary>
+    [Test]
+    public async Task TransformAsync_WithOwnerEndpoint_RendersFormattedJsonExamples()
+    {
+        OpenApiOperation operation = CreateOperation();
+        OpenApiApiExampleOperationTransformer transformer = CreateTransformer();
+
+        await transformer.TransformAsync(operation, CreateOwnerContext(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(operation.Description, Does.Contain("""
+```json
+{
+  "ownerLifecycleStateId": 1,
+  "active": true
+}
+```
+"""));
+            Assert.That(operation.Description, Does.Contain("""
+```json
+[
+  {
+    "id": 42,
+    "name": "Finance Portal",
+    "appIdExternal": "APP-4711",
+    "type": "standard",
+"""));
+            Assert.That(operation.Description, Does.Not.Contain("{\"active\":true"));
+            Assert.That(operation.Description, Does.Not.Contain("{\"id\":42"));
         });
     }
 

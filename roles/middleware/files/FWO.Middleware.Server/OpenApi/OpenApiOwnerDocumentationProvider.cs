@@ -1,7 +1,12 @@
 using FWO.Middleware.Server.Controllers;
+using FWO.Middleware.Server.Requests;
+using FWO.Middleware.Server.Responses;
+using FWO.Data;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.OpenApi;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace FWO.Middleware.Server.OpenApi;
 
@@ -11,6 +16,7 @@ namespace FWO.Middleware.Server.OpenApi;
 public sealed class OpenApiOwnerDocumentationProvider : IOpenApiEndpointDocumentationProvider
 {
     private const string kOwnerEndpointPath = "api/owners/get";
+    private static readonly JsonSerializerOptions DocumentationJsonSerializerOptions = CreateDocumentationJsonSerializerOptions();
 
     /// <inheritdoc />
     public bool Matches(ApiDescription description)
@@ -49,7 +55,7 @@ public sealed class OpenApiOwnerDocumentationProvider : IOpenApiEndpointDocument
         }
     }
 
-    private static readonly string OwnerEndpointDescription = $$"""
+    private static string OwnerEndpointDescription => $$"""
 Returns owners visible to the authenticated caller. Use this endpoint when external systems need owner metadata, owner lifecycle state, or the detailed owner fields used by modelling and recertification workflows.
 
 Requires one of the roles `admin`, `auditor`, or `modeller`. `modeller` callers only receive owners listed in their `x-hasura-editable-owners` JWT claim. `admin` and `auditor` callers are not restricted by that claim.
@@ -58,25 +64,11 @@ All request fields are optional and filters are combined with logical AND. Unkno
 
 Request body examples:
 
-```json
-{}
-```
+{{CreateJsonCodeBlocks(CreateOwnerRequestExamples())}}
 
-```json
-{"active":true,"ownerLifecycleStateId":1}
-```
+Response example:
 
-```json
-{"ownerId":42}
-```
-
-```json
-{"name":"Finance*","appIdExternal":"APP-?"}
-```
-
-```json
-{"showDetails":true}
-```
+{{CreateJsonCodeBlock(CreateOwnerResponseExamples())}}
 
 Field behavior:
 
@@ -100,4 +92,80 @@ Response behavior:
     private const string OwnerRequestDescription = """
 Optional owner lookup filters. Submit `{}` or an empty body to use the default filter behavior. Set `showDetails` to `true` to return the complete owner response shape.
 """;
+
+    private static JsonSerializerOptions CreateDocumentationJsonSerializerOptions()
+    {
+        JsonSerializerOptions options = ApiDocumentationJsonOptions.CreateSerializerOptions();
+        options.WriteIndented = true;
+        options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        return options;
+    }
+
+    private static List<GetOwnersRequest> CreateOwnerRequestExamples()
+    {
+        return
+        [
+            new(),
+            new()
+            {
+                Active = true,
+                OwnerLifeCycleStateId = 1
+            },
+            new()
+            {
+                OwnerId = 42
+            },
+            new()
+            {
+                Name = "Finance*",
+                AppIdExternal = "APP-?"
+            },
+            new()
+            {
+                ShowDetails = true
+            }
+        ];
+    }
+
+    private static List<GetOwnerResponse> CreateOwnerResponseExamples()
+    {
+        return
+        [
+            OwnersController.ToResponse(
+                new FwoOwner
+                {
+                    Id = 42,
+                    Name = "Finance Portal",
+                    ExtAppId = "APP-4711",
+                    OwnerLifeCycleState = new OwnerLifeCycleState
+                    {
+                        Id = 1,
+                        Name = "Active"
+                    }
+                },
+                false),
+            OwnersController.ToResponse(
+                new FwoOwner
+                {
+                    Id = 43,
+                    Name = "Finance Network",
+                    ExtAppId = "NET-4712"
+                },
+                false)
+        ];
+    }
+
+    private static string CreateJsonCodeBlocks(IEnumerable<object> examples)
+    {
+        return string.Join(Environment.NewLine + Environment.NewLine, examples.Select(CreateJsonCodeBlock));
+    }
+
+    private static string CreateJsonCodeBlock(object example)
+    {
+        return $"""
+```json
+{JsonSerializer.Serialize(example, DocumentationJsonSerializerOptions)}
+```
+""";
+    }
 }
