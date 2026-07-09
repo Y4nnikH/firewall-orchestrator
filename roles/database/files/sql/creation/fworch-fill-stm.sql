@@ -516,9 +516,9 @@ insert into stm_dev_typ (dev_typ_id,dev_typ_name,dev_typ_version,dev_typ_manufac
 insert into stm_dev_typ (dev_typ_id,dev_typ_name,dev_typ_version,dev_typ_manufacturer,dev_typ_predef_svc,dev_typ_is_multi_mgmt,dev_typ_is_mgmt,is_pure_routing_device)
     VALUES (29,'Cisco Asa on FirePower','9','Cisco','',false,true,false);
 insert into stm_dev_typ (dev_typ_id,dev_typ_name,dev_typ_version,dev_typ_manufacturer,dev_typ_predef_svc,dev_typ_is_multi_mgmt,dev_typ_is_mgmt,is_pure_routing_device)
-    VALUES (30, 'Generic Firewall Management', '', null, '', false, true, false);
+    VALUES (30, 'Generic Firewall Management', '1.0', null, '', false, true, false);
 insert into stm_dev_typ (dev_typ_id,dev_typ_name,dev_typ_version,dev_typ_manufacturer,dev_typ_predef_svc,dev_typ_is_multi_mgmt,dev_typ_is_mgmt,is_pure_routing_device)
-    VALUES (31, 'Generic Firewall Gateway', '', null, '', false, false, false);
+    VALUES (31, 'Generic Firewall Gateway', '1.0', null, '', false, false, false);
 
 -- SET statement_timeout = 0;
 -- SET client_encoding = 'UTF8';

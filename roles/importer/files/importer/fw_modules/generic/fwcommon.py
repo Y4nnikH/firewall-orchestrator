@@ -18,6 +18,6 @@ def get_config(
     FWOLogger.debug("starting generic/get_config")
 
     if config_in.has_empty_config() or config_in.contains_only_native():
-        FWOLogger.error("Generic firewall import requires a normalized config as input.")
+        raise ValueError("Generic firewall import requires a normalized config as input.")
 
     return 0, config_in
