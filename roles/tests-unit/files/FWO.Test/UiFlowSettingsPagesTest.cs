@@ -45,8 +45,9 @@ namespace FWO.Test
 
             component.WaitForAssertion(() =>
             {
-                var objectsCell = component.FindAll("table").Last()
-                    .QuerySelectorAll("tbody tr").Single()
+                var tables = component.FindAll("table");
+                var objectsCell = tables[tables.Count - 1]
+                    .QuerySelectorAll("tbody tr")[0]
                     .Children[5];
 
                 Assert.That(objectsCell.TextContent.Trim(), Is.EqualTo("2"));
