@@ -53,6 +53,7 @@ Alter table "ldap_connection" add foreign key ("tenant_id") references "tenant" 
 Alter table "management" add  foreign key ("dev_typ_id") references "stm_dev_typ" ("dev_typ_id") on update restrict on delete cascade;
 ALTER TABLE "management" ADD CONSTRAINT management_multi_device_manager_id_fkey FOREIGN KEY ("multi_device_manager_id") REFERENCES "management" ("mgm_id") ON UPDATE RESTRICT;
 ALTER TABLE "management" ADD CONSTRAINT management_import_credential_id_foreign_key FOREIGN KEY (import_credential_id) REFERENCES import_credential(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+ALTER TABLE "management" ADD CONSTRAINT management_export_credential_id_foreign_key FOREIGN KEY ("export_credential_id") REFERENCES import_credential(id)ON UPDATE RESTRICT ON DELETE SET NULL;
 Alter table "object" add  foreign key ("last_change_admin") references "uiuser" ("uiuser_id") on update restrict on delete cascade;
 Alter table "object" add  foreign key ("mgm_id") references "management" ("mgm_id") on update restrict on delete cascade;
 Alter table "object" add  foreign key ("obj_color_id") references "stm_color" ("color_id") on update restrict on delete cascade;
@@ -285,6 +286,19 @@ ALTER TABLE request.impltask_comment ADD CONSTRAINT request_impltask_comment_com
 --- state_action ---
 ALTER TABLE request.state_action ADD CONSTRAINT request_state_action_state_foreign_key FOREIGN KEY (state_id) REFERENCES request.state(id) ON UPDATE RESTRICT ON DELETE CASCADE;
 ALTER TABLE request.state_action ADD CONSTRAINT request_state_action_action_foreign_key FOREIGN KEY (action_id) REFERENCES request.action(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+--- state_matrix ---
+ALTER TABLE request.workflow_configuration_phase ADD CONSTRAINT request_workflow_configuration_phase_configuration_foreign_key FOREIGN KEY (configuration_id) REFERENCES request.workflow_configuration(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+ALTER TABLE request.workflow_configuration_phase ADD CONSTRAINT request_workflow_configuration_phase_phase_foreign_key FOREIGN KEY (phase_matrix_id) REFERENCES request.state_matrix_phase(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+ALTER TABLE request.workflow_visibility_group_member ADD CONSTRAINT request_workflow_visibility_group_member_group_foreign_key FOREIGN KEY (visibility_group_id) REFERENCES request.workflow_visibility_group(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+ALTER TABLE request.state_matrix_transition_group ADD CONSTRAINT request_state_matrix_transition_group_visibility_group_foreign_key FOREIGN KEY (visibility_group_id) REFERENCES request.workflow_visibility_group(id) ON UPDATE RESTRICT ON DELETE SET NULL;
+ALTER TABLE request.state_matrix_phase_transition_group ADD CONSTRAINT request_state_matrix_phase_transition_group_phase_foreign_key FOREIGN KEY (phase_matrix_id) REFERENCES request.state_matrix_phase(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+ALTER TABLE request.state_matrix_phase_transition_group ADD CONSTRAINT request_state_matrix_phase_transition_group_group_foreign_key FOREIGN KEY (transition_group_id) REFERENCES request.state_matrix_transition_group(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+ALTER TABLE request.state_matrix_transition ADD CONSTRAINT request_state_matrix_transition_group_foreign_key FOREIGN KEY (transition_group_id) REFERENCES request.state_matrix_transition_group(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+ALTER TABLE request.state_matrix_transition ADD CONSTRAINT request_state_matrix_transition_from_state_foreign_key FOREIGN KEY (from_state_id) REFERENCES request.state(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+ALTER TABLE request.state_matrix_transition ADD CONSTRAINT request_state_matrix_transition_to_state_foreign_key FOREIGN KEY (to_state_id) REFERENCES request.state(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+ALTER TABLE request.state_matrix_derived_state ADD CONSTRAINT request_state_matrix_derived_state_phase_foreign_key FOREIGN KEY (phase_matrix_id) REFERENCES request.state_matrix_phase(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+ALTER TABLE request.state_matrix_derived_state ADD CONSTRAINT request_state_matrix_derived_state_from_state_foreign_key FOREIGN KEY (from_state_id) REFERENCES request.state(id) ON UPDATE RESTRICT ON DELETE CASCADE;
+ALTER TABLE request.state_matrix_derived_state ADD CONSTRAINT request_state_matrix_derived_state_derived_state_foreign_key FOREIGN KEY (derived_state_id) REFERENCES request.state(id) ON UPDATE RESTRICT ON DELETE CASCADE;
 --- ext_state ---
 ALTER TABLE request.ext_state ADD CONSTRAINT request_ext_state_state_foreign_key FOREIGN KEY (state_id) REFERENCES request.state(id) ON UPDATE RESTRICT ON DELETE CASCADE;
 --- request.implelement ---

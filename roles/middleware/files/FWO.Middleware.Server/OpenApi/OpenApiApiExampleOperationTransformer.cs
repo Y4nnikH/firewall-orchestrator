@@ -1,36 +1,54 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
-using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace FWO.Middleware.Server.OpenApi;
 
 /// <summary>
-/// Adapts FWO-owned API examples to Swashbuckle's OpenAPI document model.
+/// Adapts FWO-owned API examples to the built-in OpenAPI document model.
 /// </summary>
-public sealed class SwashbuckleApiExampleOperationFilter : IOperationFilter
+public sealed class OpenApiApiExampleOperationTransformer : IOpenApiOperationTransformer
 {
     private readonly ApiExampleCatalog catalog;
     private readonly JsonSerializerOptions jsonSerializerOptions;
+    private readonly List<IOpenApiEndpointDocumentationProvider> documentationProviders;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="SwashbuckleApiExampleOperationFilter"/> class.
+    /// Initializes a new instance of the <see cref="OpenApiApiExampleOperationTransformer"/> class.
     /// </summary>
-    public SwashbuckleApiExampleOperationFilter(ApiExampleCatalog catalog, IOptions<JsonOptions> jsonOptions)
+    public OpenApiApiExampleOperationTransformer(
+        ApiExampleCatalog catalog,
+        IOptions<JsonOptions> jsonOptions,
+        IEnumerable<IOpenApiEndpointDocumentationProvider> documentationProviders)
     {
         this.catalog = catalog;
         jsonSerializerOptions = jsonOptions.Value.JsonSerializerOptions;
+        this.documentationProviders = documentationProviders.ToList();
     }
 
     /// <inheritdoc />
-    public void Apply(OpenApiOperation operation, OperationFilterContext context)
+    public Task TransformAsync(OpenApiOperation operation, OpenApiOperationTransformerContext context, CancellationToken cancellationToken)
     {
-        ApplyRequestExample(operation, context.ApiDescription);
-        ApplyResponseExamples(operation, context.ApiDescription);
+        ApplyEndpointDocumentation(operation, context.Description);
+        ApplyRequestExample(operation, context.Description);
+        ApplyResponseExamples(operation, context.Description);
+        return Task.CompletedTask;
+    }
+
+    private void ApplyEndpointDocumentation(OpenApiOperation operation, ApiDescription apiDescription)
+    {
+        foreach (IOpenApiEndpointDocumentationProvider provider in documentationProviders)
+        {
+            if (provider.Matches(apiDescription))
+            {
+                provider.Apply(operation);
+            }
+        }
     }
 
     private void ApplyRequestExample(OpenApiOperation operation, ApiDescription apiDescription)
