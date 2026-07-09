@@ -23,6 +23,7 @@ namespace FWO.Test
             Assert.That(FlowMutations.updateFlowSvcGroup, Does.Contain("mutation updateFlowSvcGroup"));
             Assert.That(FlowMutations.updateFlowSvcObject, Does.Contain("mutation updateFlowSvcObject"));
             Assert.That(FlowMutations.upsertFlowTimeObjectMapping, Does.Contain("mutation upsertFlowTimeObjectMapping"));
+            Assert.That(FlowMutations.upsertFlowTimeObjectMapping, Does.Not.Contain("\n    active\n"));
             Assert.That(FlowMutations.updateFlowTimeObject, Does.Contain("mutation updateFlowTimeObject"));
         }
 

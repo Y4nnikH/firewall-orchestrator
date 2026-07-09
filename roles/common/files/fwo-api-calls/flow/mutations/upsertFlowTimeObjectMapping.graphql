@@ -15,7 +15,6 @@ mutation upsertFlowTimeObjectMapping(
     time_obj_uid
     start_time
     end_time
-    active
     removed
     flow_timeobj_id
     flow_active

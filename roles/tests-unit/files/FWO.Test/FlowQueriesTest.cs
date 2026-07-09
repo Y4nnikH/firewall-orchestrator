@@ -13,6 +13,7 @@ namespace FWO.Test
             Assert.That(FlowQueries.getFlowCustomObjectCandidates, Does.Contain("networkObjects: objects"));
             Assert.That(FlowQueries.getFlowCustomObjectCandidates, Does.Contain("obj_uid"));
             Assert.That(FlowQueries.getFlowCustomObjectCandidates, Does.Contain("flow_nwobj_id"));
+            Assert.That(FlowQueries.getFlowCustomObjectCandidates, Does.Contain("flow_nwgrp_id"));
             Assert.That(FlowQueries.getFlowCustomObjectCandidates, Does.Contain("flow_active"));
             Assert.That(FlowQueries.getFlowCustomObjectCandidates, Does.Contain("type: stm_obj_typ"));
         }
