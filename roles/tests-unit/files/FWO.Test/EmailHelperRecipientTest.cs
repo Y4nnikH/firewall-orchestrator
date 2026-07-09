@@ -12,6 +12,23 @@ namespace FWO.Test
     [TestFixture]
     public class EmailHelperRecipientTest
     {
+        private static readonly string[] kDummyRecipients = ["dummy@example.test"];
+        private static readonly string[] kOtherRecipients = ["a@test", "b@test"];
+        private static readonly string[] kMainRecipients = ["main@example.test"];
+        private static readonly string[] kSupportRecipients = ["support@example.test"];
+        private static readonly string[] kOtherPlusExtraRecipients = ["other@test", "dup@test", "extra@test"];
+        private static readonly string[] kCurrentRecipients = ["current@example.test"];
+        private static readonly string[] kKnownRecipients = ["known@example.test"];
+        private static readonly string[] kOwnerRecipients = ["owner@example.test"];
+        private static readonly string[] kSplitRecipients = ["a@test", "b@test", "c@test"];
+        private static readonly string[] kResolvedDns = ["cn=alice,dc=test", "cn=bob,dc=test", "cn=external,dc=test"];
+        private static readonly string[] kOverrideRecipients = ["override@example.test"];
+        private static readonly string[] kScopedRecipients = ["scoped@example.test"];
+        private static readonly int[] kNotificationIds = [7, 9];
+        private static readonly string[] kResolverDns = ["cn=existing,dc=test", "cn=fresh,dc=test"];
+        private static readonly string[] kOwnerGroupDns = ["cn=network-team,dc=test", "cn=external,dc=test"];
+        private static readonly string[] kResolvedRecipients = ["new@example.test", "fresh@example.test"];
+
         private static EmailHelper CreateEmailHelper(List<UserGroup>? ownerGroups = null, bool useDummyEmailAddress = true,
             IWorkflowRecipientResolver? recipientResolver = null)
         {
@@ -38,7 +55,7 @@ namespace FWO.Test
                 null,
                 null);
 
-            Assert.That(recipients, Is.EqualTo(new[] { "dummy@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kDummyRecipients));
         }
 
         [Test]
@@ -52,7 +69,7 @@ namespace FWO.Test
                 null,
                 ["a@test", "b@test"]);
 
-            Assert.That(recipients, Is.EqualTo(new[] { "dummy@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kDummyRecipients));
         }
 
         [Test]
@@ -66,7 +83,7 @@ namespace FWO.Test
                 null,
                 ["a@test", "b@test"]);
 
-            Assert.That(recipients, Is.EquivalentTo(new[] { "a@test", "b@test" }));
+            Assert.That(recipients, Is.EquivalentTo(kOtherRecipients));
         }
 
         [Test]
@@ -82,7 +99,7 @@ namespace FWO.Test
 
             List<string> recipients = await helper.GetRecipients(selection, null, ["legacy@test"]);
 
-            Assert.That(recipients, Is.EqualTo(new[] { "dummy@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kDummyRecipients));
         }
 
         [Test]
@@ -98,7 +115,7 @@ namespace FWO.Test
 
             List<string> recipients = await helper.GetRecipients(selection.ToConfigValue(), null, []);
 
-            Assert.That(recipients, Is.EqualTo(new[] { "dummy@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kDummyRecipients));
         }
 
         [Test]
@@ -116,7 +133,7 @@ namespace FWO.Test
 
             List<string> recipients = await helper.GetRecipients(selection, owner, null);
 
-            Assert.That(recipients, Is.EqualTo(new[] { "dummy@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kDummyRecipients));
         }
 
         [Test]
@@ -163,7 +180,7 @@ namespace FWO.Test
 
             List<string> recipients = await helper.GetRecipients(nameof(EmailRecipientOption.OwnerMainResponsible), owner, null);
 
-            Assert.That(recipients, Is.EqualTo(new[] { "main@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kMainRecipients));
         }
 
         [Test]
@@ -194,7 +211,7 @@ namespace FWO.Test
 
             List<string> recipients = await helper.GetRecipients(selection, owner, ["dup@test", "extra@test"]);
 
-            Assert.That(recipients, Is.EquivalentTo(new[] { "other@test", "dup@test", "extra@test" }));
+            Assert.That(recipients, Is.EquivalentTo(kOtherPlusExtraRecipients));
 
             EmailRecipientSelection fallbackSelection = new()
             {
@@ -204,7 +221,7 @@ namespace FWO.Test
 
             List<string> fallbackRecipients = await helper.GetRecipients(fallbackSelection, owner, null);
 
-            Assert.That(fallbackRecipients, Is.EqualTo(new[] { "support@example.test" }));
+            Assert.That(fallbackRecipients, Is.EqualTo(kSupportRecipients));
         }
 
         [Test]
@@ -232,8 +249,8 @@ namespace FWO.Test
                 null,
                 null);
 
-            Assert.That(explicitRecipients, Is.EqualTo(new[] { "override@example.test" }));
-            Assert.That(fallbackRecipients, Is.EqualTo(new[] { "scoped@example.test" }));
+            Assert.That(explicitRecipients, Is.EqualTo(kOverrideRecipients));
+            Assert.That(fallbackRecipients, Is.EqualTo(kScopedRecipients));
         }
 
         [Test]
@@ -245,10 +262,10 @@ namespace FWO.Test
             EmailHelper helper = CreateEmailHelper(useDummyEmailAddress: false, recipientResolver: new StaticWorkflowRecipientResolver([resolvedUser, freshUser]));
             SetPrivateField(helper, "uiUsers", new List<UiUser> { existingUser });
 
-            List<string> recipients = await InvokePrivateAsync<List<string>>(helper, "CollectEmailAddressesFromResolver", new object?[] { new[] { existingUser.Dn, freshUser.Dn } });
+            List<string> recipients = await InvokePrivateAsync<List<string>>(helper, "CollectEmailAddressesFromResolver", new object?[] { kResolverDns });
             List<UiUser> uiUsers = GetPrivateField<List<UiUser>>(helper, "uiUsers");
 
-            Assert.That(recipients, Is.EqualTo(new[] { "new@example.test", "fresh@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kResolvedRecipients));
             Assert.That(uiUsers.Single(user => user.Dn == existingUser.Dn).Email, Is.EqualTo("new@example.test"));
             Assert.That(uiUsers.Any(user => user.Dn == freshUser.Dn && user.Email == "fresh@example.test"), Is.True);
         }
@@ -271,9 +288,9 @@ namespace FWO.Test
                 ],
                 useDummyEmailAddress: false);
 
-            List<string> resolvedDns = InvokePrivate<List<string>>(helper, "ResolveUserDnsFromOwnerGroups", new object?[] { new List<string> { "cn=network-team,dc=test", "cn=external,dc=test" } });
+            List<string> resolvedDns = InvokePrivate<List<string>>(helper, "ResolveUserDnsFromOwnerGroups", new object?[] { kOwnerGroupDns.ToList() });
 
-            Assert.That(resolvedDns, Is.EquivalentTo(new[] { "cn=alice,dc=test", "cn=bob,dc=test", "cn=external,dc=test" }));
+            Assert.That(resolvedDns, Is.EquivalentTo(kResolvedDns));
         }
 
         [Test]
@@ -288,7 +305,7 @@ namespace FWO.Test
             string resolvedEmail = InvokePrivate<string>(helper, "GetEmailAddress", new object?[] { "cn=known,dc=test" });
             string missingEmail = InvokePrivate<string>(helper, "GetEmailAddress", new object?[] { "cn=missing,dc=test" });
 
-            Assert.That(resolvedEmail, Is.EqualTo("known@example.test"));
+            Assert.That(resolvedEmail, Is.EqualTo(kKnownRecipients[0]));
             Assert.That(missingEmail, Is.EqualTo(""));
         }
 
@@ -308,7 +325,7 @@ namespace FWO.Test
 
             List<string> recipients = helper.GetOwnerMainResponsibleRecipients(owners);
 
-            Assert.That(recipients, Is.EqualTo(new[] { "owner@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kOwnerRecipients));
         }
 
         [Test]
@@ -339,8 +356,8 @@ namespace FWO.Test
             List<string> currentRecipients = await helper.GetRecipients(EmailRecipientOption.CurrentHandler, statefulObject, null, null, null);
             List<string> recentRecipients = await helper.GetRecipients(EmailRecipientOption.RecentHandler, statefulObject, null, null, null);
 
-            Assert.That(currentRecipients, Is.EqualTo(new[] { "dummy@example.test" }));
-            Assert.That(recentRecipients, Is.EqualTo(new[] { "dummy@example.test" }));
+            Assert.That(currentRecipients, Is.EqualTo(kDummyRecipients));
+            Assert.That(recentRecipients, Is.EqualTo(kDummyRecipients));
         }
 
         [Test]
@@ -355,7 +372,7 @@ namespace FWO.Test
 
             List<string> recipients = await helper.GetRecipients(EmailRecipientOption.CurrentHandler, statefulObject, null, null, null);
 
-            Assert.That(recipients, Is.EqualTo(new[] { "current@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kCurrentRecipients));
         }
 
         [Test]
@@ -379,8 +396,8 @@ namespace FWO.Test
             List<string> directRecipients = await helper.GetRecipients(EmailRecipientOption.CurrentHandler, directStatefulObject, null, null, null);
             List<string> fallbackRecipients = await helper.GetRecipients(EmailRecipientOption.CurrentHandler, fallbackStatefulObject, null, null, null);
 
-            Assert.That(directRecipients, Is.EqualTo(new[] { "current@example.test" }));
-            Assert.That(fallbackRecipients, Is.EqualTo(new[] { "current@example.test" }));
+            Assert.That(directRecipients, Is.EqualTo(kCurrentRecipients));
+            Assert.That(fallbackRecipients, Is.EqualTo(kCurrentRecipients));
         }
 
         [Test]
@@ -403,7 +420,7 @@ namespace FWO.Test
 
             List<string> recipients = await helper.GetRecipients(EmailRecipientOption.AssignedGroup, statefulObject, null, null, null);
 
-            Assert.That(recipients, Is.EqualTo(new[] { "dummy@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kDummyRecipients));
         }
 
         [Test]
@@ -411,7 +428,7 @@ namespace FWO.Test
         {
             List<string> addresses = EmailHelper.SplitAddresses(" a@test ; b@test, c@test |  ");
 
-            Assert.That(addresses, Is.EqualTo(new[] { "a@test", "b@test", "c@test" }));
+            Assert.That(addresses, Is.EqualTo(kSplitRecipients));
         }
 
         [Test]
@@ -425,7 +442,7 @@ namespace FWO.Test
 
             List<string> recipients = EmailHelper.CollectRecipientsFromConfig(userConfig, "a@test;b@test");
 
-            Assert.That(recipients, Is.EqualTo(new[] { "dummy@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kDummyRecipients));
         }
 
         [Test]
@@ -435,7 +452,7 @@ namespace FWO.Test
 
             List<string> recipients = EmailHelper.CollectRecipientsFromConfig(userConfig, "a@test;b@test|c@test");
 
-            Assert.That(recipients, Is.EqualTo(new[] { "a@test", "b@test", "c@test" }));
+            Assert.That(recipients, Is.EqualTo(kSplitRecipients));
         }
 
         [Test]
@@ -487,7 +504,7 @@ namespace FWO.Test
             Assert.That(notification.RecipientCc, Is.EqualTo(EmailRecipientOption.Requester));
             Assert.That(notification.EmailSubject, Is.EqualTo("subject"));
             Assert.That(notification.EmailBody, Is.EqualTo("body"));
-            Assert.That(actionParams.NotificationIds, Is.EqualTo(new[] { 7, 9 }));
+            Assert.That(actionParams.NotificationIds, Is.EqualTo(kNotificationIds));
             Assert.That(actionParams.AttachedContent, Is.EqualTo(EmailAttachedContent.RequestedConnections));
         }
 

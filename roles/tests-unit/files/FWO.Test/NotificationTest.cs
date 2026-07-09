@@ -20,6 +20,13 @@ namespace FWO.Test
         readonly NotificationTestApiConn apiConnection = new();
         readonly SimulatedGlobalConfig globalConfig = new() { UseDummyEmailAddress = true, DummyEmailAddress = "x@y.de" };
         const string EmailText = "email text";
+        private static readonly string[] kDummyRecipients = ["x@y.de"];
+        private static readonly string[] kToRecipients = ["a@b.de"];
+        private static readonly string[] kCcRecipients = ["cc1@example.com", "cc2@example.com"];
+        private static readonly string[] kBccRecipients = ["bcc1@example.com", "bcc2@example.com"];
+        private static readonly string[] kJsonRecipients = ["json@example.test"];
+        private static readonly string[] kMainRecipients = ["main@example.test"];
+        private static readonly NotificationDeadline[] kNoneDeadline = [NotificationDeadline.None];
 
         [Test]
         public async Task TestInterfaceRequestNotification()
@@ -228,7 +235,7 @@ namespace FWO.Test
                     ?? throw new InvalidOperationException("PrepareEmail returned null task."));
                 FWO.Mail.MailData mailData = await task;
 
-                CollectionAssert.AreEqual(new[] { "bcc1@example.com", "bcc2@example.com" }, mailData.Bcc);
+                CollectionAssert.AreEqual(kBccRecipients, mailData.Bcc);
             }
             finally
             {
@@ -256,8 +263,8 @@ namespace FWO.Test
                     ?? throw new InvalidOperationException("PrepareEmail returned null task."));
                 FWO.Mail.MailData mailData = await task;
 
-                CollectionAssert.AreEqual(new[] { "a@b.de" }, mailData.To);
-                CollectionAssert.AreEqual(new[] { "cc1@example.com", "cc2@example.com" }, mailData.Cc);
+                CollectionAssert.AreEqual(kToRecipients, mailData.To);
+                CollectionAssert.AreEqual(kCcRecipients, mailData.Cc);
             }
             finally
             {
@@ -316,7 +323,7 @@ namespace FWO.Test
                     ?? throw new InvalidOperationException("PrepareEmail returned null task."));
                 FWO.Mail.MailData mailData = await task;
 
-                CollectionAssert.AreEqual(new[] { "a@b.de" }, mailData.To);
+                CollectionAssert.AreEqual(kToRecipients, mailData.To);
                 ClassicAssert.AreEqual(0, mailData.Cc.Count);
                 ClassicAssert.AreEqual(0, mailData.Bcc.Count);
             }
@@ -444,8 +451,8 @@ namespace FWO.Test
                 List<string> jsonRecipients = await jsonTask;
                 List<string> configuredRecipients = await configuredTask;
 
-                CollectionAssert.AreEqual(new[] { "json@example.test" }, jsonRecipients);
-                CollectionAssert.AreEqual(new[] { "main@example.test" }, configuredRecipients);
+                CollectionAssert.AreEqual(kJsonRecipients, jsonRecipients);
+                CollectionAssert.AreEqual(kMainRecipients, configuredRecipients);
             }
             finally
             {
@@ -483,13 +490,13 @@ namespace FWO.Test
         [Test]
         public void OfferedDeadlineOptions_ReturnsOnlyNone_ForImportChange()
         {
-            CollectionAssert.AreEqual(new[] { NotificationDeadline.None }, FwoNotification.OfferedDeadlineOptions(NotificationClient.ImportChange));
+            CollectionAssert.AreEqual(kNoneDeadline, FwoNotification.OfferedDeadlineOptions(NotificationClient.ImportChange));
         }
 
         [Test]
         public void OfferedDeadlineOptions_ReturnsOnlyNone_ForWfAction()
         {
-            CollectionAssert.AreEqual(new[] { NotificationDeadline.None }, FwoNotification.OfferedDeadlineOptions(NotificationClient.WfAction));
+            CollectionAssert.AreEqual(kNoneDeadline, FwoNotification.OfferedDeadlineOptions(NotificationClient.WfAction));
         }
 
         [Test]
