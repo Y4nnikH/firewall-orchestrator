@@ -26,8 +26,8 @@ namespace FWO.Services.RuleTreeBuilder
     /// </list>
     ///
     /// The builder is scoped as a service, so per-build state is reinitialized inside
-    /// <see cref="BuildRuleTree"/>. The only state preserved across builds is the cache of
-    /// completed trees and their flattened rule rows.
+    /// <see cref="BuildRuleTree"/>. Completed trees and their flattened rule rows are kept only
+    /// for the active report generation and can be discarded with <see cref="ClearCachedRuleTrees"/>.
     /// </summary>
     public class RuleTreeBuilder : IRuleTreeBuilder
     {
@@ -123,6 +123,17 @@ namespace FWO.Services.RuleTreeBuilder
         }
 
         /// <summary>
+        /// Clears all cached trees and flattened rule rows. UI report generation calls this once
+        /// before building a fresh report so a long-lived scoped builder does not retain every
+        /// previously rendered report for the lifetime of the Blazor circuit.
+        /// </summary>
+        public void ClearCachedRuleTrees()
+        {
+            RuleTreeCache.Clear();
+            FlattenedRules.Clear();
+        }
+
+        /// <summary>
         /// Builds a rule tree for one management/device pair from normalized rulebases and
         /// rulebase links. The method creates a fresh per-build graph view, traverses ordered
         /// layers, sections, and inline layers by following their graph relationships, then
@@ -138,12 +149,17 @@ namespace FWO.Services.RuleTreeBuilder
         /// <see cref="LinksToBeProcessed"/> and are reported as a warning after traversal
         /// completes.
         /// </summary>
-        public List<Rule> BuildRuleTree(RulebaseReport[] rulebases, RulebaseLink[] links, int managementId, int deviceId)
+        public List<Rule> BuildRuleTree(RulebaseReport[] rulebases, RulebaseLink[] links, int managementId, int deviceId, bool suppressEmptyHeaders = false)
         {
             InitializeBuildState(rulebases, links);
 
             TraverseOrderedLayers();
-            List<Rule> flattenedRules = FlattenTreeAndAssignDisplayNumbers();
+            List<Rule> flattenedRules = FlattenTreeAndAssignDisplayNumbers(suppressEmptyHeaders);
+
+            if (RuleTreeCache.TryGetValue((managementId, deviceId), out RuleTreeItem? previousRuleTree))
+            {
+                FlattenedRules.Remove(previousRuleTree);
+            }
 
             RuleTreeCache[(managementId, deviceId)] = RuleTree;
             FlattenedRules[RuleTree] = [.. flattenedRules];
@@ -629,7 +645,7 @@ namespace FWO.Services.RuleTreeBuilder
         /// - every visible row receives a flat <see cref="Rule.DisplayOrderNumber"/>
         /// - only real rules receive a compact <see cref="Rule.OrderNumber"/>
         /// </summary>
-        private List<Rule> FlattenTreeAndAssignDisplayNumbers()
+        private List<Rule> FlattenTreeAndAssignDisplayNumbers(bool suppressEmptyHeaders)
         {
             RuleTree.ElementsFlat.Clear();
             NextDisplayOrderNumber = 1;
@@ -637,7 +653,7 @@ namespace FWO.Services.RuleTreeBuilder
 
             List<Rule> flattenedRules = [];
             int rootVisibleChildIndex = 0;
-            FlattenChildren(RuleTree.Children, [], flattenedRules, ref rootVisibleChildIndex);
+            FlattenChildren(RuleTree.Children, [], flattenedRules, ref rootVisibleChildIndex, suppressEmptyHeaders);
 
             return flattenedRules;
         }
@@ -661,23 +677,33 @@ namespace FWO.Services.RuleTreeBuilder
         /// The method is the central place where visible tree order turns into dotted numbering,
         /// flat-list order, and cached <see cref="RuleTree.ElementsFlat"/> entries.
         /// </summary>
-        private void FlattenChildren(IEnumerable<RuleTreeItem> childNodes, List<int> parentPosition, List<Rule> flattenedRules, ref int visibleChildIndex)
+        private void FlattenChildren(IEnumerable<RuleTreeItem> childNodes, List<int> parentPosition, List<Rule> flattenedRules, ref int visibleChildIndex, bool suppressEmptyHeaders)
         {
             foreach (RuleTreeItem childNode in childNodes)
             {
                 if (childNode.IsInlineLayerRoot)
                 {
-                    FlattenChildren(childNode.Children, parentPosition, flattenedRules, ref visibleChildIndex);
+                    FlattenChildren(childNode.Children, parentPosition, flattenedRules, ref visibleChildIndex, suppressEmptyHeaders);
                     continue;
                 }
 
                 if (childNode.IsSectionHeader)
                 {
+                    if (suppressEmptyHeaders && !HasRealRuleDescendant(childNode))
+                    {
+                        continue;
+                    }
+
                     childNode.Position = [.. parentPosition];
                     AssignOrderNumber(childNode, parentPosition, assignDisplayNumber: false);
                     RuleTree.ElementsFlat.Add(childNode);
                     flattenedRules.Add(childNode.Data!);
-                    FlattenChildren(childNode.Children, parentPosition, flattenedRules, ref visibleChildIndex);
+                    FlattenChildren(childNode.Children, parentPosition, flattenedRules, ref visibleChildIndex, suppressEmptyHeaders);
+                    continue;
+                }
+
+                if (suppressEmptyHeaders && childNode.IsOrderedLayerHeader && !HasRealRuleDescendant(childNode))
+                {
                     continue;
                 }
 
@@ -689,8 +715,26 @@ namespace FWO.Services.RuleTreeBuilder
                 flattenedRules.Add(childNode.Data!);
 
                 int nestedVisibleChildIndex = 0;
-                FlattenChildren(childNode.Children, childPosition, flattenedRules, ref nestedVisibleChildIndex);
+                FlattenChildren(childNode.Children, childPosition, flattenedRules, ref nestedVisibleChildIndex, suppressEmptyHeaders);
             }
+        }
+
+        /// <summary>
+        /// Checks whether a structural node owns at least one real rule that should be rendered.
+        /// Empty ordered-layer and section headers can occur after report-filter queries remove
+        /// all rules from a rulebase while the rulebase-link graph is still returned.
+        /// </summary>
+        private static bool HasRealRuleDescendant(RuleTreeItem node)
+        {
+            foreach (RuleTreeItem childNode in node.Children)
+            {
+                if (childNode.IsRule || HasRealRuleDescendant(childNode))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

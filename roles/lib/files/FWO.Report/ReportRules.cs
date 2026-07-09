@@ -40,7 +40,7 @@ namespace FWO.Report
         /// <summary>
         /// Flattened real rules (non-header) for each device in each management, used for export and JSON output.
         /// </summary>
-        private static Dictionary<(int deviceId, int managementId), Rule[]> _rulesCache = [];
+        private readonly Dictionary<(int deviceId, int managementId), Rule[]> _rulesCache = [];
         private readonly IRuleTreeBuilder? ruleTreeBuilderFromScope = ruleTreeBuilder;
 
         public override async Task Generate(int elementsPerFetch, ApiConnection apiConnection, Func<ReportData, Task> callback, CancellationToken ct)
@@ -155,13 +155,17 @@ namespace FWO.Report
 
             // Build rule tree for each device in each management
 
+            scopedRuleTreeBuilder.ClearCachedRuleTrees();
+            _rulesCache.Clear();
+
             int ruleCount = 0;
 
             foreach (ManagementReport managementReport in ReportData.ManagementData)
             {
                 foreach (DeviceReport deviceReport in managementReport.Devices)
                 {
-                    List<Rule> allRules = scopedRuleTreeBuilder.BuildRuleTree(managementReport.Rulebases, deviceReport.RulebaseLinks, managementReport.Id, deviceReport.Id);
+                    bool suppressEmptyHeaders = !string.IsNullOrWhiteSpace(Query.RawFilter);
+                    List<Rule> allRules = scopedRuleTreeBuilder.BuildRuleTree(managementReport.Rulebases, deviceReport.RulebaseLinks, managementReport.Id, deviceReport.Id, suppressEmptyHeaders);
                     ApplyPreferredCollapseState(scopedRuleTreeBuilder, managementReport.Id, deviceReport.Id);
 
                     Rule[] rulesArray = GetRealRulesForExport(allRules);
