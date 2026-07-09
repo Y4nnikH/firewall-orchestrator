@@ -545,3 +545,7 @@ This PR hardens FWO installation and security-sensitive workflows. It restricts 
 - Support for writing firewall configurations via templates
 - A template provider (Tufin or custom templates) must be configured before use
 - FW config change external workflow is only active after explicit assignment per management and change category in the settings
+
+## 9.1.18 - 09.07.2026
+- add generic firewall import
+- enable azure2022ff for normalized config import
