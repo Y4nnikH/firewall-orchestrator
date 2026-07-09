@@ -92,4 +92,42 @@ public class ApiExampleCatalogTest
         Assert.That(json, Does.Contain("\"appIdExternal\""));
         Assert.That(json, Does.Not.Contain("\"OwnerLifeCycleStateId\""));
     }
+
+    /// <summary>
+    /// Verifies the owner request example includes the complete filter surface.
+    /// </summary>
+    [Test]
+    public void OwnerRequestExampleIncludesLifecycleFilter()
+    {
+        Assert.That(catalog.TryGetExample(typeof(GetOwnersRequest), out object? example), Is.True);
+
+        GetOwnersRequest request = (GetOwnersRequest)example!;
+
+        Assert.That(request.OwnerLifeCycleStateId, Is.EqualTo(1));
+        Assert.That(request.ShowDetails, Is.True);
+        Assert.That(request.ShowOnlyActiveState, Is.True);
+    }
+
+    /// <summary>
+    /// Verifies the owner response example covers detailed response fields.
+    /// </summary>
+    [Test]
+    public void OwnerResponseExampleIncludesDetailFields()
+    {
+        Assert.That(catalog.TryGetExample(typeof(GetOwnerResponse), out object? example), Is.True);
+
+        GetOwnerResponse owner = (GetOwnerResponse)example!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(owner.LastRecertCheck, Is.Not.Null);
+            Assert.That(owner.RecertCheckParams, Is.Not.Empty);
+            Assert.That(owner.Criticality, Is.EqualTo("high"));
+            Assert.That(owner.OwnerLifecycleStateId, Is.EqualTo(1));
+            Assert.That(owner.LastRecertified, Is.Not.Null);
+            Assert.That(owner.LastRecertifier, Is.EqualTo(7));
+            Assert.That(owner.NextRecertDate, Is.Not.Null);
+            Assert.That(owner.DecommDate, Is.Not.Null);
+        });
+    }
 }
