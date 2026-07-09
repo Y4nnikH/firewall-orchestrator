@@ -1,5 +1,6 @@
 using FWO.Api.Client;
 using FWO.Api.Client.Queries;
+using FWO.Config.Api;
 using FWO.Data;
 using FWO.Data.Workflow;
 using FWO.Middleware.Server.Controllers;
@@ -9,6 +10,7 @@ using FWO.Middleware.Server.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NUnit.Framework;
+using System.Security.Claims;
 
 namespace FWO.Test;
 
@@ -40,7 +42,7 @@ internal class FlowRequestServiceTest
                 new WfExtState { Name = "external_implementation", StateId = 7 }
             ]
         };
-        FlowRequestService service = new(apiConnection);
+        FlowRequestService service = new(apiConnection, new GlobalConfig());
 
         GetRequestStatusResponse? result = await service.GetRequestStatusAsync(42);
 
@@ -62,7 +64,7 @@ internal class FlowRequestServiceTest
             Ticket = new WfTicket { Id = 42, StateId = 7 },
             States = [new WfState { Id = 7, Name = "implementation" }]
         };
-        FlowRequestService service = new(apiConnection);
+        FlowRequestService service = new(apiConnection, new GlobalConfig());
 
         GetRequestStatusResponse? first = await service.GetRequestStatusAsync(42);
         apiConnection.States = [new WfState { Id = 7, Name = "changed" }];
@@ -79,7 +81,7 @@ internal class FlowRequestServiceTest
     [Test]
     public async Task GetRequestStatusAsync_ReturnsNullForUnknownTicket()
     {
-        FlowRequestService service = new(new FlowRequestServiceApiConn());
+        FlowRequestService service = new(new FlowRequestServiceApiConn(), new GlobalConfig());
 
         GetRequestStatusResponse? result = await service.GetRequestStatusAsync(42);
 
@@ -92,7 +94,7 @@ internal class FlowRequestServiceTest
         FlowRequestService service = new(new FlowRequestServiceApiConn
         {
             Ticket = new WfTicket { Id = 42, StateId = 99 }
-        });
+        }, new GlobalConfig());
 
         GetRequestStatusResponse? result = await service.GetRequestStatusAsync(42);
 
@@ -107,7 +109,7 @@ internal class FlowRequestServiceTest
             Ticket = new WfTicket { Id = 42, StateId = 7 },
             States = [new WfState { Id = 7, Name = "implementation" }],
             ExtStateErrors = ["external state query failed"]
-        });
+        }, new GlobalConfig());
 
         Assert.ThrowsAsync<InvalidOperationException>(async () => await service.GetRequestStatusAsync(42));
     }
@@ -128,7 +130,7 @@ internal class FlowRequestServiceTest
                 ]
             },
             States = [new WfState { Id = 7, Name = "implementation" }]
-        });
+        }, new GlobalConfig());
 
         GetRequestStatusResponse? result = await service.GetRequestStatusAsync(42);
 
@@ -139,7 +141,7 @@ internal class FlowRequestServiceTest
     public async Task GetRequestStatus_ReturnsBadRequestForInvalidTicketId()
     {
         FlowRequestServiceApiConn apiConnection = new();
-        FlowRequestController controller = new(new FlowRequestService(apiConnection));
+        FlowRequestController controller = new(new FlowRequestService(apiConnection, new GlobalConfig()));
 
         ActionResult<GetRequestStatusResponse> result = await controller.GetRequestStatus(new GetRequestStatusRequest { TicketId = 0 });
 
@@ -163,7 +165,7 @@ internal class FlowRequestServiceTest
                 Comments = [NewComment("ready", new DateTime(2026, 6, 1, 9, 0, 0, DateTimeKind.Utc))]
             },
             States = [new WfState { Id = 7, Name = "implementation" }]
-        }));
+        }, new GlobalConfig()));
 
         ActionResult<GetRequestStatusResponse> result = await controller.GetRequestStatus(new GetRequestStatusRequest { TicketId = 42 });
 
@@ -185,7 +187,7 @@ internal class FlowRequestServiceTest
             Ticket = new WfTicket { Id = 42, StateId = 7 },
             States = [new WfState { Id = 7, Name = "implementation" }],
             ExtStateErrors = ["external state query failed"]
-        }));
+        }, new GlobalConfig()));
 
         ActionResult<GetRequestStatusResponse> result = await controller.GetRequestStatus(new GetRequestStatusRequest { TicketId = 42 });
 
@@ -195,6 +197,460 @@ internal class FlowRequestServiceTest
         {
             Assert.That(errorResult.StatusCode, Is.EqualTo(StatusCodes.Status500InternalServerError));
             Assert.That(errorResult.Value, Is.EqualTo("Internal server error"));
+        });
+    }
+
+    [Test]
+    public async Task CreateRequest_ReturnsCreatedTicketAndResolvesTemporaryIds()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States = [new WfState { Id = 0, Name = "draft" }],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }]
+        };
+        FlowRequestService service = new(apiConnection, new GlobalConfig());
+
+        CreateRequestResponse response = await service.CreateRequestAsync(new CreateRequestRequest
+        {
+            RequestorName = "Alice Example",
+            RequestorId = "alice",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Allow HTTPS to app server",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            TimeObjects =
+            [
+                new CreateRequestRequest.CreateTimeObjectRequest
+                {
+                    Id = "-3",
+                    Name = "business-hours",
+                    StartTime = "2026-07-01T08:00:00Z",
+                    EndTime = "2026-07-01T18:00:00Z"
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    Name = "Allow app traffic",
+                    SourceObjects = [-1],
+                    DestinationObjects = [-1],
+                    ServiceObjects = [-2],
+                    TimeObjectId = -3,
+                    ViolationJustification = "Business approved."
+                }
+            ]
+        }, 77);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo("draft"));
+            Assert.That(response.RequestId, Is.EqualTo(100));
+            Assert.That(apiConnection.SentQueries, Does.Contain(RequestQueries.getStates));
+            Assert.That(apiConnection.SentQueries, Does.Contain(StmQueries.getRuleActions));
+            Assert.That(apiConnection.SentQueries, Does.Contain(StmQueries.getIpProtocols));
+            Assert.That(apiConnection.SentQueries, Contains.Item(RequestQueries.newTicket));
+            Assert.That(apiConnection.LastTicketWriter, Is.Not.Null);
+            Assert.That(apiConnection.LastTicketWriter!.Tasks, Has.Count.EqualTo(1));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].TaskType, Is.EqualTo(WfTaskType.access.ToString()));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].RuleAction, Is.EqualTo(1));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].Elements.WfElementList, Has.Count.EqualTo(3));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].Elements.WfElementList.All(element => element.NetworkId == null && element.ServiceId == null), Is.True);
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].NetworkGroupId, Is.Null);
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].ServiceGroupId, Is.Null);
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].TargetBeginDate, Is.Not.Null);
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].TargetEndDate, Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public async Task CreateRequest_UsesConfiguredInitialTicketState()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States =
+            [
+                new WfState { Id = 17, Name = "requested" },
+                new WfState { Id = 0, Name = "draft" }
+            ],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }]
+        };
+        FlowRequestService service = new(apiConnection, new GlobalConfig { ReqApiTicketInitialStateId = 17 });
+
+        CreateRequestResponse response = await service.CreateRequestAsync(new CreateRequestRequest
+        {
+            RequestorName = "Alice Example",
+            RequestorId = "alice",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Configured state request",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    SourceObjects = [-1],
+                    DestinationObjects = [-1],
+                    ServiceObjects = [-2]
+                }
+            ]
+        }, 77);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo("requested"));
+            Assert.That(apiConnection.LastTicketWriter, Is.Not.Null);
+            Assert.That(GetVariable(apiConnection.NewTicketVariables, "state"), Is.EqualTo(17));
+        });
+    }
+
+    [Test]
+    public async Task CreateRequest_MapsDropActionToConfiguredRuleActionId()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States = [new WfState { Id = 0, Name = "draft" }],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }],
+            RuleActions =
+            [
+                new RuleAction { Id = 1, Name = "accept", Allowed = true },
+                new RuleAction { Id = 2, Name = "drop", Allowed = false }
+            ]
+        };
+        FlowRequestService service = new(apiConnection, new GlobalConfig());
+
+        CreateRequestResponse response = await service.CreateRequestAsync(new CreateRequestRequest
+        {
+            RequestorName = "Alice Example",
+            RequestorId = "alice",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Drop blocked traffic",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "drop",
+                    SourceObjects = [-1],
+                    DestinationObjects = [-1],
+                    ServiceObjects = [-2]
+                }
+            ]
+        }, 77);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo("draft"));
+            Assert.That(apiConnection.LastTicketWriter, Is.Not.Null);
+            Assert.That(apiConnection.LastTicketWriter!.Tasks, Has.Count.EqualTo(1));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].RuleAction, Is.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public async Task CreateRequest_AllowsGroupCreateTasks()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States = [new WfState { Id = 0, Name = "draft" }],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }],
+            RuleActions = [new RuleAction { Id = 1, Name = "accept", Allowed = true }]
+        };
+        FlowRequestService service = new(apiConnection, new GlobalConfig());
+
+        CreateRequestResponse response = await service.CreateRequestAsync(new CreateRequestRequest
+        {
+            RequestorName = "Alice Example",
+            RequestorId = "alice",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Grouped request",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            AddressGroups =
+            [
+                new CreateRequestRequest.CreateAddressGroupRequest
+                {
+                    Id = -3,
+                    Name = "app-servers",
+                    MemberIds = [-1]
+                }
+            ],
+            ServiceGroups =
+            [
+                new CreateRequestRequest.CreateServiceGroupRequest
+                {
+                    Id = -4,
+                    Name = "web-services",
+                    MemberIds = [-2]
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    SourceObjects = [-3],
+                    DestinationObjects = [-3],
+                    ServiceObjects = [-4]
+                }
+            ]
+        }, 77);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo("draft"));
+            Assert.That(apiConnection.LastTicketWriter, Is.Not.Null);
+            Assert.That(apiConnection.LastTicketWriter!.Tasks, Has.Count.EqualTo(3));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].TaskType, Is.EqualTo(WfTaskType.group_create.ToString()));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].GetAddInfoValue(AdditionalInfoKeys.GrpName), Is.EqualTo("app-servers"));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[1].TaskType, Is.EqualTo(WfTaskType.group_create.ToString()));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[1].GetAddInfoValue(AdditionalInfoKeys.GrpName), Is.EqualTo("web-services"));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[2].TaskType, Is.EqualTo(WfTaskType.access.ToString()));
+        });
+    }
+
+    [Test]
+    public async Task CreateRequest_ReturnsOkResponseAndUsesRequesterClaim()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States = [new WfState { Id = 0, Name = "draft" }],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }]
+        };
+        FlowRequestController controller = new(new FlowRequestService(apiConnection, new GlobalConfig()));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim("x-hasura-user-id", "77")],
+                    "test"))
+            }
+        };
+
+        ActionResult<CreateRequestResponse> result = await controller.CreateRequest(new CreateRequestRequest
+        {
+            RequestorName = "Alice Example",
+            RequestorId = "alice",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Allow HTTPS to app server",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            AddressGroups =
+            [
+                new CreateRequestRequest.CreateAddressGroupRequest
+                {
+                    Id = -3,
+                    Name = "app-servers",
+                    MemberIds = [-1]
+                }
+            ],
+            ServiceGroups =
+            [
+                new CreateRequestRequest.CreateServiceGroupRequest
+                {
+                    Id = -4,
+                    Name = "web-services",
+                    MemberIds = [-2]
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    SourceObjects = [-3],
+                    DestinationObjects = [-3],
+                    ServiceObjects = [-4]
+                }
+            ]
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Result, Is.TypeOf<OkObjectResult>());
+            CreateRequestResponse response = (CreateRequestResponse)((OkObjectResult)result.Result!).Value!;
+            Assert.That(response.Status, Is.EqualTo("draft"));
+            Assert.That(response.RequestId, Is.EqualTo(100));
+            Assert.That(apiConnection.LastTicketWriter, Is.Not.Null);
+            Assert.That(apiConnection.LastTicketWriter!.Tasks, Has.Count.EqualTo(3));
+        });
+    }
+
+    [Test]
+    public async Task CreateRequest_ReturnsConfiguredInitialStateFromController()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States =
+            [
+                new WfState { Id = 17, Name = "requested" },
+                new WfState { Id = 0, Name = "draft" }
+            ],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }]
+        };
+        FlowRequestController controller = new(new FlowRequestService(apiConnection, new GlobalConfig { ReqApiTicketInitialStateId = 17 }));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim("x-hasura-user-id", "77")],
+                    "test"))
+            }
+        };
+
+        ActionResult<CreateRequestResponse> result = await controller.CreateRequest(new CreateRequestRequest
+        {
+            RequestorName = "Alice Example",
+            RequestorId = "alice",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Configured state request",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    SourceObjects = [-1],
+                    DestinationObjects = [-1],
+                    ServiceObjects = [-2]
+                }
+            ]
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Result, Is.TypeOf<OkObjectResult>());
+            CreateRequestResponse response = (CreateRequestResponse)((OkObjectResult)result.Result!).Value!;
+            Assert.That(response.Status, Is.EqualTo("requested"));
+            Assert.That(response.RequestId, Is.EqualTo(100));
+            Assert.That(apiConnection.LastTicketWriter, Is.Not.Null);
+            Assert.That(GetVariable(apiConnection.NewTicketVariables, "state"), Is.EqualTo(17));
         });
     }
 
@@ -209,6 +665,11 @@ internal class FlowRequestServiceTest
 
     private static object? GetVariable(object? variables, string propertyName)
     {
+        if (variables is IDictionary<string, object?> dictionary && dictionary.TryGetValue(propertyName, out object? value))
+        {
+            return value;
+        }
+
         return variables?.GetType().GetProperty(propertyName)?.GetValue(variables);
     }
 
@@ -218,8 +679,13 @@ internal class FlowRequestServiceTest
         public List<object?> SentVariables { get; } = [];
         public WfTicket? Ticket { get; set; }
         public List<WfState> States { get; set; } = [];
+        public List<IpProtocol> Protocols { get; set; } = [];
+        public List<RuleAction> RuleActions { get; set; } = [new RuleAction { Id = 1, Name = "accept", Allowed = true }];
         public List<WfExtState> ExtStates { get; set; } = [];
         public string[]? ExtStateErrors { get; set; }
+        public WfTicketWriter? LastTicketWriter { get; private set; }
+        public object? NewTicketVariables { get; private set; }
+        private long nextId = 99;
 
         public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
         {
@@ -235,6 +701,26 @@ internal class FlowRequestServiceTest
             if (responseType == typeof(List<WfState>))
             {
                 return Task.FromResult((QueryResponseType)(object)States);
+            }
+
+            if (responseType == typeof(List<IpProtocol>))
+            {
+                return Task.FromResult((QueryResponseType)(object)Protocols);
+            }
+
+            if (responseType == typeof(List<RuleAction>))
+            {
+                return Task.FromResult((QueryResponseType)(object)RuleActions);
+            }
+
+            if (query == RequestQueries.newTicket)
+            {
+                NewTicketVariables = variables;
+                LastTicketWriter = (WfTicketWriter?)GetVariable(variables, "requestTasks");
+                return Task.FromResult((QueryResponseType)(object)new ReturnIdWrapper
+                {
+                    ReturnIds = [new ReturnId { NewIdLong = ++nextId }]
+                });
             }
 
             throw new NotImplementedException($"Unsupported response type {responseType.Name}");

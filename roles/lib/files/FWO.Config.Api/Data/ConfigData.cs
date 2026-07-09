@@ -259,6 +259,9 @@ namespace FWO.Config.Api.Data
         [JsonProperty("reqUseFlowDb"), JsonPropertyName("reqUseFlowDb")]
         public bool ReqUseFlowDb { get; set; } = false;
 
+        [JsonProperty("reqApiTicketInitialStateId"), JsonPropertyName("reqApiTicketInitialStateId")]
+        public int ReqApiTicketInitialStateId { get; set; } = 0;
+
         [JsonProperty("reqFlowIntegration"), JsonPropertyName("reqFlowIntegration")]
         public string ReqFlowIntegration { get; set; } = System.Text.Json.JsonSerializer.Serialize(new FlowIntegrationConfig());
 
