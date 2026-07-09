@@ -83,7 +83,7 @@ else
         </Column>
         <Column TableItem="FlowNwGroup" Title="@(userConfig.GetText("objects"))" Field="@(nwGroup => nwGroup.Id)" Sortable="false" Filterable="false" Context="nwGroup">
             <Template>
-                @(nwGroup.Objects?.Count ?? 0)
+                @nwGroup.NwGroupMembers.Count
             </Template>
         </Column>
         <Pager ShowPageNumber="true" ShowTotalCount="true" />

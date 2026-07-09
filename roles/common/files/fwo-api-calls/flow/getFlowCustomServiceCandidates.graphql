@@ -12,7 +12,7 @@ query getFlowCustomServiceCandidates($management_id: [Int!]) {
   ) {
     id: mgm_id
     name: mgm_name
-    services: services(
+    serviceObjects: services(
       where: {
         active: { _eq: true }
         removed: { _is_null: true }

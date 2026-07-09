@@ -37,6 +37,23 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task FlowNetworkGroupsPage_ShowsMemberCountFromFlowMembers()
+        {
+            await using BunitContext context = CreateContext();
+
+            IRenderedComponent<SettingsFlowNetworkGroups> component = RenderPage<SettingsFlowNetworkGroups>(context);
+
+            component.WaitForAssertion(() =>
+            {
+                var objectsCell = component.FindAll("table").Last()
+                    .QuerySelectorAll("tbody tr").Single()
+                    .Children[5];
+
+                Assert.That(objectsCell.TextContent.Trim(), Is.EqualTo("2"));
+            });
+        }
+
+        [Test]
         public async Task FlowServiceObjectsPage_RendersWithoutErrors()
         {
             await using BunitContext context = CreateContext();
@@ -609,7 +626,7 @@ namespace FWO.Test
             Name = "Flow Network Group",
             State = FlowState.Requested,
             ShowInRequestModule = true,
-            NwGroupMembers = [new FlowNwGroupMember()]
+            NwGroupMembers = [new FlowNwGroupMember(), new FlowNwGroupMember()]
         };
 
         private static readonly FlowTimeObject kFlowTimeObject = new()
