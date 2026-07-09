@@ -38,6 +38,7 @@
         dest: "{{ fworch_conf_file }}"
         owner: "{{ fworch_user }}"
         group: "{{ fworch_group }}"
+        mode: "0640"
       become: true     
   when: installation_mode == "upgrade"
   
