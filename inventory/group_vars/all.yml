@@ -28,6 +28,7 @@ install_syslog: true
 add_demo_data: true
 api_docu: false
 force_install: false
+allowRepoChangesForRedhat: false
 docker_network: ""
 
 ### operating system settings
@@ -47,10 +48,17 @@ fworch_tmp_dir: "{{ fworch_home }}/tmp"
 importer_venv_dir: "{{ fworch_home }}/importer/importer-venv"
 
 # setting default proxy (may be overwritten via --extra-vars)
-http_proxy: "{{ lookup('env','http_proxy') }}"
-https_proxy: "{{ lookup('env','https_proxy') }}"
-no_proxy: "{{ lookup('env','no_proxy') }}"
-proxy_exceptions: "{{ lookup('env','no_proxy') }}"
+# Lowercase proxy variables take precedence over uppercase when both are set.
+env_http_proxy_lowercase: "{{ lookup('env','http_proxy') }}"
+env_http_proxy_uppercase: "{{ lookup('env','HTTP_PROXY') }}"
+env_https_proxy_lowercase: "{{ lookup('env','https_proxy') }}"
+env_https_proxy_uppercase: "{{ lookup('env','HTTPS_PROXY') }}"
+env_no_proxy_lowercase: "{{ lookup('env','no_proxy') }}"
+env_no_proxy_uppercase: "{{ lookup('env','NO_PROXY') }}"
+http_proxy: "{{ env_http_proxy_lowercase if env_http_proxy_lowercase | length > 0 else env_http_proxy_uppercase }}"
+https_proxy: "{{ env_https_proxy_lowercase if env_https_proxy_lowercase | length > 0 else env_https_proxy_uppercase }}"
+no_proxy: "{{ env_no_proxy_lowercase if env_no_proxy_lowercase | length > 0 else env_no_proxy_uppercase }}"
+proxy_exceptions: "{{ no_proxy }}"
 github_download_timeout: 60
 proxy_env:
         http_proxy: "{{ http_proxy }}"
@@ -58,6 +66,7 @@ proxy_env:
         HTTP_PROXY: "{{ http_proxy }}"
         HTTPS_PROXY: "{{ https_proxy }}"
         no_proxy: "{{ proxy_exceptions }}"
+        NO_PROXY: "{{ proxy_exceptions }}"
 
 http_proxy_import_parameter: ""
 # proxy in capitals needed for debian and ubuntu <20

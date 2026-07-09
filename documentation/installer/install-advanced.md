@@ -46,6 +46,7 @@ If you want to drop the database and re-install from scratch, do the following:
 ### Installation behind a proxy (no direct Internet connection)
 
 By default, during installation or upgrade the proxy settings are read from the OS environment of the installer host.
+The installer reads both lowercase and uppercase proxy variables. If both forms are set and non-empty, the lowercase value wins.
 For example you may either use /etc/environment or add a global system-wide config file /etc/profile.d/proxy.sh and add the following content:
 
 ```console
@@ -149,6 +150,16 @@ e.g. if your hasura metadata file needs to be re-created from scratch, then use 
 
 ```console
 ./scripts/run-playbook-with-sudo.sh site.yml -e "force_install=yes"
+```
+
+### Parameter "allowRepoChangesForRedhat" to allow RedHat repository changes
+
+By default, the installer does not add or enable RedHat repositories. If required packages are not available from the already enabled repositories, prepare the OS repositories outside the installer.
+
+Set this parameter only if the installer is allowed to install EPEL and enable CodeReady Builder/CRB on RedHat-like systems:
+
+```console
+./scripts/run-playbook-with-sudo.sh site.yml -e "allowRepoChangesForRedhat=true"
 ```
 
 ### Parameter "docker_network" after the Podman migration
