@@ -24,17 +24,6 @@ namespace FWO.Test
             "compliance/updateViolationById.graphql",
             "config/deleteCustomText.graphql",
             "config/getTexts.graphql",
-            "config/subscribeAutodiscoveryConfigChanges.graphql",
-            "config/subscribeComplianceCheckConfigChanges.graphql",
-            "config/subscribeConfigChangesByUser.graphql",
-            "config/subscribeDailyCheckConfigChanges.graphql",
-            "config/subscribeExternalRequestConfigChanges.graphql",
-            "config/subscribeFlowSyncConfigChanges.graphql",
-            "config/subscribeImportAppDataConfigChanges.graphql",
-            "config/subscribeImportNotifyConfigChanges.graphql",
-            "config/subscribeImportSubnetDataConfigChanges.graphql",
-            "config/subscribeUpdateRuleOwnerMappingConfigChanges.graphql",
-            "config/subscribeVarianceAnalysisConfigChanges.graphql",
             "device/deleteCredential.graphql",
             "device/deleteDevice.graphql",
             "device/deleteManagement.graphql",
@@ -44,24 +33,17 @@ namespace FWO.Test
             "device/fragments/managementDetailsWithoutSecrets.graphql",
             "device/getManagementDetailsWithoutSecrets.graphql",
             "device/getManagementsDetails.graphql",
-            "device/getMgmtNumberUsingCred.graphql",
             "device/getSingleManagementDetails.graphql",
             "device/newManagement.graphql",
             "device/updateGatewayUid.graphql",
-            "extRequest/subscribeExtRequestStateUpdate.graphql",
             "import/deleteImport.graphql",
             "modelling/addNwAppZone.graphql",
-            "monitor/subscribeAlertChanges.graphql",
             "networking/getAllNetworkInfosTable.graphql",
             "recertification/refreshViewRuleWithOwner.graphql",
             "report/addReportScheduleFileFormats.graphql",
             "report/getAllObjectDetailsInReport.graphql",
             "report/getReportById.graphql",
             "report/getReportsOverview.graphql",
-            "report/subscribeGeneratedReportsChanges.graphql",
-            "report/subscribeReportScheduleChanges.graphql",
-            "request/subscribeTaskChanges.graphql",
-            "request/subscribeTicketStateChanges.graphql",
             "rule/fragments/natRuleDetailsForReport.graphql",
             "rule/getNatRuleOverview.graphql",
             "rule/getRuleDetailByID.graphql",
@@ -94,7 +76,7 @@ namespace FWO.Test
             string fileName = Path.GetFileNameWithoutExtension(filePath);
             string fileContent = File.ReadAllText(filePath);
             string escapedFileName = Regex.Escape(fileName);
-            string pattern = $@"\b(query|mutation|fragment)\s+{escapedFileName}\b";
+            string pattern = $@"\b(query|mutation|subscription|fragment)\s+{escapedFileName}\b";
             bool hasMatchingOperationName = Regex.IsMatch(fileContent, pattern);
 
             if (kKnownInconsistentFiles.Contains(relativePath))
@@ -110,6 +92,7 @@ namespace FWO.Test
                 hasMatchingOperationName,
                 Is.True,
                 $"Expected '{relativePath}' to contain 'query {fileName}', 'mutation {fileName}', 'subscription {fileName}', or 'fragment {fileName}'.");
+        }
 
         /// <summary>
         /// Resolves the repository path to the shared GraphQL API call files.
