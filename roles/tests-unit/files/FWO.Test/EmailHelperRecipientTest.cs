@@ -635,16 +635,11 @@ namespace FWO.Test
         {
             public List<OwnerResponsibleType> OwnerResponsibleTypes { get; init; } = [];
             public List<UiUser> Users { get; init; } = [];
-            public bool ThrowOnOwnerResponsibleTypes { get; init; }
 
             public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, FWO.Api.Client.QueryChunkingOptions? chunkingOptions = null)
             {
                 if (typeof(QueryResponseType) == typeof(List<OwnerResponsibleType>))
                 {
-                    if (ThrowOnOwnerResponsibleTypes)
-                    {
-                        throw new InvalidOperationException("Owner responsible types unavailable.");
-                    }
                     return Task.FromResult((QueryResponseType)(object)OwnerResponsibleTypes);
                 }
 

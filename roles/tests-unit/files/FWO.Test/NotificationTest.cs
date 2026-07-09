@@ -384,10 +384,10 @@ namespace FWO.Test
         }
 
         [Test]
-        public void PrepareBundledEmail_ThrowsForUnsupportedBundleType()
+        public async Task PrepareBundledEmail_ThrowsForUnsupportedBundleType()
         {
             List<UserGroup> ownerGroups = [];
-            NotificationService notificationService = NotificationService.CreateAsync(NotificationClient.InterfaceRequest, globalConfig, apiConnection, ownerGroups).GetAwaiter().GetResult();
+            NotificationService notificationService = await NotificationService.CreateAsync(NotificationClient.InterfaceRequest, globalConfig, apiConnection, ownerGroups);
             FwoOwner owner = new() { Name = "Owner", ExtAppId = "1" };
             FwoNotification notification = notificationService.Notifications[0];
             notification.BundleType = (BundleType)999;
@@ -539,12 +539,9 @@ namespace FWO.Test
 
             public override string ExportToHtml()
             {
+                htmlBodyExport = "<p>report body</p>";
+                htmlBodyExportValid = true;
                 return "<html>report</html>";
-            }
-
-            public override string ExportToHtmlBody()
-            {
-                return "<p>report body</p>";
             }
 
             public override string SetDescription()

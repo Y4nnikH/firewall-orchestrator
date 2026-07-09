@@ -86,6 +86,39 @@ namespace FWO.Test
             }
         }
 
+        private sealed class LazyBodyReportBase() : ReportBase(new DynGraphqlQuery(""), new SimulatedUserConfig(), ReportType.TicketReport)
+        {
+            public int ExportCalls { get; private set; }
+
+            public override Task Generate(int elementsPerFetch, ApiConnection apiConnection, Func<ReportData, Task> callback, CancellationToken ct)
+            {
+                return Task.CompletedTask;
+            }
+
+            public override string ExportToCsv()
+            {
+                return string.Empty;
+            }
+
+            public override string ExportToJson()
+            {
+                return string.Empty;
+            }
+
+            public override string ExportToHtml()
+            {
+                ExportCalls++;
+                htmlBodyExport = "<p>lazy frame body</p>";
+                htmlBodyExportValid = true;
+                return "<html><body><p>lazy frame body</p></body></html>";
+            }
+
+            public override string SetDescription()
+            {
+                return string.Empty;
+            }
+        }
+
         [Test]
         public void OutputCsvEscapesQuotesAndNull()
         {
@@ -145,6 +178,17 @@ namespace FWO.Test
             Assert.That(body, Does.Not.Contain("<html>"));
             Assert.That(body, Does.Not.Contain("<body>"));
             Assert.That(body, Does.Contain("<p>frame body</p>"));
+        }
+
+        [Test]
+        public void ExportToHtmlBodyTriggersExportWhenBodyIsNotYetCached()
+        {
+            LazyBodyReportBase report = new();
+
+            string body = report.ExportToHtmlBody();
+
+            Assert.That(report.ExportCalls, Is.EqualTo(1));
+            Assert.That(body, Is.EqualTo("<p>lazy frame body</p>"));
         }
 
         [Test]

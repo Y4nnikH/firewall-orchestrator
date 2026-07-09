@@ -151,6 +151,10 @@ namespace FWO.Report
 
         public virtual string ExportToHtmlBody()
         {
+            if (!htmlBodyExportValid)
+            {
+                ExportToHtml();
+            }
             return htmlBodyExport;
         }
 
