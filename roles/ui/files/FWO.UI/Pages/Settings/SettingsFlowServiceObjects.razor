@@ -1,6 +1,7 @@
 @page "/settings/flows/serviceobjects"
 
 @using FWO.Api.Client.Queries
+@using FWO.Basics
 @using FWO.Config.Api
 @using FWO.Data
 @using FWO.Data.Flow
@@ -317,7 +318,8 @@ else
                 .. customServiceManagements.Select(management => new CustomObjectManagementSelection
                 {
                     Management = management,
-                    Candidates = [.. (management.Services ?? [])],
+                    Candidates = [.. (management.Services ?? [])
+                        .Where(service => !string.Equals(service.Type?.Name, ServiceType.Group, StringComparison.OrdinalIgnoreCase))],
                     SelectedService = null
                 })
             ];

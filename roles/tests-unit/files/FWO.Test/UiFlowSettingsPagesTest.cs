@@ -99,6 +99,23 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task FlowServiceObjectsPage_CreateCustomObject_DoesNotOfferServiceGroupCandidates()
+        {
+            await using BunitContext context = CreateCustomServiceCreateContext(out _);
+
+            IRenderedComponent<SettingsFlowServiceObjects> component = RenderPage<SettingsFlowServiceObjects>(context);
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-primary"), Is.Not.Empty));
+
+            component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(component.Markup, Does.Not.Contain("Service Group Candidate"));
+                Assert.That(component.Markup, Does.Contain("Service A"));
+            });
+        }
+
+        [Test]
         public async Task FlowServiceObjectsPage_CreateCustomObject_RejectsMixedTechnicalDefinitionSelection()
         {
             await using BunitContext context = CreateCustomServiceCreateContext(out FlowServiceObjectsCustomCreateApiConn apiConnection);
@@ -799,6 +816,16 @@ namespace FWO.Test
                     DestinationPortEnd = 80,
                     ProtoId = 6,
                     FlowServiceObjectId = null,
+                    Type = new NetworkServiceType { Name = ServiceType.SimpleService },
+                    FlowActive = false
+                },
+                new()
+                {
+                    Id = 12,
+                    Name = "Service Group Candidate",
+                    Uid = "svc-group",
+                    Type = new NetworkServiceType { Name = ServiceType.Group },
+                    FlowServiceGroupId = null,
                     FlowActive = false
                 }
             ]
@@ -819,6 +846,7 @@ namespace FWO.Test
                     DestinationPortEnd = 443,
                     ProtoId = 6,
                     FlowServiceObjectId = null,
+                    Type = new NetworkServiceType { Name = ServiceType.SimpleService },
                     FlowActive = false
                 }
             ]

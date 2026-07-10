@@ -378,15 +378,7 @@ namespace FWO.Data.Flow
         {
             return FormatDuplicateObjectSummary(objects, maxItems, emptyLabel, moreTemplate, FormatTimeObjectTechnicalDetails);
         }
-
-        /// <summary>
-        /// Formats a compact duplicate overview for a list of flow network objects.
-        /// </summary>
-        public static string FormatDuplicateObjectSummary(IEnumerable<FlowNwObject>? objects, int maxItems, string emptyLabel, string moreTemplate)
-        {
-            return FormatDuplicateObjectSummary(objects, maxItems, emptyLabel, moreTemplate, FormatFlowNwObjectTechnicalDetails);
-        }
-
+        
         private static string FormatDuplicateObjectSummary<T>(IEnumerable<T>? objects, int maxItems, string emptyLabel, string moreTemplate, Func<T, string> technicalDetailsFormatter)
         {
             List<T> duplicateObjects = [.. (objects ?? [])];
