@@ -1,4 +1,5 @@
 using System.Globalization;
+using FWO.Basics;
 using FWO.Data;
 
 namespace FWO.Data.Flow
@@ -249,7 +250,7 @@ namespace FWO.Data.Flow
                 candidate.Active ? "active" : "inactive",
                 candidate.Type?.Id.ToString() ?? "",
                 candidate.Type?.Name ?? ""
-            ]).ToLowerInvariant();
+            ]);
         }
 
         /// <summary>
@@ -264,7 +265,7 @@ namespace FWO.Data.Flow
 
         private static bool IsGroupObject(NetworkObject candidate)
         {
-            return string.Equals(candidate.Type?.Name, "Group", StringComparison.OrdinalIgnoreCase);
+            return string.Equals(candidate.Type?.Name, ObjectType.Group, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -401,7 +402,7 @@ namespace FWO.Data.Flow
             }
 
             int remainingCount = duplicateObjects.Count - previewCount;
-            string moreText = moreTemplate.Replace("@@COUNT@@", remainingCount.ToString(CultureInfo.InvariantCulture));
+            string moreText = moreTemplate.Replace(Placeholder.COUNT, remainingCount.ToString(CultureInfo.InvariantCulture));
             return string.IsNullOrWhiteSpace(summary)
                 ? moreText
                 : $"{summary}, {moreText}";
