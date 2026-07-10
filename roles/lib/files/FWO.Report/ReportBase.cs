@@ -6,6 +6,7 @@ using FWO.Data.Report;
 using FWO.Logging;
 using FWO.Report.Data;
 using FWO.Report.Filter;
+using FWO.Services;
 using FWO.Services.RuleTreeBuilder;
 using System.Text;
 using System.Reflection;
@@ -58,27 +59,7 @@ namespace FWO.Report
 <head>
     <meta charset=""utf-8""/>
       <title>##Title##</title>
-         <style>  
-             table {{
-                font-family: arial, sans-serif;
-                font-size: 10px;
-                border-collapse: collapse; 
-                width: 100 %;
-              }}
-
-              td {{
-                border: 1px solid #000000;
-                text-align: left;
-                padding: 3px;
-              }}
-
-              th {{
-                border: 1px solid #000000;
-                text-align: left;
-                padding: 3px;
-                background-color: #dddddd;
-              }}
-         </style>
+         {NotificationTableBodyBuilder.HtmlTableStyleBlock}
     </head>
     <body>
         <h2>##Title##</h2>
@@ -154,8 +135,13 @@ namespace FWO.Report
             if (!htmlBodyExportValid)
             {
                 ExportToHtml();
+                if (!htmlBodyExportValid && !string.IsNullOrWhiteSpace(htmlExport))
+                {
+                    htmlBodyExport = htmlExport;
+                    htmlBodyExportValid = true;
+                }
             }
-            return htmlBodyExport;
+            return htmlBodyExportValid ? htmlBodyExport : htmlExport;
         }
 
         public abstract string SetDescription();
@@ -263,6 +249,7 @@ namespace FWO.Report
         {
             if (string.IsNullOrEmpty(htmlExport))
             {
+                string body = htmlReport.ToString();
                 HtmlTemplate = HtmlTemplate.Replace("##Title##", title);
                 ReplaceFilter(filter);
                 HtmlTemplate = HtmlTemplate.Replace("##GeneratedOn##", userConfig.GetText("generated_on"));
@@ -271,11 +258,11 @@ namespace FWO.Report
                 ReplaceOwnerFilter(ownerFilter);
                 ReplaceOtherFilter(otherFilter);
 
-                string htmlToC = BuildHTMLToC(htmlReport.ToString());
+                string htmlToC = BuildHTMLToC(body);
                 HtmlTemplate = HtmlTemplate.Replace("##ToC##", htmlToC);
-                HtmlTemplate = HtmlTemplate.Replace("##Body##", htmlReport.ToString());
+                HtmlTemplate = HtmlTemplate.Replace("##Body##", body);
                 htmlExport = HtmlTemplate.ToString();
-                htmlBodyExport = htmlReport.ToString();
+                htmlBodyExport = NotificationTableBodyBuilder.HtmlTableStyleBlock + body;
                 htmlBodyExportValid = true;
             }
             return htmlExport;

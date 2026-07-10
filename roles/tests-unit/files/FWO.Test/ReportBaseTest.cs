@@ -119,6 +119,38 @@ namespace FWO.Test
             }
         }
 
+        private sealed class HtmlOnlyReportBase() : ReportBase(new DynGraphqlQuery(""), new SimulatedUserConfig(), ReportType.TicketReport)
+        {
+            public int ExportCalls { get; private set; }
+
+            public override Task Generate(int elementsPerFetch, ApiConnection apiConnection, Func<ReportData, Task> callback, CancellationToken ct)
+            {
+                return Task.CompletedTask;
+            }
+
+            public override string ExportToCsv()
+            {
+                return string.Empty;
+            }
+
+            public override string ExportToJson()
+            {
+                return string.Empty;
+            }
+
+            public override string ExportToHtml()
+            {
+                ExportCalls++;
+                htmlExport = "<html><body><p>html only</p></body></html>";
+                return htmlExport;
+            }
+
+            public override string SetDescription()
+            {
+                return string.Empty;
+            }
+        }
+
         [Test]
         public void OutputCsvEscapesQuotesAndNull()
         {
@@ -175,6 +207,8 @@ namespace FWO.Test
             string body = report.ExportToHtmlBody();
 
             Assert.That(html, Does.Contain("<html>"));
+            Assert.That(body, Does.Contain("<style>"));
+            Assert.That(body, Does.Contain("border-collapse"));
             Assert.That(body, Does.Not.Contain("<html>"));
             Assert.That(body, Does.Not.Contain("<body>"));
             Assert.That(body, Does.Contain("<p>frame body</p>"));
@@ -189,6 +223,19 @@ namespace FWO.Test
 
             Assert.That(report.ExportCalls, Is.EqualTo(1));
             Assert.That(body, Is.EqualTo("<p>lazy frame body</p>"));
+        }
+
+        [Test]
+        public void ExportToHtmlBodyFallsBackToFullHtmlWhenBodyIsNeverPopulated()
+        {
+            HtmlOnlyReportBase report = new();
+
+            string firstBody = report.ExportToHtmlBody();
+            string secondBody = report.ExportToHtmlBody();
+
+            Assert.That(report.ExportCalls, Is.EqualTo(1));
+            Assert.That(firstBody, Is.EqualTo("<html><body><p>html only</p></body></html>"));
+            Assert.That(secondBody, Is.EqualTo(firstBody));
         }
 
         [Test]

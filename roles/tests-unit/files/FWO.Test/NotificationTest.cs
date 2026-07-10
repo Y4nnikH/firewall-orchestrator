@@ -225,12 +225,12 @@ namespace FWO.Test
             notification.EmailAddressBcc = "bcc1@example.com,bcc2@example.com";
             FwoOwner owner = new();
 
-            MethodInfo? prepareEmail = typeof(NotificationService).GetMethod("PrepareEmail", BindingFlags.Instance | BindingFlags.NonPublic);
-            ClassicAssert.IsNotNull(prepareEmail);
-
             globalConfig.UseDummyEmailAddress = false;
             try
             {
+                MethodInfo? prepareEmail = typeof(NotificationService).GetMethod("PrepareEmail", BindingFlags.Instance | BindingFlags.NonPublic);
+                ClassicAssert.IsNotNull(prepareEmail);
+
                 Task<FWO.Mail.MailData> task = (Task<FWO.Mail.MailData>)(prepareEmail?.Invoke(notificationService, [notification, null, owner, null, ""])
                     ?? throw new InvalidOperationException("PrepareEmail returned null task."));
                 FWO.Mail.MailData mailData = await task;
@@ -253,12 +253,12 @@ namespace FWO.Test
             notification.EmailAddressCc = "cc1@example.com,cc2@example.com";
             FwoOwner owner = new();
 
-            MethodInfo? prepareEmail = typeof(NotificationService).GetMethod("PrepareEmail", BindingFlags.Instance | BindingFlags.NonPublic);
-            ClassicAssert.IsNotNull(prepareEmail);
-
             globalConfig.UseDummyEmailAddress = false;
             try
             {
+                MethodInfo? prepareEmail = typeof(NotificationService).GetMethod("PrepareEmail", BindingFlags.Instance | BindingFlags.NonPublic);
+                ClassicAssert.IsNotNull(prepareEmail);
+
                 Task<FWO.Mail.MailData> task = (Task<FWO.Mail.MailData>)(prepareEmail?.Invoke(notificationService, [notification, null, owner, null, ""])
                     ?? throw new InvalidOperationException("PrepareEmail returned null task."));
                 FWO.Mail.MailData mailData = await task;
@@ -282,12 +282,12 @@ namespace FWO.Test
             notification.EmailAddressBcc = null!;
             FwoOwner owner = new();
 
-            MethodInfo? prepareEmail = typeof(NotificationService).GetMethod("PrepareEmail", BindingFlags.Instance | BindingFlags.NonPublic);
-            ClassicAssert.IsNotNull(prepareEmail);
-
             globalConfig.UseDummyEmailAddress = false;
             try
             {
+                MethodInfo? prepareEmail = typeof(NotificationService).GetMethod("PrepareEmail", BindingFlags.Instance | BindingFlags.NonPublic);
+                ClassicAssert.IsNotNull(prepareEmail);
+
                 Task<FWO.Mail.MailData> task = (Task<FWO.Mail.MailData>)(prepareEmail?.Invoke(notificationService, [notification, null, owner, null, ""])
                     ?? throw new InvalidOperationException("PrepareEmail returned null task."));
                 FWO.Mail.MailData mailData = await task;
@@ -313,12 +313,12 @@ namespace FWO.Test
             notification.EmailAddressBcc = "bcc@example.com";
             FwoOwner owner = new();
 
-            MethodInfo? prepareEmail = typeof(NotificationService).GetMethod("PrepareEmail", BindingFlags.Instance | BindingFlags.NonPublic);
-            ClassicAssert.IsNotNull(prepareEmail);
-
             globalConfig.UseDummyEmailAddress = false;
             try
             {
+                MethodInfo? prepareEmail = typeof(NotificationService).GetMethod("PrepareEmail", BindingFlags.Instance | BindingFlags.NonPublic);
+                ClassicAssert.IsNotNull(prepareEmail);
+
                 Task<FWO.Mail.MailData> task = (Task<FWO.Mail.MailData>)(prepareEmail?.Invoke(notificationService, [notification, null, owner, null, ""])
                     ?? throw new InvalidOperationException("PrepareEmail returned null task."));
                 FWO.Mail.MailData mailData = await task;
@@ -426,9 +426,6 @@ namespace FWO.Test
             FwoOwner owner = new() { Name = "Owner", ExtAppId = "1" };
             owner.AddOwnerResponsible(GlobalConst.kOwnerResponsibleTypeMain, "cn=main,dc=test");
 
-            MethodInfo? collectRecipients = typeof(NotificationService).GetMethod("CollectRecipients", BindingFlags.Instance | BindingFlags.NonPublic);
-            ClassicAssert.IsNotNull(collectRecipients);
-
             FwoNotification jsonNotification = new()
             {
                 RecipientTo = EmailRecipientOption.OtherAddresses,
@@ -443,6 +440,9 @@ namespace FWO.Test
             globalConfig.UseDummyEmailAddress = false;
             try
             {
+                MethodInfo? collectRecipients = typeof(NotificationService).GetMethod("CollectRecipients", BindingFlags.Instance | BindingFlags.NonPublic);
+                ClassicAssert.IsNotNull(collectRecipients);
+
                 Task<List<string>> jsonTask = (Task<List<string>>)(collectRecipients?.Invoke(notificationService, [jsonNotification, owner, false, false])
                     ?? throw new InvalidOperationException("CollectRecipients returned null task."));
                 Task<List<string>> configuredTask = (Task<List<string>>)(collectRecipients?.Invoke(notificationService, [configuredNotification, owner, false, false])
