@@ -62,17 +62,19 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
 
         await transformer.TransformAsync(operation, CreateOwnerContext(), CancellationToken.None);
 
+        string description = NormalizeLineEndings(operation.Description!);
+
         Assert.Multiple(() =>
         {
-            Assert.That(operation.Description, Does.Contain("""
+            Assert.That(description, Does.Contain(NormalizeLineEndings("""
 ```json
 {
   "ownerLifecycleStateId": 1,
   "active": true
 }
 ```
-"""));
-            Assert.That(operation.Description, Does.Contain("""
+""")));
+            Assert.That(description, Does.Contain(NormalizeLineEndings("""
 ```json
 [
   {
@@ -80,9 +82,9 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
     "name": "Finance Portal",
     "appIdExternal": "APP-4711",
     "type": "standard",
-"""));
-            Assert.That(operation.Description, Does.Not.Contain("{\"active\":true"));
-            Assert.That(operation.Description, Does.Not.Contain("{\"id\":42"));
+""")));
+            Assert.That(description, Does.Not.Contain("{\"active\":true"));
+            Assert.That(description, Does.Not.Contain("{\"id\":42"));
         });
     }
 
@@ -349,5 +351,10 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
         ]) ?? throw new InvalidOperationException("Owner response mapper returned null.");
 
         return response;
+    }
+
+    private static string NormalizeLineEndings(string value)
+    {
+        return value.Replace("\r\n", "\n", StringComparison.Ordinal);
     }
 }
