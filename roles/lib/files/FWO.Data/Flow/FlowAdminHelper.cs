@@ -408,7 +408,9 @@ namespace FWO.Data.Flow
         }
 
         /// <summary>
-        /// Filters custom flow object candidates by a case-insensitive search string.
+        /// Returns custom flow object candidates without technical addresses or group-object types and optionally
+        /// filters them by a case-insensitive search string. The exact search terms "active" and "inactive" filter
+        /// by object state.
         /// </summary>
         public static List<NetworkObject> FilterCustomObjectCandidates(IEnumerable<NetworkObject>? candidates, string? searchText)
         {
