@@ -7,6 +7,11 @@ namespace FWO.Test
     [TestFixture]
     internal class FlowAdminHelperTest
     {
+        private static readonly long[] kInactiveConflictObjectIds = [100L, 200L];
+        private static readonly string[] kManagementNames = ["mgm-a", "mgm-b"];
+        private static readonly long[] kActiveMatchIds = [10L];
+        private static readonly long[] kInactiveMatchIds = [20L];
+
         [Test]
         public void BuildDuplicateGroups_FindsInactiveConflicts()
         {
@@ -51,7 +56,7 @@ namespace FWO.Test
             Assert.That(groups[0].ManagementId, Is.EqualTo(10));
             Assert.That(groups[0].ManagementName, Is.EqualTo("mgm-a"));
             Assert.That(groups[0].Objects, Has.Count.EqualTo(2));
-            Assert.That(groups[0].Objects.Select(nwObject => nwObject.Id), Is.EqualTo(new[] { 100L, 200L }));
+            Assert.That(groups[0].Objects.Select(nwObject => nwObject.Id), Is.EqualTo(kInactiveConflictObjectIds));
         }
 
         [Test]
@@ -134,7 +139,7 @@ namespace FWO.Test
             List<FlowNwObjectDuplicateGroup> groups = FlowAdminHelper.BuildDuplicateGroups(flowObjects, managements);
 
             Assert.That(groups, Has.Count.EqualTo(2));
-            Assert.That(groups.Select(group => group.ManagementName), Is.EqualTo(new[] { "mgm-a", "mgm-b" }));
+            Assert.That(groups.Select(group => group.ManagementName), Is.EqualTo(kManagementNames));
         }
 
         [Test]
@@ -520,8 +525,8 @@ namespace FWO.Test
             List<NetworkObject> activeMatches = FlowAdminHelper.FilterCustomObjectCandidates(candidates, "active");
             List<NetworkObject> inactiveMatches = FlowAdminHelper.FilterCustomObjectCandidates(candidates, "inactive");
 
-            Assert.That(activeMatches.Select(candidate => candidate.Id), Is.EqualTo(new[] { 10L }));
-            Assert.That(inactiveMatches.Select(candidate => candidate.Id), Is.EqualTo(new[] { 20L }));
+            Assert.That(activeMatches.Select(candidate => candidate.Id), Is.EqualTo(kActiveMatchIds));
+            Assert.That(inactiveMatches.Select(candidate => candidate.Id), Is.EqualTo(kInactiveMatchIds));
         }
 
         [Test]

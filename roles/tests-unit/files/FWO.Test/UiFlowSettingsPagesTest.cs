@@ -20,6 +20,8 @@ namespace FWO.Test
     [TestFixture]
     internal class UiFlowSettingsPagesTest
     {
+        private static readonly string[] kFilteredCandidateTypes = ["host", "host"];
+
         [SetUp]
         public void SetUp()
         {
@@ -398,7 +400,7 @@ namespace FWO.Test
                 .ToList();
 
             Assert.That(filteredCandidates, Has.Count.EqualTo(2));
-            Assert.That(filteredCandidates.Select(candidate => candidate.Type.Name), Is.EqualTo(new[] { "host", "host" }));
+            Assert.That(filteredCandidates.Select(candidate => candidate.Type.Name), Is.EqualTo(kFilteredCandidateTypes));
         }
 
         private static BunitContext CreateContext()
