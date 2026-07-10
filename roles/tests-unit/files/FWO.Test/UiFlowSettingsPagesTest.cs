@@ -1017,8 +1017,9 @@ namespace FWO.Test
                     Uid = serviceId == 11 ? "svc-a" : "svc-b",
                     DestinationPort = serviceId == 11 ? 80 : 443,
                     DestinationPortEnd = serviceId == 11 ? 80 : 443,
-                    ProtoId = 6,
-                    FlowServiceObjectId = 900,
+                    Active = true,
+                    Removed = null,
+                    FlowServiceObjectId = flowSvcobjId,
                     FlowActive = activeOnMgm
                 });
             }
@@ -1164,8 +1165,11 @@ namespace FWO.Test
                     Id = serviceId,
                     Name = "Protocol Only Service",
                     Uid = "svc-proto-only",
-                    ProtoId = 1,
-                    FlowServiceObjectId = 900,
+                    DestinationPort = null,
+                    DestinationPortEnd = null,
+                    Active = true,
+                    Removed = null,
+                    FlowServiceObjectId = flowSvcobjId,
                     FlowActive = activeOnMgm
                 });
             }
