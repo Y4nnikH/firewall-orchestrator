@@ -15,20 +15,28 @@ namespace FWO.Test
                 new FlowNwObject
                 {
                     Id = 1,
-                    Name = "duplicate-flow",
+                    Name = "duplicate-flow"
+                }
+            ];
+            List<Management> managements =
+            [
+                new Management
+                {
+                    Id = 10,
+                    Name = "mgm-a",
                     Objects =
                     [
                         new NetworkObject
                         {
-                            Id = 100,
-                            Name = "obj-a",
+                            Id = 200,
+                            Name = "obj-b",
                             FlowNetworkObjectId = 1,
                             FlowActive = false
                         },
                         new NetworkObject
                         {
-                            Id = 200,
-                            Name = "obj-b",
+                            Id = 100,
+                            Name = "obj-a",
                             FlowNetworkObjectId = 1,
                             FlowActive = false
                         }
@@ -36,11 +44,14 @@ namespace FWO.Test
                 }
             ];
 
-            List<FlowNwObjectDuplicateGroup> groups = FlowAdminHelper.BuildDuplicateGroups(flowObjects);
+            List<FlowNwObjectDuplicateGroup> groups = FlowAdminHelper.BuildDuplicateGroups(flowObjects, managements);
 
             Assert.That(groups, Has.Count.EqualTo(1));
             Assert.That(groups[0].FlowNwObjectId, Is.EqualTo(1));
+            Assert.That(groups[0].ManagementId, Is.EqualTo(10));
+            Assert.That(groups[0].ManagementName, Is.EqualTo("mgm-a"));
             Assert.That(groups[0].Objects, Has.Count.EqualTo(2));
+            Assert.That(groups[0].Objects.Select(nwObject => nwObject.Id), Is.EqualTo(new[] { 100L, 200L }));
         }
 
         [Test]
@@ -51,7 +62,15 @@ namespace FWO.Test
                 new FlowNwObject
                 {
                     Id = 1,
-                    Name = "non-duplicate-flow",
+                    Name = "non-duplicate-flow"
+                }
+            ];
+            List<Management> managements =
+            [
+                new Management
+                {
+                    Id = 10,
+                    Name = "mgm-a",
                     Objects =
                     [
                         new NetworkObject
@@ -72,9 +91,50 @@ namespace FWO.Test
                 }
             ];
 
-            List<FlowNwObjectDuplicateGroup> groups = FlowAdminHelper.BuildDuplicateGroups(flowObjects);
+            List<FlowNwObjectDuplicateGroup> groups = FlowAdminHelper.BuildDuplicateGroups(flowObjects, managements);
 
             Assert.That(groups, Is.Empty);
+        }
+
+        [Test]
+        public void BuildDuplicateGroups_CreatesSeparateGroupsPerManagement()
+        {
+            List<FlowNwObject> flowObjects =
+            [
+                new FlowNwObject
+                {
+                    Id = 1,
+                    Name = "duplicate-flow"
+                }
+            ];
+            List<Management> managements =
+            [
+                new Management
+                {
+                    Id = 20,
+                    Name = "mgm-b",
+                    Objects =
+                    [
+                        new NetworkObject { Id = 201, Name = "obj-c", FlowNetworkObjectId = 1, FlowActive = false },
+                        new NetworkObject { Id = 202, Name = "obj-d", FlowNetworkObjectId = 1, FlowActive = false }
+                    ]
+                },
+                new Management
+                {
+                    Id = 10,
+                    Name = "mgm-a",
+                    Objects =
+                    [
+                        new NetworkObject { Id = 101, Name = "obj-a", FlowNetworkObjectId = 1, FlowActive = false },
+                        new NetworkObject { Id = 102, Name = "obj-b", FlowNetworkObjectId = 1, FlowActive = false }
+                    ]
+                }
+            ];
+
+            List<FlowNwObjectDuplicateGroup> groups = FlowAdminHelper.BuildDuplicateGroups(flowObjects, managements);
+
+            Assert.That(groups, Has.Count.EqualTo(2));
+            Assert.That(groups.Select(group => group.ManagementName), Is.EqualTo(new[] { "mgm-a", "mgm-b" }));
         }
 
         [Test]
@@ -428,6 +488,40 @@ namespace FWO.Test
 
             Assert.That(filtered, Has.Count.EqualTo(1));
             Assert.That(filtered[0].Id, Is.EqualTo(10));
+        }
+
+        [Test]
+        public void FilterCustomObjectCandidates_DoesNotMatchInactiveWhenSearchingForActive()
+        {
+            List<NetworkObject> candidates =
+            [
+                new NetworkObject
+                {
+                    Id = 10,
+                    Name = "active-object",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "uid-10",
+                    Active = true,
+                    Type = new NetworkObjectType { Id = 1, Name = "host" }
+                },
+                new NetworkObject
+                {
+                    Id = 20,
+                    Name = "inactive-object",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "uid-20",
+                    Active = false,
+                    Type = new NetworkObjectType { Id = 1, Name = "host" }
+                }
+            ];
+
+            List<NetworkObject> activeMatches = FlowAdminHelper.FilterCustomObjectCandidates(candidates, "active");
+            List<NetworkObject> inactiveMatches = FlowAdminHelper.FilterCustomObjectCandidates(candidates, "inactive");
+
+            Assert.That(activeMatches.Select(candidate => candidate.Id), Is.EqualTo(new[] { 10L }));
+            Assert.That(inactiveMatches.Select(candidate => candidate.Id), Is.EqualTo(new[] { 20L }));
         }
 
         [Test]

@@ -411,7 +411,7 @@ else
             flowNwObjects = await apiConnection.SendQueryAsync<List<FlowNwObject>>(FlowQueries.getFlowNwObjectCatalog);
             await LoadCustomObjectManagements();
             await LoadNamingCustomObjectManagements();
-            duplicateGroups = BuildDuplicateGroups();
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowNwObjects, customObjectManagements);
             customObjectSelections = [];
 
             workInProgress = false;
@@ -663,7 +663,7 @@ else
             }
 
             CloseDuplicateResolver();
-            duplicateGroups = BuildDuplicateGroups();
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowNwObjects, customObjectManagements);
             workInProgress = false;
         }
         catch (Exception exception)
@@ -780,48 +780,6 @@ else
     {
         return [.. namingCustomObjectManagements.SelectMany(management => management.Objects)
             .Where(nwObject => nwObject.FlowNetworkObjectId == flowNwObjectId)];
-    }
-
-    private List<NetworkObject> GetLinkedCustomObjects(long flowNwObjectId, int managementId)
-    {
-        return [.. customObjectManagements
-            .Where(management => management.Id == managementId)
-            .SelectMany(management => management.Objects)
-            .Where(nwObject => nwObject.FlowNetworkObjectId == flowNwObjectId)];
-    }
-
-    private List<FlowNwObjectDuplicateGroup> BuildDuplicateGroups()
-    {
-        List<FlowNwObjectDuplicateGroup> flowNwObjectDuplicateGroups = [];
-
-        foreach (FlowNwObject flowObject in flowNwObjects)
-        {
-            foreach (Management management in customObjectManagements)
-            {
-                List<NetworkObject> linkedObjects = GetLinkedCustomObjects(flowObject.Id, management.Id);
-                if (linkedObjects.Count <= 1 || linkedObjects.Any(nwObject => nwObject.FlowActive))
-                {
-                    continue;
-                }
-
-                flowNwObjectDuplicateGroups.Add(new FlowNwObjectDuplicateGroup
-                {
-                    FlowNwObjectId = flowObject.Id,
-                    FlowNwObjectName = flowObject.Name ?? "",
-                    ManagementId = management.Id,
-                    ManagementName = management.Name,
-                    Objects = [.. linkedObjects
-                        .OrderBy(nwObject => nwObject.Name ?? "", StringComparer.OrdinalIgnoreCase)
-                        .ThenBy(nwObject => nwObject.Id)]
-                });
-            }
-        }
-
-        return [.. flowNwObjectDuplicateGroups
-                .OrderBy(group => group.FlowNwObjectName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(group => group.ManagementName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(group => group.FlowNwObjectId)
-                .ThenBy(group => group.ManagementId)];
     }
 
     private string ResolveFlowObjectName(FlowNwObject nwObject, IReadOnlyList<int> preferredManagementRanking, string fallbackName)

@@ -6,33 +6,49 @@ namespace FWO.Data.Flow
     public static class FlowAdminHelper
     {
         /// <summary>
-        /// Builds the list of unresolved duplicate flow object links.
-        /// A group only qualifies if it has multiple linked objects and none of them are active. 
+        /// Builds the list of unresolved duplicate flow object links per management.
+        /// A group only qualifies if it has multiple linked objects on the same management and none of them are active.
         /// </summary>
-        public static List<FlowNwObjectDuplicateGroup> BuildDuplicateGroups(IEnumerable<FlowNwObject>? flowObjects)
+        public static List<FlowNwObjectDuplicateGroup> BuildDuplicateGroups(IEnumerable<FlowNwObject>? flowObjects, IEnumerable<Management>? managements)
         {
+            Dictionary<long, FlowNwObject> flowObjectLookup = (flowObjects ?? []).ToDictionary(flowObject => flowObject.Id);
             List<FlowNwObjectDuplicateGroup> duplicateGroups = [];
 
-            foreach (FlowNwObject flowObject in flowObjects ?? [])
+            foreach (Management management in managements ?? [])
             {
-                List<NetworkObject> linkedObjects = [.. (flowObject.Objects ?? [])];
-                if (linkedObjects.Count <= 1 || linkedObjects.Any(nwObject => nwObject.FlowActive))
+                foreach (IGrouping<long, NetworkObject> linkedObjectsByFlowObject in (management.Objects ?? [])
+                    .Where(nwObject => nwObject.FlowNetworkObjectId.HasValue)
+                    .GroupBy(nwObject => nwObject.FlowNetworkObjectId!.Value))
                 {
-                    continue;
-                }
+                    if (!flowObjectLookup.TryGetValue(linkedObjectsByFlowObject.Key, out FlowNwObject? flowObject))
+                    {
+                        continue;
+                    }
 
-                duplicateGroups.Add(new FlowNwObjectDuplicateGroup
-                {
-                    FlowNwObjectId = flowObject.Id,
-                    FlowNwObjectName = flowObject.Name ?? "",
-                    Objects = linkedObjects
-                });
+                    List<NetworkObject> linkedObjects = [.. linkedObjectsByFlowObject
+                        .OrderBy(nwObject => nwObject.Name ?? "", StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(nwObject => nwObject.Id)];
+                    if (linkedObjects.Count <= 1 || linkedObjects.Any(nwObject => nwObject.FlowActive))
+                    {
+                        continue;
+                    }
+
+                    duplicateGroups.Add(new FlowNwObjectDuplicateGroup
+                    {
+                        FlowNwObjectId = flowObject.Id,
+                        FlowNwObjectName = flowObject.Name ?? "",
+                        ManagementId = management.Id,
+                        ManagementName = management.Name,
+                        Objects = linkedObjects
+                    });
+                }
             }
 
             return [.. duplicateGroups
                 .OrderBy(group => group.FlowNwObjectName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(group => group.ManagementName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(group => group.FlowNwObjectId)
-                .ThenBy(group => group.Objects.Count)];
+                .ThenBy(group => group.ManagementId)];
         }
 
         /// <summary>
@@ -402,8 +418,19 @@ namespace FWO.Data.Flow
             if (!string.IsNullOrWhiteSpace(searchText))
             {
                 string normalizedSearchText = searchText.Trim();
-                filteredCandidates = filteredCandidates.Where(candidate =>
-                    BuildCustomObjectSearchText(candidate).Contains(normalizedSearchText, StringComparison.OrdinalIgnoreCase));
+                if (string.Equals(normalizedSearchText, "active", StringComparison.OrdinalIgnoreCase))
+                {
+                    filteredCandidates = filteredCandidates.Where(candidate => candidate.Active);
+                }
+                else if (string.Equals(normalizedSearchText, "inactive", StringComparison.OrdinalIgnoreCase))
+                {
+                    filteredCandidates = filteredCandidates.Where(candidate => !candidate.Active);
+                }
+                else
+                {
+                    filteredCandidates = filteredCandidates.Where(candidate =>
+                        BuildCustomObjectSearchText(candidate).Contains(normalizedSearchText, StringComparison.OrdinalIgnoreCase));
+                }
             }
 
             return [.. filteredCandidates
