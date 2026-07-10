@@ -552,7 +552,7 @@ else
             int objectIndex = Array.FindIndex(management.Services, service => service.Id == updatedService.Id);
             if (objectIndex >= 0)
             {
-                management.Services[objectIndex] = updatedService;
+                FlowAdminHelper.MergeServiceObjectMappingUpdate(management.Services[objectIndex], updatedService);
                 return;
             }
         }

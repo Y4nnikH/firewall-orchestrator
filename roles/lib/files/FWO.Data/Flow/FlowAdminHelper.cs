@@ -467,6 +467,52 @@ namespace FWO.Data.Flow
                 ? technicalId
                 : $"{details} [{technicalId}]";
         }
+
+        public static void MergeServiceObjectMappingUpdate(NetworkService cachedService, NetworkService updatedService)
+        {
+            MergeNetworkServiceMappingFields(cachedService, updatedService);
+            cachedService.FlowServiceObjectId = updatedService.FlowServiceObjectId;
+        }
+
+        public static void MergeServiceGroupMappingUpdate(NetworkService cachedService, NetworkService updatedService)
+        {
+            MergeNetworkServiceMappingFields(cachedService, updatedService);
+            cachedService.FlowServiceGroupId = updatedService.FlowServiceGroupId;
+        }
+
+        public static void MergeNetworkObjectMappingUpdate(NetworkObject cachedObject, NetworkObject updatedObject)
+        {
+            MergeNetworkObjectMappingFields(cachedObject, updatedObject);
+            cachedObject.FlowNetworkObjectId = updatedObject.FlowNetworkObjectId;
+        }
+
+        public static void MergeNetworkGroupMappingUpdate(NetworkObject cachedObject, NetworkObject updatedObject)
+        {
+            MergeNetworkObjectMappingFields(cachedObject, updatedObject);
+            cachedObject.FlowNetworkGroupId = updatedObject.FlowNetworkGroupId;
+        }
+
+        private static void MergeNetworkServiceMappingFields(NetworkService cachedService, NetworkService updatedService)
+        {
+            cachedService.Name = updatedService.Name;
+            cachedService.Uid = updatedService.Uid;
+            cachedService.DestinationPort = updatedService.DestinationPort;
+            cachedService.DestinationPortEnd = updatedService.DestinationPortEnd;
+            cachedService.Active = updatedService.Active;
+            cachedService.Removed = updatedService.Removed;
+            cachedService.FlowActive = updatedService.FlowActive;
+        }
+
+        private static void MergeNetworkObjectMappingFields(NetworkObject cachedObject, NetworkObject updatedObject)
+        {
+            cachedObject.Name = updatedObject.Name;
+            cachedObject.IP = updatedObject.IP;
+            cachedObject.IpEnd = updatedObject.IpEnd;
+            cachedObject.Uid = updatedObject.Uid;
+            cachedObject.Active = updatedObject.Active;
+            cachedObject.Removed = updatedObject.Removed;
+            cachedObject.FlowActive = updatedObject.FlowActive;
+        }
     }
 
     public class FlowNwObjectDuplicateGroup

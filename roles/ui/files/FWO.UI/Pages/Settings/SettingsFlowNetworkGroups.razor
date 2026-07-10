@@ -340,7 +340,7 @@ else
             int objectIndex = Array.FindIndex(management.Objects, nwObject => nwObject.Id == updatedObject.Id);
             if (objectIndex >= 0)
             {
-                management.Objects[objectIndex] = updatedObject;
+                FlowAdminHelper.MergeNetworkGroupMappingUpdate(management.Objects[objectIndex], updatedObject);
                 return;
             }
         }

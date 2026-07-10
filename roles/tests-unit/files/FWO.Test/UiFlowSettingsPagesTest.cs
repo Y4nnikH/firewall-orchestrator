@@ -263,6 +263,40 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task FlowServiceObjectsPage_ResolveDuplicateMapping_PreservesCachedServiceSignatureForCreateDialog()
+        {
+            await using BunitContext context = CreateDuplicateResolverContext(out FlowServiceObjectsDuplicateResolverApiConn apiConnection);
+
+            IRenderedComponent<SettingsFlowServiceObjects> component = RenderPage<SettingsFlowServiceObjects>(context);
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-warning"), Is.Not.Empty));
+
+            component.FindAll("button.btn.btn-sm.btn-warning")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-outline-primary"), Is.Not.Empty));
+            component.FindAll("button.btn-outline-primary")[^1].Click();
+            component.FindAll("button.btn.btn-sm.btn-warning")[^1].Click();
+
+            component.WaitForAssertion(() => Assert.That(apiConnection.MappingCalls.Count, Is.EqualTo(2)));
+
+            component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("input.form-control.form-control-sm"), Is.Not.Empty));
+
+            component.FindAll("input.form-control.form-control-sm")[0].Change("Merged Service");
+            component.FindAll("button.btn-outline-primary")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-success"), Is.Not.Empty));
+            component.FindAll("button.btn.btn-sm.btn-primary")[^1].Click();
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(apiConnection.Queries, Does.Contain(FlowQueries.insertFlowSvcObjects));
+                Assert.That(apiConnection.InsertedServiceObject, Is.Not.Null);
+                Assert.That(apiConnection.InsertedServiceObject!.IpProtoId, Is.EqualTo(6));
+                Assert.That(apiConnection.InsertedServiceObject.PortStart, Is.EqualTo(80));
+                Assert.That(apiConnection.InsertedServiceObject.PortEnd, Is.EqualTo(80));
+                Assert.That(apiConnection.MappingCalls, Does.Contain((11L, 900L, true)));
+            });
+        }
+
+        [Test]
         public async Task FlowServiceGroupsPage_RendersWithoutErrors()
         {
             await using BunitContext context = CreateContext();
@@ -322,6 +356,49 @@ namespace FWO.Test
                 Assert.That(saveButton.InnerHtml, Does.Contain("spinner-border"));
                 Assert.That(saveButton.GetAttribute("disabled"), Is.Not.Null);
             });
+        }
+
+        [Test]
+        public async Task FlowNetworkObjectsPage_ResolveDuplicateMapping_PreservesTypeForCustomObjectSearch()
+        {
+            await using BunitContext context = CreateNetworkDuplicateResolverContext(out FlowNetworkObjectsDuplicateResolverApiConn apiConnection);
+
+            IRenderedComponent<SettingsFlowNetworkObjects> component = RenderPage<SettingsFlowNetworkObjects>(context);
+            FieldInfo? duplicateGroupsField = typeof(SettingsFlowNetworkObjects).GetField("duplicateGroups", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo? selectedGroupField = typeof(SettingsFlowNetworkObjects).GetField("SelectedDuplicateGroup", BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo? resolveDuplicateMapping = typeof(SettingsFlowNetworkObjects).GetMethod("ResolveDuplicateMapping", BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo? openCreateCustomObject = typeof(SettingsFlowNetworkObjects).GetMethod("OpenCreateCustomObject", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(duplicateGroupsField, Is.Not.Null);
+            Assert.That(selectedGroupField, Is.Not.Null);
+            Assert.That(resolveDuplicateMapping, Is.Not.Null);
+            Assert.That(openCreateCustomObject, Is.Not.Null);
+
+            component.WaitForAssertion(() =>
+            {
+                List<FlowNwObjectDuplicateGroup> duplicateGroups = (List<FlowNwObjectDuplicateGroup>)duplicateGroupsField!.GetValue(component.Instance)!;
+                Assert.That(duplicateGroups, Has.Count.EqualTo(1));
+            });
+
+            List<FlowNwObjectDuplicateGroup> loadedDuplicateGroups = (List<FlowNwObjectDuplicateGroup>)duplicateGroupsField!.GetValue(component.Instance)!;
+            FlowNwObjectDuplicateGroup duplicateGroup = loadedDuplicateGroups.Single();
+            selectedGroupField!.SetValue(component.Instance, duplicateGroup);
+            await component.InvokeAsync(async () => await (Task)resolveDuplicateMapping!.Invoke(component.Instance, [duplicateGroup.Objects[0]])!);
+
+            component.WaitForAssertion(() => Assert.That(apiConnection.MappingCalls.Count, Is.EqualTo(2)));
+
+            await component.InvokeAsync(async () => await (Task)openCreateCustomObject!.Invoke(component.Instance, null)!);
+            FieldInfo? selectionsField = typeof(SettingsFlowNetworkObjects).GetField("customObjectSelections", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(selectionsField, Is.Not.Null);
+            System.Collections.IEnumerable selections = (System.Collections.IEnumerable)selectionsField!.GetValue(component.Instance)!;
+            object selection = selections.Cast<object>().Single();
+            selection.GetType().GetProperty("SearchText")!.SetValue(selection, "host");
+
+            var filteredCandidates = ((System.Collections.IEnumerable)selection.GetType().GetProperty("FilteredCandidates")!.GetValue(selection)!)
+                .Cast<NetworkObject>()
+                .ToList();
+
+            Assert.That(filteredCandidates, Has.Count.EqualTo(2));
+            Assert.That(filteredCandidates.Select(candidate => candidate.Type.Name), Is.EqualTo(new[] { "host", "host" }));
         }
 
         private static BunitContext CreateContext()
@@ -387,6 +464,25 @@ namespace FWO.Test
             apiConnection = new FlowServiceObjectsDuplicateResolverApiConn();
             context.Services.AddSingleton<ApiConnection>(apiConnection);
             context.Services.AddScoped<DomEventService>();
+            context.Services.AddSingleton<UserConfig>(new SimulatedUserConfig
+            {
+                User = { Roles = [Roles.Admin] }
+            });
+            context.Services.AddSingleton<AuthenticationStateProvider>(new FlowSettingsPagesAuthStateProvider(Roles.Admin));
+            return context;
+        }
+
+        private static BunitContext CreateNetworkDuplicateResolverContext(out FlowNetworkObjectsDuplicateResolverApiConn apiConnection)
+        {
+            BunitContext context = new();
+            context.JSInterop.Mode = JSRuntimeMode.Loose;
+            context.Services.AddAuthorizationCore();
+            context.Services.AddLocalization();
+            context.Services.AddSingleton<IAuthorizationService>(new AllowAllAuthorizationService());
+            apiConnection = new FlowNetworkObjectsDuplicateResolverApiConn();
+            context.Services.AddSingleton<ApiConnection>(apiConnection);
+            context.Services.AddScoped<DomEventService>();
+            context.Services.AddSingleton<GlobalConfig>(new SimulatedGlobalConfig());
             context.Services.AddSingleton<UserConfig>(new SimulatedUserConfig
             {
                 User = { Roles = [Roles.Admin] }
@@ -1122,6 +1218,7 @@ namespace FWO.Test
 
         public List<string> Queries { get; } = [];
         public List<(long ServiceId, long FlowSvcobjId, bool ActiveOnMgm)> MappingCalls { get; } = [];
+        public FlowSvcObjectInsert? InsertedServiceObject { get; private set; }
 
         private readonly FlowSvcObject flowSvcObject = new()
         {
@@ -1184,6 +1281,39 @@ namespace FWO.Test
             {
                 return Task.FromResult((QueryResponseType)(object)new List<Management> { management });
             }
+            if (query == FlowQueries.insertFlowSvcObjects && typeof(QueryResponseType) == typeof(FlowSvcObjectInsertResult))
+            {
+                object?[] insertedObjects = GetAnonymousArray(variables, "objects");
+                object? firstObject = insertedObjects.FirstOrDefault();
+                InsertedServiceObject = new FlowSvcObjectInsert
+                {
+                    Name = GetAnonymousProperty<string>(firstObject, "Name"),
+                    PortStart = GetAnonymousNullableProperty<int>(firstObject, "PortStart"),
+                    PortEnd = GetAnonymousNullableProperty<int>(firstObject, "PortEnd"),
+                    IpProtoId = GetAnonymousProperty<int>(firstObject, "IpProtoId"),
+                    SvcObjHash = GetAnonymousProperty<string>(firstObject, "SvcObjHash"),
+                    State = GetAnonymousProperty<string>(firstObject, "State"),
+                    RemovedDate = null,
+                    ShowInRequestModule = GetAnonymousProperty<bool>(firstObject, "ShowInRequestModule")
+                };
+                return Task.FromResult((QueryResponseType)(object)new FlowSvcObjectInsertResult
+                {
+                    Returning =
+                    [
+                        new FlowSvcObject
+                        {
+                            Id = 900,
+                            Name = InsertedServiceObject.Name ?? "",
+                            PortStart = InsertedServiceObject.PortStart,
+                            PortEnd = InsertedServiceObject.PortEnd,
+                            ProtoId = InsertedServiceObject.IpProtoId,
+                            Hash = InsertedServiceObject.SvcObjHash ?? "",
+                            State = InsertedServiceObject.State ?? FlowState.Implemented,
+                            ShowInRequestModule = InsertedServiceObject.ShowInRequestModule
+                        }
+                    ]
+                });
+            }
             if (query == FlowMutations.upsertFlowSvcObjectMapping && typeof(QueryResponseType) == typeof(NetworkService))
             {
                 long serviceId = GetAnonymousProperty<long>(variables, "svcId");
@@ -1197,8 +1327,135 @@ namespace FWO.Test
                     Uid = serviceId == 11 ? "svc-a" : "svc-b",
                     DestinationPort = 80,
                     DestinationPortEnd = 80,
-                    ProtoId = 6,
-                    FlowServiceObjectId = 900,
+                    Active = true,
+                    Removed = null,
+                    FlowServiceObjectId = flowSvcobjId,
+                    FlowActive = activeOnMgm
+                });
+            }
+
+            throw new InvalidOperationException($"Unexpected query: {query}");
+        }
+
+        private static T GetAnonymousProperty<T>(object? variables, string propertyName)
+        {
+            if (variables == null)
+            {
+                throw new InvalidOperationException($"Missing variables for {propertyName}");
+            }
+
+            return (T)(variables.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)?.GetValue(variables)
+                ?? throw new InvalidOperationException($"Missing property {propertyName}"));
+        }
+
+        private static T? GetAnonymousNullableProperty<T>(object? variables, string propertyName)
+            where T : struct
+        {
+            if (variables == null)
+            {
+                throw new InvalidOperationException($"Missing variables for {propertyName}");
+            }
+
+            object? value = variables.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)?.GetValue(variables);
+            return value == null ? null : (T)value;
+        }
+
+        private static object?[] GetAnonymousArray(object? variables, string propertyName)
+        {
+            if (variables == null)
+            {
+                throw new InvalidOperationException($"Missing variables for {propertyName}");
+            }
+
+            return (object?[])(variables.GetType().GetProperty(propertyName)?.GetValue(variables)
+                ?? throw new InvalidOperationException($"Missing property {propertyName}"));
+        }
+    }
+
+    internal sealed class FlowNetworkObjectsDuplicateResolverApiConn : SimulatedApiConnection
+    {
+        public List<string> Queries { get; } = [];
+        public List<(long ObjectId, long FlowNwobjId, bool ActiveOnMgm)> MappingCalls { get; } = [];
+
+        private readonly FlowNwObject flowNwObject = new()
+        {
+            Id = 100,
+            Name = "Flow Object",
+            IpStart = null,
+            IpEnd = null,
+            Hash = "hash-100",
+            State = FlowState.Implemented,
+            ShowInRequestModule = false
+        };
+
+        private readonly Management management = new()
+        {
+            Id = 10,
+            Name = "Management",
+            Objects =
+            [
+                new NetworkObject
+                {
+                    Id = 11,
+                    Name = "Object A",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "obj-a",
+                    Active = true,
+                    Type = new NetworkObjectType { Id = 1, Name = "host" },
+                    FlowNetworkObjectId = 100,
+                    FlowActive = false
+                },
+                new NetworkObject
+                {
+                    Id = 12,
+                    Name = "Object B",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "obj-b",
+                    Active = true,
+                    Type = new NetworkObjectType { Id = 1, Name = "host" },
+                    FlowNetworkObjectId = 100,
+                    FlowActive = false
+                }
+            ]
+        };
+
+        public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
+        {
+            Queries.Add(query);
+            if (query == FlowQueries.getFlowSelectableManagements)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<Management> { new() { Id = 10, Name = "Management" } });
+            }
+            if (query == FlowQueries.getFlowNwObjectCatalog)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<FlowNwObject> { flowNwObject });
+            }
+            if (query == FlowQueries.getFlowCustomObjectCandidates)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<Management> { management });
+            }
+            if (query == FlowQueries.getFlowCustomObjectNamingCandidates)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<Management> { management });
+            }
+            if (query == FlowMutations.upsertFlowNwObjectMapping && typeof(QueryResponseType) == typeof(NetworkObject))
+            {
+                long objectId = GetAnonymousProperty<long>(variables, "objId");
+                long flowNwobjId = GetAnonymousProperty<long>(variables, "flowNwobjId");
+                bool activeOnMgm = GetAnonymousProperty<bool>(variables, "activeOnMgm");
+                MappingCalls.Add((objectId, flowNwobjId, activeOnMgm));
+                return Task.FromResult((QueryResponseType)(object)new NetworkObject
+                {
+                    Id = objectId,
+                    Name = objectId == 11 ? "Object A" : "Object B",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = objectId == 11 ? "obj-a" : "obj-b",
+                    Active = true,
+                    Removed = null,
+                    FlowNetworkObjectId = flowNwobjId,
                     FlowActive = activeOnMgm
                 });
             }
