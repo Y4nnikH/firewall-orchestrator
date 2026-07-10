@@ -336,15 +336,20 @@ namespace FWO.Data.Flow
         /// </summary>
         public static string FormatFlowTimeObjectTechnicalDetails(FlowTimeObject candidate)
         {
+            return FormatTimeRangeTechnicalDetails(candidate.StartTime, candidate.EndTime);
+        }
+
+        private static string FormatTimeRangeTechnicalDetails(DateTime? startTime, DateTime? endTime)
+        {
             List<string> parts = [];
-            if (candidate.StartTime.HasValue)
+            if (startTime.HasValue)
             {
-                parts.Add(candidate.StartTime.Value.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
+                parts.Add(startTime.Value.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
             }
 
-            if (candidate.EndTime.HasValue)
+            if (endTime.HasValue)
             {
-                parts.Add(candidate.EndTime.Value.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
+                parts.Add(endTime.Value.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
             }
 
             return string.Join(" - ", parts);
@@ -461,11 +466,7 @@ namespace FWO.Data.Flow
         /// </summary>
         public static string FormatTimeObjectTechnicalDetails(TimeObject candidate)
         {
-            string details = FormatFlowTimeObjectTechnicalDetails(new FlowTimeObject
-            {
-                StartTime = candidate.StartTime,
-                EndTime = candidate.EndTime
-            });
+            string details = FormatTimeRangeTechnicalDetails(candidate.StartTime, candidate.EndTime);
             string technicalId = string.IsNullOrWhiteSpace(candidate.Uid)
                 ? $"#{candidate.Id}"
                 : candidate.Uid;
