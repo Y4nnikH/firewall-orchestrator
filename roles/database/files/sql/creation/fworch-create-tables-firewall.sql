@@ -215,8 +215,8 @@ Create table firewall.rule_metadata
 	"rule_last_hit" Timestamp,
 	"rule_hit_counter" BIGINT,
 	"removed" BIGINT,
- primary key ("rule_metadata_id")
-);
+ primary key ("rule_metadata_id"),
+ constraint "rule_metadata_mgm_id_rule_uid_unique" unique ("mgm_id", "rule_uid"));
 
 Create table firewall.parent_rule_type
 (
