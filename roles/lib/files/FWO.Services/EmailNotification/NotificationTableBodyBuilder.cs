@@ -12,7 +12,7 @@ namespace FWO.Services
     {
         private const string kTextColumnSeparator = " | ";
         private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(100);
-        public static readonly string HtmlTableStyleBlock = "<style>table {font-family: arial, sans-serif;font-size: 10px;border-collapse: collapse;width: 100 %;}td {border: 1px solid #000000;text-align: left;padding: 3px;}th {border: 1px solid #000000;text-align: left;padding: 3px;background-color: #dddddd;}</style>";
+        public static readonly string HtmlTableStyleBlock = "<style>table {font-family: arial, sans-serif;font-size: 10px;border-collapse: collapse;width: 100%;}td {border: 1px solid #000000;text-align: left;padding: 3px;}th {border: 1px solid #000000;text-align: left;padding: 3px;background-color: #dddddd;}</style>";
 
         /// <summary>
         /// Builds a plain-text table from headers and rows.
