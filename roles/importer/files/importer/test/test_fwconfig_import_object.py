@@ -2279,6 +2279,7 @@ class TestFwConfigImportObjectUpdateObjectDiffs:
         fwconfig_import_object.remove_outdated_memberships = mocker.Mock()
         fwconfig_import_object.add_group_memberships = mocker.Mock()
         fwconfig_import_object.add_changelog_objs = mocker.Mock()
+        fwconfig_import_object.update_time_objs_via_api = mocker.Mock()
 
         fwconfig_import_object.update_objects_via_api = mocker.Mock(
             return_value=(
@@ -2335,6 +2336,11 @@ class TestFwConfigImportObjectUpdateObjectDiffs:
 
         assert fwconfig_import_object.remove_outdated_memberships.call_count == 3
         assert fwconfig_import_object.add_group_memberships.call_count == 3
+        fwconfig_import_object.update_time_objs_via_api.assert_called_once_with(
+            prev_config.time_objects,
+            curr_config.time_objects,
+            is_global=fw_config_manager.is_super_manager,
+        )
 
         fwconfig_import_object.add_changelog_objs.assert_called_once_with(
             [{"obj_id": 2}],
