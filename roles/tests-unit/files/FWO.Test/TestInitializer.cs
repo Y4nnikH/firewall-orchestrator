@@ -10,11 +10,24 @@ namespace FWO.Test
     [SetUpFixture]
     class TestInitializer
     {
+        private const string kConfigFilePathEnvVar = "FWO_CONFIG_FILE_PATH";
+
+        private const string kTestConfigFileContent = @"{
+          ""api_uri"": ""https://127.0.0.1:9443/api/v1/graphql/"",
+          ""fworch_home"": ""/usr/local/fworch"",
+          ""middleware_native_uri"": ""http://127.0.0.3:8880/"",
+          ""middleware_uri"": ""http://127.0.0.1:8880/"",
+          ""product_version"": ""9.2.1"",
+          ""remote_addresses"": []
+        }";
+
         private FakeLocalTimeZone? fakeLocalTimeZone;
+        private string? testConfigFilePath;
 
         [OneTimeSetUp]
         public void OnStart()
         {
+            SetConfigFilePath();
             SetGermanCultureOnAllUnitTest();
             SetGermanTimeZoneOnAllUnitTest();
             SetQueryBasePath();
@@ -24,6 +37,29 @@ namespace FWO.Test
         public void OnFinish()
         {
             fakeLocalTimeZone?.Dispose();
+
+            if (testConfigFilePath != null)
+            {
+                Environment.SetEnvironmentVariable(kConfigFilePathEnvVar, null);
+                File.Delete(testConfigFilePath);
+            }
+        }
+
+        /// <summary>
+        /// Points ConfigFile at a synthetic config file so its static constructor does not
+        /// depend on /etc/fworch/fworch.json existing on the test host (e.g. CI runners).
+        /// Must run before any test touches ConfigFile.
+        /// </summary>
+        private void SetConfigFilePath()
+        {
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(kConfigFilePathEnvVar)))
+            {
+                return;
+            }
+
+            testConfigFilePath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "fworch.test.json");
+            File.WriteAllText(testConfigFilePath, kTestConfigFileContent);
+            Environment.SetEnvironmentVariable(kConfigFilePathEnvVar, testConfigFilePath);
         }
 
 
