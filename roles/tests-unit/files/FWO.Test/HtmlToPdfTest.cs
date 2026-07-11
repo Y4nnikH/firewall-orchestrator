@@ -20,8 +20,7 @@ namespace FWO.Test
             bool isValidHtml = ReportBase.IsValidHTML(GlobalConst.TestPDFHtmlTemplate);
             ClassicAssert.IsTrue(isValidHtml);
 
-            string? sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
-            bool isGitHubActions = sudoUser is not null && sudoUser.Equals("runner", StringComparison.OrdinalIgnoreCase);
+            bool isGitHubActions = IsGitHubActions(Environment.GetEnvironmentVariable("GITHUB_ACTIONS"));
 
             if (ShouldSkipPdfTest(isGitHubActions, out string skipReason))
             {
@@ -151,6 +150,15 @@ namespace FWO.Test
             ClassicAssert.AreEqual(tocContent[1].Title, "test mit puppteer");
         }
 
+        [TestCase("true", true)]
+        [TestCase("TRUE", true)]
+        [TestCase("false", false)]
+        [TestCase(null, false)]
+        public void IsGitHubActionsReturnsExpectedResult(string? value, bool expected)
+        {
+            ClassicAssert.AreEqual(expected, IsGitHubActions(value));
+        }
+
         private async Task TryCreatePDF(IBrowser browser, PuppeteerSharp.Media.PaperFormat paperFormat)
         {
             if (browser.IsClosed || !browser.IsConnected || browser.Process == null)
@@ -218,6 +226,14 @@ namespace FWO.Test
                 || value.Equals("true", StringComparison.OrdinalIgnoreCase)
                 || value.Equals("yes", StringComparison.OrdinalIgnoreCase)
                 || value.Equals("on", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Determines whether the standard GitHub Actions environment marker is enabled.
+        /// </summary>
+        private static bool IsGitHubActions(string? value)
+        {
+            return value?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
         }
     }
 }
