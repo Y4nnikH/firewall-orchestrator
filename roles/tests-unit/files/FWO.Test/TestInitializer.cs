@@ -11,6 +11,7 @@ namespace FWO.Test
     class TestInitializer
     {
         private const string kConfigFilePathEnvVar = "FWO_CONFIG_FILE_PATH";
+        private const string kLogLockDirEnvVar = "FWO_LOG_LOCK_DIR";
 
         private const string kTestConfigFileContent = @"{
           ""api_uri"": ""https://127.0.0.1:9443/api/v1/graphql/"",
@@ -23,10 +24,12 @@ namespace FWO.Test
 
         private FakeLocalTimeZone? fakeLocalTimeZone;
         private string? testConfigFilePath;
+        private bool logLockDirSet;
 
         [OneTimeSetUp]
         public void OnStart()
         {
+            SetLogLockDirectory();
             SetConfigFilePath();
             SetGermanCultureOnAllUnitTest();
             SetGermanTimeZoneOnAllUnitTest();
@@ -43,6 +46,27 @@ namespace FWO.Test
                 Environment.SetEnvironmentVariable(kConfigFilePathEnvVar, null);
                 File.Delete(testConfigFilePath);
             }
+
+            if (logLockDirSet)
+            {
+                Environment.SetEnvironmentVariable(kLogLockDirEnvVar, null);
+            }
+        }
+
+        /// <summary>
+        /// Points the Log lock file at the writable test work directory so the log lock
+        /// mechanism does not depend on /var/fworch/lock existing on the test host
+        /// (e.g. CI runners). Must run before any test touches Log.
+        /// </summary>
+        private void SetLogLockDirectory()
+        {
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(kLogLockDirEnvVar)))
+            {
+                return;
+            }
+
+            Environment.SetEnvironmentVariable(kLogLockDirEnvVar, TestContext.CurrentContext.WorkDirectory);
+            logLockDirSet = true;
         }
 
         /// <summary>
