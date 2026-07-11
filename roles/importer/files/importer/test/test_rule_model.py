@@ -65,3 +65,9 @@ def test_rules_differing_only_in_zone_are_unequal(field: str, value_a: str | Non
     rule_a = _base_rule(**{field: value_a})
     rule_b = _base_rule(**{field: value_b})
     assert rule_a != rule_b
+
+
+def test_eq_returns_notimplemented_for_other_types():
+    rule = _base_rule()
+    assert rule.__eq__("not a rule") is NotImplemented
+    assert rule != "not a rule"
