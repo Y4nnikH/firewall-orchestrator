@@ -55,14 +55,24 @@ namespace FWO.Test
 
             BrowserFetcher browserFetcher = new(new BrowserFetcherOptions() { Platform = platform, Browser = wantedBrowser, Path = path });
 
-            IEnumerable<InstalledBrowser>? allInstalledBrowsers = browserFetcher.GetInstalledBrowsers().Where(_ => _.Browser == wantedBrowser);
+            IEnumerable<InstalledBrowser> allInstalledBrowsers = browserFetcher.GetInstalledBrowsers().Where(_ => _.Browser == wantedBrowser);
+            string? executablePath = null;
 
-            if (allInstalledBrowsers is null || !allInstalledBrowsers.Any())
+            if (!allInstalledBrowsers.Any())
             {
-                // this should only happen for testing on local systems where no suitable browser is installed
-                Log.WriteInfo("Browser", $"Browser not found for current system - trying to download...");
-                await browserFetcher.DownloadAsync();
-                allInstalledBrowsers = browserFetcher.GetInstalledBrowsers().Where(_ => _.Browser == wantedBrowser);
+                executablePath = SystemChromium.GetPath();
+                if (executablePath is null)
+                {
+                    string downloadPath = Path.Combine(Path.GetTempPath(), "fwo-puppeteer");
+                    Log.WriteInfo("Browser", $"Browser not found for current system - downloading to {downloadPath}...");
+                    browserFetcher = new(new BrowserFetcherOptions() { Platform = platform, Browser = wantedBrowser, Path = downloadPath });
+                    await browserFetcher.DownloadAsync();
+                    allInstalledBrowsers = browserFetcher.GetInstalledBrowsers().Where(_ => _.Browser == wantedBrowser);
+                }
+                else
+                {
+                    Log.WriteInfo("Browser", $"No installed {wantedBrowser} found, falling back to system chromium at: {executablePath}");
+                }
             }
 
             foreach (InstalledBrowser instBrowser in allInstalledBrowsers)
@@ -70,23 +80,21 @@ namespace FWO.Test
                 Log.WriteInfo("Test Log", $"Found installed {instBrowser.Browser}({instBrowser.BuildId}) at: {instBrowser.GetExecutablePath()}");
             }
 
-            string? newestBuildId = allInstalledBrowsers.Max(_ => _.BuildId);
-
-            if (string.IsNullOrWhiteSpace(newestBuildId))
+            if (executablePath is null)
             {
-                Log.WriteAlert("Test Log", $"Invalid build ID!");
-                return;
+                string? newestBuildId = allInstalledBrowsers.Max(_ => _.BuildId);
+
+                if (string.IsNullOrWhiteSpace(newestBuildId))
+                {
+                    Assert.Fail("Invalid browser build ID.");
+                    return;
+                }
+
+                InstalledBrowser latestInstalledBrowser = allInstalledBrowsers.Single(_ => _.BuildId == newestBuildId);
+
+                executablePath = latestInstalledBrowser.GetExecutablePath();
+                Log.WriteInfo("Test Log", $"Selecting latest installed {wantedBrowser}({latestInstalledBrowser.BuildId}) at: {executablePath}");
             }
-
-            InstalledBrowser? latestInstalledBrowser = allInstalledBrowsers.Single(_ => _.BuildId == newestBuildId);
-
-            if (latestInstalledBrowser is null)
-            {
-                Log.WriteAlert("Test Log", $"Found no installed {wantedBrowser} instances with a valid build ID!");
-                return;
-            }
-
-            Log.WriteInfo("Test Log", $"Selecting latest installed {wantedBrowser}({latestInstalledBrowser.BuildId}) at: {latestInstalledBrowser.GetExecutablePath()}");
 
             IBrowser? browser;
 
@@ -94,7 +102,7 @@ namespace FWO.Test
             {
                 browser = await Puppeteer.LaunchAsync(new LaunchOptions
                 {
-                    ExecutablePath = latestInstalledBrowser.GetExecutablePath(),
+                    ExecutablePath = executablePath,
                     Headless = true,
                     DumpIO = isGitHubActions,
                     Args = isGitHubActions ? ["--database=/tmp", "--no-sandbox"] : []
