@@ -56,6 +56,19 @@ BEGIN
     EXECUTE format('ALTER DATABASE %I SET search_path = %s', current_database(), '"$user", public, firewall');
 END $$;
 
--- keep upgraded installs in sync with fresh ones: this index is created by
--- fworch-create-indices.sql on a fresh install, so add it here for existing installs too.
-CREATE INDEX IF NOT EXISTS "IX_Relationship90" ON firewall.rule ("rule_from_zone");
+-- give the read-only user access to the new schema (same pattern as 8.8.8.sql);
+-- the moved tables keep their table-level grants, but schema USAGE and default
+-- privileges for future tables have to be granted explicitly.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'fwo_ro') THEN
+        CREATE ROLE fwo_ro WITH LOGIN NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE;
+    END IF;
+END
+$$;
+
+GRANT USAGE ON SCHEMA firewall TO fwo_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA firewall TO fwo_ro;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA firewall TO fwo_ro;
+ALTER DEFAULT PRIVILEGES IN SCHEMA firewall GRANT SELECT ON TABLES TO fwo_ro;
+ALTER DEFAULT PRIVILEGES IN SCHEMA firewall GRANT USAGE, SELECT ON SEQUENCES TO fwo_ro;
