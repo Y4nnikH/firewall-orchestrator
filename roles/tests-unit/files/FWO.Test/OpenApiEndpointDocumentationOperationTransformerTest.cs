@@ -62,9 +62,10 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
 
         await transformer.TransformAsync(operation, CreateOwnerContext(), CancellationToken.None);
 
+        string normalizedDescription = NormalizeLineEndings(operation.Description);
         Assert.Multiple(() =>
         {
-            Assert.That(operation.Description, Does.Contain("""
+            Assert.That(normalizedDescription, Does.Contain("""
 ```json
 {
   "ownerLifecycleStateId": 1,
@@ -72,7 +73,7 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
 }
 ```
 """));
-            Assert.That(operation.Description, Does.Contain("""
+            Assert.That(normalizedDescription, Does.Contain("""
 ```json
 [
   {
@@ -84,6 +85,11 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
             Assert.That(operation.Description, Does.Not.Contain("{\"active\":true"));
             Assert.That(operation.Description, Does.Not.Contain("{\"id\":42"));
         });
+    }
+
+    private static string NormalizeLineEndings(string? text)
+    {
+        return (text ?? string.Empty).Replace("\r\n", "\n");
     }
 
     /// <summary>

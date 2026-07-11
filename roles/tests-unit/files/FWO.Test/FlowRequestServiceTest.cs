@@ -271,6 +271,7 @@ internal class FlowRequestServiceTest
             Assert.That(apiConnection.SentQueries, Does.Contain(StmQueries.getRuleActions));
             Assert.That(apiConnection.SentQueries, Does.Contain(StmQueries.getIpProtocols));
             Assert.That(apiConnection.SentQueries, Contains.Item(RequestQueries.newTicket));
+            Assert.That(apiConnection.SentQueries, Contains.Item(RequestQueries.getTicketById));
             Assert.That(apiConnection.LastTicketWriter, Is.Not.Null);
             Assert.That(apiConnection.LastTicketWriter!.Tasks, Has.Count.EqualTo(1));
             Assert.That(apiConnection.LastTicketWriter.Tasks[0].TaskType, Is.EqualTo(WfTaskType.access.ToString()));
@@ -281,6 +282,9 @@ internal class FlowRequestServiceTest
             Assert.That(apiConnection.LastTicketWriter.Tasks[0].ServiceGroupId, Is.Null);
             Assert.That(apiConnection.LastTicketWriter.Tasks[0].TargetBeginDate, Is.Not.Null);
             Assert.That(apiConnection.LastTicketWriter.Tasks[0].TargetEndDate, Is.Not.Null);
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].GetAddInfoValue(AdditionalInfoKeys.TimeObjectId), Is.EqualTo("-3"));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].GetAddInfoValue("timeStart"), Is.EqualTo(""));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[0].GetAddInfoValue("timeEnd"), Is.EqualTo(""));
         });
     }
 
@@ -343,6 +347,8 @@ internal class FlowRequestServiceTest
             Assert.That(response.Status, Is.EqualTo("requested"));
             Assert.That(apiConnection.LastTicketWriter, Is.Not.Null);
             Assert.That(GetVariable(apiConnection.NewTicketVariables, "state"), Is.EqualTo(17));
+            Assert.That(apiConnection.CreatedTicket, Is.Not.Null);
+            Assert.That(apiConnection.CreatedTicket!.Requester?.DbId, Is.EqualTo(77));
         });
     }
 
@@ -685,6 +691,7 @@ internal class FlowRequestServiceTest
         public string[]? ExtStateErrors { get; set; }
         public WfTicketWriter? LastTicketWriter { get; private set; }
         public object? NewTicketVariables { get; private set; }
+        public WfTicket? CreatedTicket { get; private set; }
         private long nextId = 99;
 
         public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
@@ -695,7 +702,8 @@ internal class FlowRequestServiceTest
             Type responseType = typeof(QueryResponseType);
             if (responseType == typeof(WfTicket))
             {
-                return Task.FromResult((QueryResponseType)(object?)Ticket!);
+                WfTicket? ticket = CreatedTicket ?? Ticket;
+                return Task.FromResult((QueryResponseType)(object?)ticket!);
             }
 
             if (responseType == typeof(List<WfState>))
@@ -713,13 +721,22 @@ internal class FlowRequestServiceTest
                 return Task.FromResult((QueryResponseType)(object)RuleActions);
             }
 
+            if (responseType == typeof(ReturnId))
+            {
+                return Task.FromResult((QueryResponseType)(object)new ReturnId
+                {
+                    UpdatedIdLong = Convert.ToInt64(GetVariable(variables, "id") ?? 0)
+                });
+            }
+
             if (query == RequestQueries.newTicket)
             {
                 NewTicketVariables = variables;
                 LastTicketWriter = (WfTicketWriter?)GetVariable(variables, "requestTasks");
+                CreatedTicket = BuildCreatedTicket(variables, ++nextId);
                 return Task.FromResult((QueryResponseType)(object)new ReturnIdWrapper
                 {
-                    ReturnIds = [new ReturnId { NewIdLong = ++nextId }]
+                    ReturnIds = [new ReturnId { NewIdLong = CreatedTicket.Id }]
                 });
             }
 
@@ -775,6 +792,56 @@ internal class FlowRequestServiceTest
         public override Task ReconnectSubscriptionsAsync(string jwt, CancellationToken ct)
         {
             return Task.CompletedTask;
+        }
+
+        private static WfTicket BuildCreatedTicket(object? variables, long ticketId)
+        {
+            List<WfReqTask> tasks = [];
+            WfTicketWriter? writer = (WfTicketWriter?)GetVariable(variables, "requestTasks");
+            long taskId = 0;
+            if (writer != null)
+            {
+                foreach (WfReqTaskWriter taskWriter in writer.Tasks)
+                {
+                    tasks.Add(new WfReqTask
+                    {
+                        Id = ++taskId,
+                        Title = taskWriter.Title,
+                        TaskNumber = taskWriter.TaskNumber,
+                        TaskType = taskWriter.TaskType,
+                        TicketId = ticketId,
+                        StateId = taskWriter.StateId,
+                        RequestAction = taskWriter.RequestAction,
+                        Reason = taskWriter.Reason,
+                        AdditionalInfo = taskWriter.AdditionalInfo,
+                        Locked = taskWriter.Locked,
+                        Tracking = taskWriter.Tracking,
+                        RuleAction = taskWriter.RuleAction,
+                        ManagementId = taskWriter.ManagementId,
+                        Elements = [],
+                        Approvals = [],
+                        Owners = []
+                    });
+                }
+            }
+
+            return new WfTicket
+            {
+                Id = ticketId,
+                Title = Convert.ToString(GetVariable(variables, "title")) ?? "",
+                StateId = Convert.ToInt32(GetVariable(variables, "state") ?? 0),
+                Reason = Convert.ToString(GetVariable(variables, "reason")) ?? "",
+                Locked = Convert.ToBoolean(GetVariable(variables, "locked") ?? false),
+                Priority = Convert.ToInt32(GetVariable(variables, "priority") ?? 0),
+                Deadline = GetVariable(variables, "deadline") is DateTime deadline ? deadline : null,
+                Requester = new UiUser
+                {
+                    DbId = Convert.ToInt32(GetVariable(variables, "requesterId") ?? 0),
+                    Name = Convert.ToString(GetVariable(variables, "requesterName")) ?? "",
+                    Dn = Convert.ToString(GetVariable(variables, "requesterDn")) ?? ""
+                },
+                Tasks = tasks
+            };
         }
     }
 }

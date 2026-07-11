@@ -1,5 +1,6 @@
 using FWO.Api.Client;
 using FWO.Api.Client.Queries;
+using FWO.Basics;
 using FWO.Config.Api;
 using FWO.Data.Workflow;
 using FWO.Data;
@@ -43,13 +44,13 @@ public sealed class FlowRequestService
         Dictionary<string, int> ruleActionIds = await ResolveRuleActionIdsAsync();
         Dictionary<string, int> protocolIds = await ResolveProtocolIdsAsync();
         WfTicket ticket = BuildTicket(request, ticketStateId, requesterId, ruleActionIds, protocolIds);
-        long ticketId = await InsertTicketAsync(ticket);
+        ticket = await SaveTicketAsync(ticket);
         string status = await BuildRequestStatusAsync(ticket.StateId, tolerateExternalStateErrors: true);
 
         return new CreateRequestResponse
         {
             Status = status,
-            RequestId = checked((int)ticketId)
+            RequestId = checked((int)ticket.Id)
         };
     }
 
@@ -499,38 +500,24 @@ public sealed class FlowRequestService
     }
 
     /// <summary>
-    /// Inserts the created ticket by using the same whole-ticket mutation as the workflow services.
+    /// Persists the created ticket through the workflow save path so request actions are executed consistently.
     /// </summary>
-    private async Task<long> InsertTicketAsync(WfTicket ticket)
+    private async Task<WfTicket> SaveTicketAsync(WfTicket ticket)
     {
-        Dictionary<string, object?> variables = BuildTicketVariables(ticket);
-        variables["requesterId"] = ticket.Requester?.DbId;
-        variables["requestTasks"] = new WfTicketWriter(ticket);
-        variables["locked"] = ticket.Locked;
+        using UserConfig userConfig = new();
+        WfHandler wfHandler = new(userConfig, apiConnection, WorkflowPhases.request, (List<UserGroup>?)null);
+        ActionHandler actionHandler = new(apiConnection, wfHandler, null, true);
+        await actionHandler.Init();
+        WfDbAccess dbAccess = new((_, _, _, _) => { }, userConfig, apiConnection, actionHandler, true);
 
-        ReturnIdWrapper result = await apiConnection.SendQueryAsync<ReturnIdWrapper>(RequestQueries.newTicket, variables);
-        ReturnId? ticketId = result.ReturnIds?.FirstOrDefault();
-        if (ticketId == null)
+        WfTicket createdTicket = await dbAccess.AddTicketToDb(ticket);
+        long ticketId = createdTicket.Id;
+        if (ticketId <= 0)
         {
             throw new InvalidOperationException("Could not create the request ticket.");
         }
 
-        return ticketId.NewIdLong;
-    }
-
-    /// <summary>
-    /// Builds the ticket-level GraphQL variables.
-    /// </summary>
-    private static Dictionary<string, object?> BuildTicketVariables(WfTicket ticket)
-    {
-        return new Dictionary<string, object?>
-        {
-            ["title"] = ticket.Title,
-            ["state"] = ticket.StateId,
-            ["reason"] = ticket.Reason,
-            ["deadline"] = ticket.Deadline,
-            ["priority"] = ticket.Priority
-        };
+        return createdTicket;
     }
 
     /// <summary>
@@ -570,14 +557,6 @@ public sealed class FlowRequestService
         if (timeEntity != null)
         {
             additionalInfo[AdditionalInfoKeys.TimeObjectId] = timeEntity.Id.ToString();
-            if (!string.IsNullOrWhiteSpace(timeEntity.RawStartTime))
-            {
-                additionalInfo[AdditionalInfoKeys.TimeStart] = timeEntity.RawStartTime;
-            }
-            if (!string.IsNullOrWhiteSpace(timeEntity.RawEndTime))
-            {
-                additionalInfo[AdditionalInfoKeys.TimeEnd] = timeEntity.RawEndTime;
-            }
         }
         return JsonSerializer.Serialize(additionalInfo);
     }

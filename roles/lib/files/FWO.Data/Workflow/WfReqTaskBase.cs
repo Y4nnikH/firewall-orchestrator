@@ -25,8 +25,6 @@ namespace FWO.Data.Workflow
         public const string RequestorName = "requestorName";
         public const string RequestorId = "requestorId";
         public const string TimeObjectId = "timeObjectId";
-        public const string TimeStart = "timeStart";
-        public const string TimeEnd = "timeEnd";
         public const string ExtIcketId = "ExtIcketId";
         public const string AppRoleId = "AppRoleId";
         public const string SvcGrpId = "SvcGrpId";
