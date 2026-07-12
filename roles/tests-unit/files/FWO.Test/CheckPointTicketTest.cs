@@ -236,7 +236,7 @@ namespace FWO.Test
             RestResponse<int> response = await ticket.CreateExternalTicket();
 
             ClassicAssert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-            CollectionAssert.AreEqual(new[] { "add-group", "show-group", "publish" }, checkPointClient.CalledEndpoints);
+            CollectionAssert.AreEqual(ExpectedExistingGroupSkipEndpoints, checkPointClient.CalledEndpoints);
             ClassicAssert.AreEqual(1, checkPointClient.LogoutCalls);
         }
 
@@ -259,7 +259,7 @@ namespace FWO.Test
             RestResponse<int> response = await ticket.CreateExternalTicket();
 
             ClassicAssert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-            CollectionAssert.AreEqual(new[] { "add-network", "show-network", "publish" }, checkPointClient.CalledEndpoints);
+            CollectionAssert.AreEqual(ExpectedExistingNetworkSkipEndpoints, checkPointClient.CalledEndpoints);
         }
 
         [Test]
@@ -281,7 +281,7 @@ namespace FWO.Test
             RestResponse<int> response = await ticket.CreateExternalTicket();
 
             ClassicAssert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-            CollectionAssert.AreEqual(new[] { "add-address-range", "show-address-range", "publish" }, checkPointClient.CalledEndpoints);
+            CollectionAssert.AreEqual(ExpectedExistingAddressRangeSkipEndpoints, checkPointClient.CalledEndpoints);
         }
 
         [Test]
@@ -333,7 +333,7 @@ namespace FWO.Test
             RestResponse<int> response = await ticket.CreateExternalTicket();
 
             ClassicAssert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
-            CollectionAssert.AreEqual(new[] { "add-host", "show-host" }, checkPointClient.CalledEndpoints);
+            CollectionAssert.AreEqual(ExpectedHardErrorEndpoints, checkPointClient.CalledEndpoints);
             ClassicAssert.AreEqual(1, checkPointClient.LogoutCalls);
         }
 
@@ -394,6 +394,33 @@ namespace FWO.Test
                 "add-host",
                 "set-group",
                 "publish"
+            ];
+
+        private static readonly string[] ExpectedExistingGroupSkipEndpoints =
+            [
+                "add-group",
+                "show-group",
+                "publish"
+            ];
+
+        private static readonly string[] ExpectedExistingNetworkSkipEndpoints =
+            [
+                "add-network",
+                "show-network",
+                "publish"
+            ];
+
+        private static readonly string[] ExpectedExistingAddressRangeSkipEndpoints =
+            [
+                "add-address-range",
+                "show-address-range",
+                "publish"
+            ];
+
+        private static readonly string[] ExpectedHardErrorEndpoints =
+            [
+                "add-host",
+                "show-host"
             ];
 
         private CheckPointTicket CreateTicketWithPlan(SimulatedCheckPointClient checkPointClient, Management management, string ticketText)
