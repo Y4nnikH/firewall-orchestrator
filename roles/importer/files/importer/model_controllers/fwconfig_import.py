@@ -44,10 +44,10 @@ class FwConfigImport:
     _global_state: GlobalState
 
     @property
-    def fwconfig_import_object(self):
+    def fwconfig_import_object(self) -> FwConfigImportObject:
         return self._fw_config_import_object
 
-    def __init__(self):
+    def __init__(self) -> None:
         service_provider = ServiceProvider()
         self._global_state = service_provider.get_global_state()
         self.import_state = self._global_state.import_state
@@ -58,7 +58,7 @@ class FwConfigImport:
         self._fw_config_import_rule = FwConfigImportRule()
         self._fw_config_import_gateway = FwConfigImportGateway()
 
-    def import_single_config(self, single_manager: FwConfigManager):
+    def import_single_config(self, single_manager: FwConfigManager) -> None:
         # current implementation restriction: assuming we always get the full config (only inserts) from API
         mgm_id = self.import_state.state.lookup_management_id(single_manager.manager_uid)
         if mgm_id is None:
@@ -77,7 +77,7 @@ class FwConfigImport:
         # calculate differences and write them to the database via API
         self.update_diffs(previous_config, previous_global_config, single_manager)
 
-    def import_management_set(self, service_provider: ServiceProvider, mgr_set: FwConfigManagerListController):
+    def import_management_set(self, service_provider: ServiceProvider, mgr_set: FwConfigManagerListController) -> None:
         self.import_state.state.rollback_required = True
         for manager in sorted(mgr_set.ManagerSet, key=lambda m: not getattr(m, "IsSuperManager", False)):
             """
@@ -90,7 +90,9 @@ class FwConfigImport:
                 self.import_config(service_provider, manager, config)
         self.update_removed_managers(mgr_set.ManagerSet)
 
-    def import_config(self, service_provider: ServiceProvider, manager: FwConfigManager, config: FwConfigNormalized):
+    def import_config(
+        self, service_provider: ServiceProvider, manager: FwConfigManager, config: FwConfigNormalized
+    ) -> None:
         global_state = service_provider.get_global_state()
         global_state.normalized_config = config
         if manager.is_super_manager:
@@ -107,7 +109,7 @@ class FwConfigImport:
         config_importer.consistency_check_config_against_db()
         config_importer.write_latest_config()
 
-    def update_removed_managers(self, mgr_set: list[FwConfigManager]):
+    def update_removed_managers(self, mgr_set: list[FwConfigManager]) -> None:
         """
         Sets removed flag on all db entries associated with sub-managers which are not part of the current import set.
         """
@@ -116,7 +118,7 @@ class FwConfigImport:
         get_sub_mgrs_query = FwoApi.get_graphql_code(
             [fwo_const.GRAPHQL_QUERY_PATH + "device/getSubManagerUids.graphql"]
         )
-        query_variables = {"mgmId": self.import_state.state.mgm_details.mgm_id}
+        query_variables: dict[str, Any] = {"mgmId": self.import_state.state.mgm_details.mgm_id}
         try:
             query_result = self.import_state.api_connection.call(get_sub_mgrs_query, query_variables=query_variables)
             if "errors" in query_result:
@@ -241,7 +243,7 @@ class FwConfigImport:
         prev_config: FwConfigNormalized,
         prev_global_config: FwConfigNormalized | None,
         single_manager: FwConfigManager,
-    ):
+    ) -> None:
         self._fw_config_import_object.update_object_diffs(prev_config, prev_global_config, single_manager)
 
         if fwo_globals.shutdown_requested:
@@ -292,7 +294,7 @@ class FwConfigImport:
             )
             raise FwoApiFailedDeleteOldImportsError(f"management id: {mgm_id}") from None
 
-    def write_latest_config(self):
+    def write_latest_config(self) -> None:
         if self.import_state.state.import_version > 8:  # noqa: PLR2004
             if self.normalized_config is None:
                 raise FwoImporterError("cannot write latest config: NormalizedConfig is None")
@@ -337,12 +339,12 @@ class FwConfigImport:
                 )
                 raise
 
-    def delete_latest_config_of_management(self):
+    def delete_latest_config_of_management(self) -> None:
         delete_mutation = FwoApi.get_graphql_code(
             [fwo_const.GRAPHQL_QUERY_PATH + "import/deleteLatestConfigOfManagement.graphql"]
         )
         try:
-            query_variables = {"mgmId": self.import_state.state.mgm_details.current_mgm_id}
+            query_variables: dict[str, Any] = {"mgmId": self.import_state.state.mgm_details.current_mgm_id}
             import_result = self.import_state.api_call.call(delete_mutation, query_variables=query_variables)
             if "errors" in import_result:
                 FWOLogger.exception(
@@ -360,7 +362,7 @@ class FwConfigImport:
 
     def get_latest_import_id(self) -> int | None:
         query = FwoApi.get_graphql_code([fwo_const.GRAPHQL_QUERY_PATH + "import/getLastSuccessImport.graphql"])
-        query_variables = {"mgmId": self.import_state.state.mgm_details.mgm_id}
+        query_variables: dict[str, Any] = {"mgmId": self.import_state.state.mgm_details.mgm_id}
         try:
             query_result = self.import_state.api_connection.call(query, query_variables=query_variables)
             if "errors" in query_result:
@@ -387,7 +389,7 @@ class FwConfigImport:
             return prev_config
 
         query = FwoApi.get_graphql_code([fwo_const.GRAPHQL_QUERY_PATH + "import/getLatestConfig.graphql"])
-        query_variables = {"mgmId": mgm_id}
+        query_variables: dict[str, Any] = {"mgmId": mgm_id}
         try:
             query_result = self.import_state.api_connection.call(query, query_variables=query_variables)
             if "errors" in query_result:
@@ -409,7 +411,7 @@ class FwConfigImport:
             raise FwoImporterError("error while trying to get the previous config")
 
     def get_latest_config_from_db(self) -> FwConfigNormalized:
-        params = {"mgm-ids": [self.import_state.state.mgm_details.current_mgm_id]}
+        params: dict[str, Any] = {"mgm-ids": [self.import_state.state.mgm_details.current_mgm_id]}
         result = self.import_state.api_connection.call_endpoint("POST", "api/NormalizedConfig/Get", params=params)
         try:
             return FwConfigNormalized.model_validate(result)
@@ -419,7 +421,7 @@ class FwConfigImport:
             )
             raise FwoImporterError("error while trying to get the latest config")
 
-    def _sort_lists(self, config: FwConfigNormalized):
+    def _sort_lists(self, config: FwConfigNormalized) -> None:
         # sort lists in config to have consistent ordering for diff checks
         config.rulebases.sort(key=lambda rb: rb.uid)
         if any(gw.Uid is None for gw in config.gateways):
@@ -435,7 +437,7 @@ class FwConfigImport:
                 gw.EnforcedNatPolicyUids.sort()
             # TODO: interfaces and routing as soon as they are implemented
 
-    def consistency_check_config_against_db(self):
+    def consistency_check_config_against_db(self) -> None:
         normalized_config = self.normalized_config
         if normalized_config is None:
             raise FwoImporterError("cannot perform consistency check: NormalizedConfig is None")
@@ -460,7 +462,7 @@ class FwConfigImport:
         self,
         previous_config: FwConfigNormalized,
         previous_global_config: FwConfigNormalized | None,
-    ):
+    ) -> None:
         """
         Check consistency of the latest config (=previous config) built from database state before import.
         If inconsistencies are found, they will be fixed in the database by marking objects/rules/links as removed.
@@ -478,7 +480,7 @@ class FwConfigImport:
         self.fix_ref_tables_in_db()
         self.fix_changelog_rule()
 
-    def fix_objects_in_db(self, nwobj_uids: list[str], svcobj_uids: list[str], user_uids: list[str]):
+    def fix_objects_in_db(self, nwobj_uids: list[str], svcobj_uids: list[str], user_uids: list[str]) -> None:
         """
         Sets removed flag on network objects, service objects and user objects with the given UIDs in the database
         to fix consistency issues.
@@ -521,7 +523,7 @@ class FwConfigImport:
             )
             raise FwoImporterError("error while trying to fix object consistency issues") from None
 
-    def fix_rules_in_db(self, rule_uids: list[str]):
+    def fix_rules_in_db(self, rule_uids: list[str]) -> None:
         """
         Sets removed flag on rules with the given UIDs in the database to fix consistency issues.
         """
@@ -553,7 +555,7 @@ class FwConfigImport:
             )
             raise FwoImporterError("error while trying to fix rule consistency issues") from None
 
-    def fix_rulebase_links_in_db(self, previous_config: FwConfigNormalized):
+    def fix_rulebase_links_in_db(self, previous_config: FwConfigNormalized) -> None:
         """
         Removes inconsistent rulebase links from the database to fix consistency issues.
         """
@@ -625,7 +627,7 @@ class FwConfigImport:
             FWOLogger.exception(f"failed to fetch rulebase links for mgm id {mgm_id!s}: {traceback.format_exc()!s}")
             raise FwoImporterError("error while trying to fetch rulebase links") from None
 
-    def _insert_missing_rule_to_gw_refs_in_db(self, refs_to_add: set[tuple[str, str]]):
+    def _insert_missing_rule_to_gw_refs_in_db(self, refs_to_add: set[tuple[str, str]]) -> None:
         """Inserts missing rule enforced on gateway references to the database to fix consistency issues."""
         if not refs_to_add:
             return  # nothing to do
@@ -682,7 +684,7 @@ class FwConfigImport:
 
     def fix_rule_to_gw_refs_in_db(
         self, previous_config: FwConfigNormalized, previous_global_config: FwConfigNormalized | None
-    ):
+    ) -> None:
         """
         Set inconsistent rule_enforced_on_gateway entries removed and insert missing ones.
         """
@@ -764,7 +766,7 @@ class FwConfigImport:
         if refs_to_add:
             self._insert_missing_rule_to_gw_refs_in_db(refs_to_add)
 
-    def fix_ref_tables_in_db(self):
+    def fix_ref_tables_in_db(self) -> None:
         """
         Check ref tables for active references to objects/rules which were marked as removed and remove these
         references to fix consistency issues.
@@ -791,7 +793,7 @@ class FwConfigImport:
                 "error while trying to fix references to removed objects/rules in ref tables"
             ) from None
 
-    def fix_changelog_rule(self):
+    def fix_changelog_rule(self) -> None:
         """
         Fix changelog entries with old_rule_id == new_rule_id (both containing new_rule_id due to a bug in the past)
         """
