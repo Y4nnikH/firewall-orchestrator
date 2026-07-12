@@ -15,9 +15,9 @@
             @(DisplayService.DisplayButton(userConfig, "add_state", Icons.Add))
         </button>
     </div>
-    @if (ActAction.StateActions.Count > 0)
+    @if (pendingStateLinks.Count > 0)
     {
-        <Table class="table table-bordered table-sm th-bg-secondary table-responsive overflow-auto sticky-header" TableItem="WfStateActionStateHelper" Items="ActAction.StateActions" PageSize="0" ColumnReorder="false">
+        <Table class="table table-bordered table-sm th-bg-secondary table-responsive overflow-auto sticky-header" TableItem="WfStateActionStateHelper" Items="pendingStateLinks" PageSize="0" ColumnReorder="false">
             <Column TableItem="WfStateActionStateHelper" Title="@(userConfig.GetText("actions"))" Field="(x => x.State.Id)" Sortable="false" Filterable="false">
                 <Template>
                     <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoveStateLink(context)">
@@ -57,17 +57,21 @@
     [Parameter]
     public List<WfState> States { get; set; } = [];
 
-    [Parameter]
-    public bool AddActionMode { get; set; }
-
-    [Parameter]
-    public EventCallback OnChanged { get; set; }
-
     private bool selectStateMode;
     private WfState? selectedStateLink;
+    private List<WfStateActionStateHelper> pendingStateLinks = [];
+    private WfStateAction? loadedAction;
 
     protected override void OnParametersSet()
     {
+        if (!ReferenceEquals(loadedAction, ActAction))
+        {
+            pendingStateLinks = [.. ActAction.StateActions.Select(CloneStateLink)];
+            loadedAction = ActAction;
+            selectedStateLink = null;
+            selectStateMode = false;
+        }
+
         if (selectedStateLink == null)
         {
             selectedStateLink = AvailableStateLinks.FirstOrDefault();
@@ -76,24 +80,11 @@
 
     public async Task PersistPendingStateLinksAsync()
     {
-        foreach (WfStateActionStateHelper stateAction in ActAction.StateActions)
-        {
-            WfState? state = States.FirstOrDefault(candidate => candidate.Id == stateAction.State.Id);
-            if (state == null)
-            {
-                continue;
-            }
+        ActAction.StateActions = [.. pendingStateLinks.Select(CloneStateLink)];
 
-            int sortOrder = NextActionSortOrder(state);
-            stateAction.SortOrder = sortOrder;
-            state.Actions.Add(new WfStateActionDataHelper
-            {
-                Action = ActAction,
-                SortOrder = sortOrder
-            });
-            NormalizeActionSortOrder(state);
-            await apiConnection.SendQueryAsync<object>(RequestQueries.addStateAction, new { stateId = state.Id, actionId = ActAction.Id, sortOrder });
-            await SaveActionSortOrder(state);
+        foreach (WfState state in States)
+        {
+            await SyncStateLinksAsync(state);
         }
     }
 
@@ -110,81 +101,54 @@
     }
 
     private List<WfState> AvailableStateLinks => States
-        .Where(state => state.Id > 0 && ActAction.StateActions.All(link => link.State.Id != state.Id))
+        .Where(state => state.Id > 0 && pendingStateLinks.All(link => link.State.Id != state.Id))
         .OrderBy(state => state.Id)
         .ToList();
 
-    private async Task AddStateLink()
+    private Task AddStateLink()
     {
         try
         {
             if (selectedStateLink == null)
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            WfState state = States.FirstOrDefault(candidate => candidate.Id == selectedStateLink.Id) ?? throw new ArgumentException("no state selected");
-            WfStateActionDataHelper newStateAction = new()
+            int stateId = selectedStateLink.Id;
+            WfState state = States.FirstOrDefault(candidate => candidate.Id == stateId) ?? throw new ArgumentException("no state selected");
+            if (pendingStateLinks.Any(link => link.State.Id == state.Id))
             {
-                Action = ActAction,
-                SortOrder = NextActionSortOrder(state)
-            };
-
-            if (!AddActionMode)
-            {
-                await apiConnection.SendQueryAsync<object>(RequestQueries.addStateAction, new { stateId = state.Id, actionId = ActAction.Id, sortOrder = newStateAction.SortOrder });
-                state.Actions.Add(newStateAction);
-                NormalizeActionSortOrder(state);
-                await SaveActionSortOrder(state);
+                return Task.CompletedTask;
             }
 
-            ActAction.StateActions.Add(new WfStateActionStateHelper
+            pendingStateLinks.Add(new WfStateActionStateHelper
             {
-                SortOrder = newStateAction.SortOrder,
+                SortOrder = NextActionSortOrder(state),
                 State = state
             });
             selectStateMode = false;
             selectedStateLink = null;
-            if (!AddActionMode)
-            {
-                await OnChanged.InvokeAsync();
-            }
+            return Task.CompletedTask;
         }
         catch (Exception exception)
         {
             DisplayMessageInUi(exception, userConfig.GetText("edit_action"), "", true);
+            return Task.CompletedTask;
         }
     }
 
-    private async Task RemoveStateLink(WfStateActionStateHelper stateAction)
+    private Task RemoveStateLink(WfStateActionStateHelper stateAction)
     {
         try
         {
-            WfState state = States.FirstOrDefault(candidate => candidate.Id == stateAction.State.Id) ?? throw new ArgumentException("no state selected");
-            WfStateActionDataHelper? linkedAction = state.Actions.FirstOrDefault(action => action.Action.Id == ActAction.Id);
-            if (linkedAction == null)
-            {
-                ActAction.StateActions.Remove(stateAction);
-                return;
-            }
-
-            if (!AddActionMode)
-            {
-                await apiConnection.SendQueryAsync<object>(RequestQueries.removeStateAction, new { stateId = state.Id, actionId = ActAction.Id });
-                state.Actions.Remove(linkedAction);
-                NormalizeActionSortOrder(state);
-                await SaveActionSortOrder(state);
-            }
-
-            ActAction.StateActions.Remove(stateAction);
-            if (!AddActionMode)
-            {
-                await OnChanged.InvokeAsync();
-            }
+            int stateId = stateAction.State?.Id ?? -1;
+            pendingStateLinks.RemoveAll(link => link.State.Id == stateId);
+            return Task.CompletedTask;
         }
         catch (Exception exception)
         {
             DisplayMessageInUi(exception, userConfig.GetText("edit_action"), "", true);
+            return Task.CompletedTask;
         }
     }
 
@@ -212,5 +176,42 @@
                 sortOrder = stateAction.SortOrder
             });
         }
+    }
+
+    private async Task SyncStateLinksAsync(WfState state)
+    {
+        bool desired = pendingStateLinks.Any(link => link.State.Id == state.Id);
+        WfStateActionDataHelper? linkedAction = state.Actions.FirstOrDefault(action => action.Action.Id == ActAction.Id);
+
+        if (linkedAction != null && !desired)
+        {
+            await apiConnection.SendQueryAsync<object>(RequestQueries.removeStateAction, new { stateId = state.Id, actionId = ActAction.Id });
+            state.Actions.Remove(linkedAction);
+            NormalizeActionSortOrder(state);
+            await SaveActionSortOrder(state);
+            return;
+        }
+
+        if (linkedAction == null && desired)
+        {
+            int sortOrder = NextActionSortOrder(state);
+            state.Actions.Add(new WfStateActionDataHelper
+            {
+                Action = ActAction,
+                SortOrder = sortOrder
+            });
+            await apiConnection.SendQueryAsync<object>(RequestQueries.addStateAction, new { stateId = state.Id, actionId = ActAction.Id, sortOrder });
+            NormalizeActionSortOrder(state);
+            await SaveActionSortOrder(state);
+        }
+    }
+
+    private static WfStateActionStateHelper CloneStateLink(WfStateActionStateHelper stateLink)
+    {
+        return new WfStateActionStateHelper
+        {
+            SortOrder = stateLink.SortOrder,
+            State = stateLink.State
+        };
     }
 }

@@ -298,7 +298,7 @@ namespace FWO.Test
             await InvokeAsync(component, "OnParametersSet");
 
             Assert.That(GetMember<WfState>(component, "selectedToState").Id, Is.EqualTo(-1));
-            Assert.That(action.ExternalParams, Is.EqualTo("-1"));
+            Assert.That(action.ExternalParams, Is.EqualTo("not-a-valid-auto-promote-value"));
         }
 
         [Test]
@@ -972,6 +972,7 @@ namespace FWO.Test
                 linkedState,
                 new() { Id = 14, Name = "Available" }
             });
+            await InvokeAsync(component, "OnParametersSet");
 
             List<WfState> availableStateLinks = (List<WfState>)GetInstanceMethod(component.GetType(), "get_AvailableStateLinks").Invoke(component, [])!;
 
@@ -1004,14 +1005,13 @@ namespace FWO.Test
             WfStateAction action = new();
             SetMember(component, "ActAction", action);
             SetMember(component, "States", new List<WfState> { state });
-            SetMember(component, "AddActionMode", true);
+            await InvokeAsync(component, "OnParametersSet");
             SetMember(component, "selectedStateLink", state);
-            SetMember(component, "selectStateMode", true);
 
             await InvokeAsync(component, "AddStateLink");
 
-            Assert.That(action.StateActions, Has.Count.EqualTo(1));
-            Assert.That(action.StateActions[0].State, Is.SameAs(state));
+            Assert.That(action.StateActions, Is.Empty);
+            Assert.That(GetMember<List<WfStateActionStateHelper>>(component, "pendingStateLinks"), Has.Count.EqualTo(1));
             Assert.That(GetMember<bool>(component, "selectStateMode"), Is.False);
             Assert.That(GetMember<WfState?>(component, "selectedStateLink"), Is.Null);
         }
@@ -1032,17 +1032,38 @@ namespace FWO.Test
             SetMember(component, "apiConnection", apiConn);
             SetMember(component, "ActAction", action);
             SetMember(component, "States", new List<WfState> { state });
-            SetMember(component, "AddActionMode", false);
             SetMember(component, "selectedStateLink", state);
-            SetMember(component, "OnChanged", EventCallback.Factory.Create(new object(), () => changedCount++));
 
             await InvokeAsync(component, "AddStateLink");
+
+            Assert.That(apiConn.Queries, Is.Empty);
+            Assert.That(action.StateActions, Is.Empty);
+            Assert.That(GetMember<List<WfStateActionStateHelper>>(component, "pendingStateLinks"), Has.Count.EqualTo(1));
+
+            await component.PersistPendingStateLinksAsync();
 
             Assert.That(apiConn.Queries.Count(q => q == RequestQueries.addStateAction), Is.EqualTo(1));
             Assert.That(apiConn.Queries.Count(q => q == RequestQueries.updateStateActionSortOrder), Is.EqualTo(1));
             Assert.That(action.StateActions, Has.Count.EqualTo(1));
             Assert.That(state.Actions, Has.Count.EqualTo(1));
-            Assert.That(changedCount, Is.EqualTo(1));
+            Assert.That(changedCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public async Task EditActionUsingStates_OnParametersSet_DoesNotResetPendingLinksForSameAction()
+        {
+            EditActionUsingStates component = new();
+            WfState state = new() { Id = 11, Name = "Approved" };
+            WfStateAction action = new();
+            SetMember(component, "ActAction", action);
+            SetMember(component, "States", new List<WfState> { state });
+
+            await InvokeAsync(component, "OnParametersSet");
+            SetMember(component, "selectedStateLink", state);
+            await InvokeAsync(component, "AddStateLink");
+            await InvokeAsync(component, "OnParametersSet");
+
+            Assert.That(GetMember<List<WfStateActionStateHelper>>(component, "pendingStateLinks"), Has.Count.EqualTo(1));
         }
 
         [Test]
@@ -1054,12 +1075,13 @@ namespace FWO.Test
             WfStateActionStateHelper stateLink = new() { State = state, SortOrder = 1 };
             SetMember(component, "ActAction", action);
             SetMember(component, "States", new List<WfState> { state });
-            SetMember(component, "AddActionMode", false);
             action.StateActions.Add(stateLink);
+            await InvokeAsync(component, "OnParametersSet");
 
             await InvokeAsync(component, "RemoveStateLink", stateLink);
 
-            Assert.That(action.StateActions, Is.Empty);
+            Assert.That(action.StateActions, Has.Count.EqualTo(1));
+            Assert.That(GetMember<List<WfStateActionStateHelper>>(component, "pendingStateLinks"), Is.Empty);
         }
 
         [Test]
@@ -1096,10 +1118,15 @@ namespace FWO.Test
             SetMember(component, "apiConnection", apiConn);
             SetMember(component, "ActAction", action);
             SetMember(component, "States", new List<WfState> { state });
-            SetMember(component, "AddActionMode", false);
-            SetMember(component, "OnChanged", EventCallback.Factory.Create(new object(), () => changedCount++));
+            await InvokeAsync(component, "OnParametersSet");
 
             await InvokeAsync(component, "RemoveStateLink", stateLink);
+
+            Assert.That(apiConn.Queries, Is.Empty);
+            Assert.That(action.StateActions, Has.Count.EqualTo(1));
+            Assert.That(GetMember<List<WfStateActionStateHelper>>(component, "pendingStateLinks"), Is.Empty);
+
+            await component.PersistPendingStateLinksAsync();
 
             Assert.That(apiConn.Queries.Count(q => q == RequestQueries.removeStateAction), Is.EqualTo(1));
             Assert.That(apiConn.Queries.Count(q => q == RequestQueries.updateStateActionSortOrder), Is.EqualTo(1));
@@ -1107,7 +1134,7 @@ namespace FWO.Test
             Assert.That(state.Actions, Has.Count.EqualTo(1));
             Assert.That(state.Actions[0].Action, Is.SameAs(otherAction));
             Assert.That(state.Actions[0].SortOrder, Is.EqualTo(1));
-            Assert.That(changedCount, Is.EqualTo(1));
+            Assert.That(changedCount, Is.EqualTo(0));
         }
 
         [Test]
@@ -1130,6 +1157,7 @@ namespace FWO.Test
             SetMember(component, "apiConnection", apiConn);
             SetMember(component, "ActAction", action);
             SetMember(component, "States", new List<WfState> { firstState, secondState });
+            await InvokeAsync(component, "OnParametersSet");
 
             await component.PersistPendingStateLinksAsync();
 
@@ -1378,7 +1406,7 @@ namespace FWO.Test
             SetMember(usingStatesEditor, "apiConnection", apiConn);
             SetMember(usingStatesEditor, "ActAction", action);
             SetMember(usingStatesEditor, "States", new List<WfState> { state });
-            SetMember(usingStatesEditor, "AddActionMode", true);
+            await InvokeAsync(usingStatesEditor, "OnParametersSet");
             SetMember(component, "AddActionMode", true);
 
             await InvokeAsync(component, "SaveAction");

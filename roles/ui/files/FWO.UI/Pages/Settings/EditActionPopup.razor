@@ -64,9 +64,7 @@
             <hr />
             <EditActionUsingStates @ref="usingStatesEditor"
                                    ActAction="actAction"
-                                   States="States"
-                                   AddActionMode="AddActionMode"
-                                   OnChanged="NotifyChanged" />
+                                   States="States" />
         }
     </Body>
     <Footer>
@@ -270,6 +268,10 @@
         }
 
         Actions[Actions.FindIndex(x => x.Id == actAction.Id)] = actAction;
+        if (usingStatesEditor != null)
+        {
+            await usingStatesEditor.PersistPendingStateLinksAsync();
+        }
         EditActionMode = false;
         await NotifyChanged();
     }

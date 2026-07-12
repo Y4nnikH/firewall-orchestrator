@@ -53,7 +53,6 @@
     {
         ResetLocalState();
         LoadFromExternalParams();
-        UpdateExternalParams();
     }
 
     private void ResetLocalState()
@@ -98,7 +97,6 @@
     private Task SetActionNotificationIds(List<int> notificationIds)
     {
         actActionNotificationIds = [.. notificationIds.Distinct()];
-        UpdateExternalParams();
         return PersistActionNotificationIds();
     }
 
