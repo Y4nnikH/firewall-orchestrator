@@ -1,6 +1,12 @@
+import os
 import unittest.mock
+from pathlib import Path
 
 import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[5]
+os.environ.setdefault("FWO_GRAPHQL_QUERY_PATH", str(REPO_ROOT / "roles" / "common" / "files" / "fwo-api-calls"))
+
 from fwo_api import FwoApi
 from fwo_api_call import FwoApiCall
 from model_controllers.fwconfig_import_gateway import FwConfigImportGateway

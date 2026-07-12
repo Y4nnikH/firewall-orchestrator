@@ -153,7 +153,7 @@ class TestUpdateRemovedManagers:
         importer.import_state.state.mgm_details.is_super_manager = True
         api_connection_mock(importer).call.side_effect = [
             {"data": {"management": [{"mgm_uid": "keep", "mgm_id": 1}, {"mgm_uid": "gone", "mgm_id": 2}]}},
-            {"data": {"update_object": {"affected_rows": 2}, "update_rule": {"affected_rows": 3}}},
+            {"data": {"update_firewall_nw_object": {"affected_rows": 2}, "update_firewall_rule": {"affected_rows": 3}}},
         ]
 
         importer.update_removed_managers([make_manager(uid="keep")])
@@ -471,9 +471,9 @@ class TestFixObjectsAndRules:
     def test_fix_objects_updates_statistics(self, importer: FwConfigImport):
         api_call_mock(importer).call.return_value = {
             "data": {
-                "update_object": {"returning": [1]},
-                "update_service": {"returning": [1, 2]},
-                "update_usr": {"returning": []},
+                "update_firewall_nw_object": {"returning": [1]},
+                "update_firewall_nw_service": {"returning": [1, 2]},
+                "update_firewall_nw_user": {"returning": []},
             }
         }
         importer.fix_objects_in_db(["nw-1"], ["svc-1"], [])
@@ -493,7 +493,7 @@ class TestFixObjectsAndRules:
 
     def test_fix_rules_updates_statistics(self, importer: FwConfigImport):
         api_call_mock(importer).call.return_value = {
-            "data": {"update_rule": {"returning": [{"rule_id": 1}, {"rule_id": 2}]}}
+            "data": {"update_firewall_rule": {"returning": [{"rule_id": 1}, {"rule_id": 2}]}}
         }
         importer.fix_rules_in_db(["rule-1", "rule-2"])
         assert importer.import_state.state.stats.statistics.inconsistent_rule_delete_count == 2
@@ -506,14 +506,14 @@ class TestFixObjectsAndRules:
 
 class TestFixRulebaseLinks:
     def test_without_removed_links_keeps_previous_config(self, importer: FwConfigImport):
-        api_call_mock(importer).call.return_value = {"data": {"update_rulebase_link": {"affected_rows": 0}}}
+        api_call_mock(importer).call.return_value = {"data": {"update_firewall_rulebase_link": {"affected_rows": 0}}}
         importer.fix_rulebase_links_in_db(FwConfigNormalized())
         assert api_call_mock(importer).call.call_count == 1
 
     def test_removed_links_reload_gateway_links(self, importer: FwConfigImport):
         previous_config = FwConfigNormalized(gateways=[Gateway(Uid="gw-1", RulebaseLinks=[make_link("stale")])])
         api_call_mock(importer).call.side_effect = [
-            {"data": {"update_rulebase_link": {"affected_rows": 1}}},
+            {"data": {"update_firewall_rulebase_link": {"affected_rows": 1}}},
             {
                 "data": {
                     "device": [
@@ -557,7 +557,7 @@ class TestFixRulebaseLinks:
     def test_gateway_missing_in_db_links_raises(self, importer: FwConfigImport):
         previous_config = FwConfigNormalized(gateways=[Gateway(Uid="gw-unknown")])
         api_call_mock(importer).call.side_effect = [
-            {"data": {"update_rulebase_link": {"affected_rows": 1}}},
+            {"data": {"update_firewall_rulebase_link": {"affected_rows": 1}}},
             {"data": {"device": []}},
         ]
         with pytest.raises(FwoImporterError, match="fetch rulebase links"):
@@ -584,13 +584,13 @@ class TestFixRuleToGwRefs:
         api_call_mock(importer).call.side_effect = [
             {
                 "data": {
-                    "rule_enforced_on_gateway": [
+                    "firewall_rule_enforced_on_gateway": [
                         {"rule": {"removed": 123, "rule_uid": "old"}, "device": {"dev_uid": "gw-1"}},
                         {"rule": {"removed": None, "rule_uid": "unexpected"}, "device": {"dev_uid": "gw-1"}},
                     ]
                 }
             },
-            {"data": {"update_rule_enforced_on_gateway": {"affected_rows": 1}}},
+            {"data": {"update_firewall_rule_enforced_on_gateway": {"affected_rows": 1}}},
         ]
         with (
             patch(
@@ -613,8 +613,8 @@ class TestFixRuleToGwRefs:
     def test_insert_missing_refs_maps_rule_ids(self, importer: FwConfigImport):
         self.prepare_state(importer)
         api_call_mock(importer).call.side_effect = [
-            {"data": {"rule": [{"rule_uid": "rule-1", "rule_id": 11, "rule_create": 100}]}},
-            {"data": {"insert_rule_enforced_on_gateway": {"affected_rows": 1}}},
+            {"data": {"firewall_rule": [{"rule_uid": "rule-1", "rule_id": 11, "rule_create": 100}]}},
+            {"data": {"insert_firewall_rule_enforced_on_gateway": {"affected_rows": 1}}},
         ]
 
         importer._insert_missing_rule_to_gw_refs_in_db({("rule-1", "gw-1")})
@@ -664,7 +664,14 @@ class TestFixRefTablesAndChangelog:
                     ]
                 }
             },
-            {"data": {"rule": [{"rule_uid": "rule-1", "rule_id": 8}, {"rule_uid": "rule-1", "rule_id": 10}]}},
+            {
+                "data": {
+                    "firewall_rule": [
+                        {"rule_uid": "rule-1", "rule_id": 8},
+                        {"rule_uid": "rule-1", "rule_id": 10},
+                    ]
+                }
+            },
             {"data": {"update_changelog_rule_many": [{"affected_rows": 1}]}},
         ]
 
