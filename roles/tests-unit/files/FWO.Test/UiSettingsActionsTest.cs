@@ -1067,6 +1067,29 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task EditActionUsingStates_ResetPendingStateLinks_ReinitializesFromActionOnNextParametersSet()
+        {
+            EditActionUsingStates component = new();
+            WfState persistedState = new() { Id = 11, Name = "Approved" };
+            WfState stagedState = new() { Id = 14, Name = "Rejected" };
+            WfStateAction action = new()
+            {
+                StateActions = [new WfStateActionStateHelper { State = persistedState, SortOrder = 1 }]
+            };
+            SetMember(component, "ActAction", action);
+            SetMember(component, "States", new List<WfState> { persistedState, stagedState });
+
+            await InvokeAsync(component, "OnParametersSet");
+            SetMember(component, "selectedStateLink", stagedState);
+            await InvokeAsync(component, "AddStateLink");
+            await InvokeAsync(component, "ResetPendingStateLinks");
+            await InvokeAsync(component, "OnParametersSet");
+
+            List<WfStateActionStateHelper> pendingStateLinks = GetMember<List<WfStateActionStateHelper>>(component, "pendingStateLinks");
+            Assert.That(pendingStateLinks.Select(link => link.State.Id), Is.EqualTo(new[] { persistedState.Id }));
+        }
+
+        [Test]
         public async Task EditActionUsingStates_RemoveStateLink_WithoutLinkedAction_RemovesLocally()
         {
             EditActionUsingStates component = new();

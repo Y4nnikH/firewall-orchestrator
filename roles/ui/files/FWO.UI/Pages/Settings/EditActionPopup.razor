@@ -248,11 +248,11 @@
         }
 
         actAction.Id = returnIds[0].NewId;
-        Actions.Add(actAction);
         if (usingStatesEditor != null)
         {
             await usingStatesEditor.PersistPendingStateLinksAsync();
         }
+        Actions.Add(actAction);
         EditActionMode = false;
         AddActionMode = false;
         await NotifyChanged();
@@ -267,11 +267,11 @@
             return;
         }
 
-        Actions[Actions.FindIndex(x => x.Id == actAction.Id)] = actAction;
         if (usingStatesEditor != null)
         {
             await usingStatesEditor.PersistPendingStateLinksAsync();
         }
+        Actions[Actions.FindIndex(x => x.Id == actAction.Id)] = actAction;
         EditActionMode = false;
         await NotifyChanged();
     }
@@ -292,6 +292,7 @@
                     await sendEmailEditor.CleanupOnCancelAsync();
                 }
             }
+            usingStatesEditor?.ResetPendingStateLinks();
         }
         catch (Exception exception)
         {
