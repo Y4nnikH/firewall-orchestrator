@@ -28,6 +28,7 @@ database_groups:
 
 
 database_idempotent_files:
+  - fworch-search-path.sql
   - fworch-api-funcs.sql
   - fworch-backup-grants.sql
   - fworch-encryption.sql
