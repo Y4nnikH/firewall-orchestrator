@@ -12,6 +12,7 @@ fwo_db_ro_user: fwo_ro
 
 db_schemata:
   - compliance
+  - firewall
   - modelling
   - public
   - request
@@ -27,6 +28,7 @@ database_groups:
 
 
 database_idempotent_files:
+  - fworch-search-path.sql
   - fworch-api-funcs.sql
   - fworch-backup-grants.sql
   - fworch-encryption.sql

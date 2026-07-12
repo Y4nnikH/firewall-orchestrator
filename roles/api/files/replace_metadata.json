@@ -1179,7 +1179,7 @@
                       "column": "flow_access_id",
                       "table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -1609,8 +1609,8 @@
                     "foreign_key_constraint_on": {
                       "column": "flow_nwgrp_id",
                       "table": {
-                        "name": "object",
-                        "schema": "public"
+                        "name": "nw_object",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -1771,8 +1771,8 @@
                     "foreign_key_constraint_on": {
                       "column": "flow_nwobj_id",
                       "table": {
-                        "name": "object",
-                        "schema": "public"
+                        "name": "nw_object",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -1964,8 +1964,8 @@
                     "foreign_key_constraint_on": {
                       "column": "flow_svcgrp_id",
                       "table": {
-                        "name": "service",
-                        "schema": "public"
+                        "name": "nw_service",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -2122,8 +2122,8 @@
                     "foreign_key_constraint_on": {
                       "column": "flow_svcobj_id",
                       "table": {
-                        "name": "service",
-                        "schema": "public"
+                        "name": "nw_service",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -7373,8 +7373,8 @@
                     "foreign_key_constraint_on": {
                       "column": "obj_nat_install",
                       "table": {
-                        "name": "object",
-                        "schema": "public"
+                        "name": "nw_object",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -7398,7 +7398,7 @@
                       "column": "dev_id",
                       "table": {
                         "name": "rule_enforced_on_gateway",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -7410,7 +7410,7 @@
                       "column": "gw_id",
                       "table": {
                         "name": "rulebase_link",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8692,8 +8692,8 @@
                     "foreign_key_constraint_on": {
                       "column": "obj_create",
                       "table": {
-                        "name": "object",
-                        "schema": "public"
+                        "name": "nw_object",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8716,8 +8716,8 @@
                     "foreign_key_constraint_on": {
                       "column": "import_created",
                       "table": {
-                        "name": "objgrp",
-                        "schema": "public"
+                        "name": "nw_object_group",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8729,7 +8729,7 @@
                       "column": "removed",
                       "table": {
                         "name": "rule_enforced_on_gateway",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8741,7 +8741,7 @@
                       "column": "removed",
                       "table": {
                         "name": "rule_metadata",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8752,8 +8752,8 @@
                     "foreign_key_constraint_on": {
                       "column": "removed",
                       "table": {
-                        "name": "rule_nwobj_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_object_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8776,8 +8776,8 @@
                     "foreign_key_constraint_on": {
                       "column": "removed",
                       "table": {
-                        "name": "rule_svc_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_service_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8789,7 +8789,7 @@
                       "column": "removed",
                       "table": {
                         "name": "rule_time",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8800,8 +8800,8 @@
                     "foreign_key_constraint_on": {
                       "column": "removed",
                       "table": {
-                        "name": "rule_user_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_user_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8813,7 +8813,7 @@
                       "column": "created",
                       "table": {
                         "name": "rule_enforced_on_gateway",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8825,7 +8825,7 @@
                       "column": "rf_create",
                       "table": {
                         "name": "rule_from",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8837,7 +8837,7 @@
                       "column": "rule_created",
                       "table": {
                         "name": "rule_metadata",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8848,8 +8848,8 @@
                     "foreign_key_constraint_on": {
                       "column": "created",
                       "table": {
-                        "name": "rule_nwobj_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_object_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8873,7 +8873,7 @@
                       "column": "rs_create",
                       "table": {
                         "name": "rule_service",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8884,8 +8884,8 @@
                     "foreign_key_constraint_on": {
                       "column": "created",
                       "table": {
-                        "name": "rule_svc_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_service_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8897,7 +8897,7 @@
                       "column": "created",
                       "table": {
                         "name": "rule_time",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8909,7 +8909,7 @@
                       "column": "rt_create",
                       "table": {
                         "name": "rule_to",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8920,8 +8920,8 @@
                     "foreign_key_constraint_on": {
                       "column": "created",
                       "table": {
-                        "name": "rule_user_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_user_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8933,7 +8933,7 @@
                       "column": "removed",
                       "table": {
                         "name": "rulebase_link",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8945,7 +8945,7 @@
                       "column": "created",
                       "table": {
                         "name": "rulebase_link",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8957,7 +8957,7 @@
                       "column": "rule_create",
                       "table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8969,7 +8969,7 @@
                       "column": "removed",
                       "table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -8980,8 +8980,8 @@
                     "foreign_key_constraint_on": {
                       "column": "svc_create",
                       "table": {
-                        "name": "service",
-                        "schema": "public"
+                        "name": "nw_service",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -9004,8 +9004,8 @@
                     "foreign_key_constraint_on": {
                       "column": "import_created",
                       "table": {
-                        "name": "svcgrp",
-                        "schema": "public"
+                        "name": "nw_service_group",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -9052,8 +9052,8 @@
                     "foreign_key_constraint_on": {
                       "column": "import_created",
                       "table": {
-                        "name": "usergrp",
-                        "schema": "public"
+                        "name": "nw_user_group",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -9064,8 +9064,8 @@
                     "foreign_key_constraint_on": {
                       "column": "user_create",
                       "table": {
-                        "name": "usr",
-                        "schema": "public"
+                        "name": "nw_user",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -9077,7 +9077,7 @@
                       "column": "zone_create",
                       "table": {
                         "name": "zone",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -10888,8 +10888,8 @@
                     "foreign_key_constraint_on": {
                       "column": "mgm_id",
                       "table": {
-                        "name": "object",
-                        "schema": "public"
+                        "name": "nw_object",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -10913,7 +10913,7 @@
                       "column": "mgm_id",
                       "table": {
                         "name": "rule_metadata",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -10924,8 +10924,8 @@
                     "foreign_key_constraint_on": {
                       "column": "mgm_id",
                       "table": {
-                        "name": "rule_nwobj_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_object_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -10936,8 +10936,8 @@
                     "foreign_key_constraint_on": {
                       "column": "mgm_id",
                       "table": {
-                        "name": "rule_svc_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_service_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -10948,8 +10948,8 @@
                     "foreign_key_constraint_on": {
                       "column": "mgm_id",
                       "table": {
-                        "name": "rule_user_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_user_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -10961,7 +10961,7 @@
                       "column": "mgm_id",
                       "table": {
                         "name": "rulebase",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -10973,7 +10973,7 @@
                       "column": "mgm_id",
                       "table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -10984,8 +10984,8 @@
                     "foreign_key_constraint_on": {
                       "column": "mgm_id",
                       "table": {
-                        "name": "service",
-                        "schema": "public"
+                        "name": "nw_service",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -11020,8 +11020,8 @@
                     "foreign_key_constraint_on": {
                       "column": "mgm_id",
                       "table": {
-                        "name": "usr",
-                        "schema": "public"
+                        "name": "nw_user",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -11033,7 +11033,7 @@
                       "column": "mgm_id",
                       "table": {
                         "name": "zone",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -12854,8 +12854,8 @@
             },
             {
               "table": {
-                "name": "object",
-                "schema": "public"
+                "name": "nw_object",
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -12992,8 +12992,8 @@
                     "foreign_key_constraint_on": {
                       "column": "objgrp_id",
                       "table": {
-                        "name": "objgrp",
-                        "schema": "public"
+                        "name": "nw_object_group",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -13004,8 +13004,8 @@
                     "foreign_key_constraint_on": {
                       "column": "objgrp_member_id",
                       "table": {
-                        "name": "objgrp",
-                        "schema": "public"
+                        "name": "nw_object_group",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -13041,7 +13041,7 @@
                       "column": "obj_id",
                       "table": {
                         "name": "rule_from",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -13052,8 +13052,8 @@
                     "foreign_key_constraint_on": {
                       "column": "obj_id",
                       "table": {
-                        "name": "rule_nwobj_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_object_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -13065,7 +13065,7 @@
                       "column": "obj_id",
                       "table": {
                         "name": "rule_to",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -13535,8 +13535,8 @@
             },
             {
               "table": {
-                "name": "objgrp",
-                "schema": "public"
+                "name": "nw_object_group",
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -15814,7 +15814,7 @@
             {
               "table": {
                 "name": "parent_rule_type",
-                "schema": "public"
+                "schema": "firewall"
               },
               "array_relationships": [
                 {
@@ -15824,7 +15824,7 @@
                       "column": "parent_rule_type",
                       "table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -18734,7 +18734,7 @@
             {
               "table": {
                 "name": "rule",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -18790,7 +18790,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule_metadata",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -18879,7 +18879,7 @@
                       "column": "rule_id",
                       "table": {
                         "name": "rule_enforced_on_gateway",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -18891,7 +18891,7 @@
                       "column": "rule_id",
                       "table": {
                         "name": "rule_from_zone",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -18903,7 +18903,7 @@
                       "column": "rule_id",
                       "table": {
                         "name": "rule_from",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -18914,8 +18914,8 @@
                     "foreign_key_constraint_on": {
                       "column": "rule_id",
                       "table": {
-                        "name": "rule_nwobj_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_object_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -18939,7 +18939,7 @@
                       "column": "rule_id",
                       "table": {
                         "name": "rule_service",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -18950,8 +18950,8 @@
                     "foreign_key_constraint_on": {
                       "column": "rule_id",
                       "table": {
-                        "name": "rule_svc_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_service_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -18963,7 +18963,7 @@
                       "column": "rule_id",
                       "table": {
                         "name": "rule_time",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -18975,7 +18975,7 @@
                       "column": "rule_id",
                       "table": {
                         "name": "rule_to_zone",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -18987,7 +18987,7 @@
                       "column": "rule_id",
                       "table": {
                         "name": "rule_to",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -18998,8 +18998,8 @@
                     "foreign_key_constraint_on": {
                       "column": "rule_id",
                       "table": {
-                        "name": "rule_user_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_user_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -19011,7 +19011,7 @@
                       "column": "from_rule_id",
                       "table": {
                         "name": "rulebase_link",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -19023,7 +19023,7 @@
                       "column": "parent_rule_id",
                       "table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -19035,7 +19035,7 @@
                       "column": "xlate_rule",
                       "table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -19103,6 +19103,8 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
+                      "rule_src_zone",
+                      "rule_dst_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19111,11 +19113,9 @@
                       "rule_comment",
                       "rule_dst",
                       "rule_dst_refs",
-                      "rule_dst_zone",
                       "rule_head_text",
                       "rule_src",
                       "rule_src_refs",
-                      "rule_src_zone",
                       "rule_svc",
                       "rule_svc_refs",
                       "rule_track",
@@ -19154,6 +19154,8 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
+                      "rule_src_zone",
+                      "rule_dst_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19162,11 +19164,9 @@
                       "rule_comment",
                       "rule_dst",
                       "rule_dst_refs",
-                      "rule_dst_zone",
                       "rule_head_text",
                       "rule_src",
                       "rule_src_refs",
-                      "rule_src_zone",
                       "rule_svc",
                       "rule_svc_refs",
                       "rule_track",
@@ -19207,6 +19207,8 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
+                      "rule_src_zone",
+                      "rule_dst_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19215,11 +19217,9 @@
                       "rule_comment",
                       "rule_dst",
                       "rule_dst_refs",
-                      "rule_dst_zone",
                       "rule_head_text",
                       "rule_src",
                       "rule_src_refs",
-                      "rule_src_zone",
                       "rule_svc",
                       "rule_svc_refs",
                       "rule_track",
@@ -19260,6 +19260,8 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
+                      "rule_src_zone",
+                      "rule_dst_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19268,11 +19270,9 @@
                       "rule_comment",
                       "rule_dst",
                       "rule_dst_refs",
-                      "rule_dst_zone",
                       "rule_head_text",
                       "rule_src",
                       "rule_src_refs",
-                      "rule_src_zone",
                       "rule_svc",
                       "rule_svc_refs",
                       "rule_track",
@@ -19313,6 +19313,8 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
+                      "rule_src_zone",
+                      "rule_dst_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19321,11 +19323,9 @@
                       "rule_comment",
                       "rule_dst",
                       "rule_dst_refs",
-                      "rule_dst_zone",
                       "rule_head_text",
                       "rule_src",
                       "rule_src_refs",
-                      "rule_src_zone",
                       "rule_svc",
                       "rule_svc_refs",
                       "rule_track",
@@ -19366,6 +19366,8 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
+                      "rule_src_zone",
+                      "rule_dst_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19374,11 +19376,9 @@
                       "rule_comment",
                       "rule_dst",
                       "rule_dst_refs",
-                      "rule_dst_zone",
                       "rule_head_text",
                       "rule_src",
                       "rule_src_refs",
-                      "rule_src_zone",
                       "rule_svc",
                       "rule_svc_refs",
                       "rule_track",
@@ -19419,6 +19419,8 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
+                      "rule_src_zone",
+                      "rule_dst_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19427,11 +19429,9 @@
                       "rule_comment",
                       "rule_dst",
                       "rule_dst_refs",
-                      "rule_dst_zone",
                       "rule_head_text",
                       "rule_src",
                       "rule_src_refs",
-                      "rule_src_zone",
                       "rule_svc",
                       "rule_svc_refs",
                       "rule_track",
@@ -19485,6 +19485,8 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
+                      "rule_src_zone",
+                      "rule_dst_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19493,11 +19495,9 @@
                       "rule_comment",
                       "rule_dst",
                       "rule_dst_refs",
-                      "rule_dst_zone",
                       "rule_head_text",
                       "rule_src",
                       "rule_src_refs",
-                      "rule_src_zone",
                       "rule_svc",
                       "rule_svc_refs",
                       "rule_track",
@@ -19551,6 +19551,8 @@
                       "last_change_admin",
                       "mgm_id",
                       "rulebase_id",
+                      "rule_src_zone",
+                      "rule_dst_zone",
                       "track_id",
                       "rule_custom_fields",
                       "rule_num_numeric",
@@ -19559,11 +19561,9 @@
                       "rule_comment",
                       "rule_dst",
                       "rule_dst_refs",
-                      "rule_dst_zone",
                       "rule_head_text",
                       "rule_src",
                       "rule_src_refs",
-                      "rule_src_zone",
                       "rule_svc",
                       "rule_svc_refs",
                       "rule_track",
@@ -19643,7 +19643,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule_metadata",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -19660,7 +19660,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule_enforced_on_gateway",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -19675,7 +19675,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule_from_zone",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -19690,7 +19690,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule_from",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -19705,7 +19705,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule_service",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -19720,7 +19720,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule_to_zone",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -19735,7 +19735,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule_to",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -20147,7 +20147,7 @@
             {
               "table": {
                 "name": "rule_enforced_on_gateway",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -20340,7 +20340,7 @@
             {
               "table": {
                 "name": "rule_from",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -20626,7 +20626,7 @@
             {
               "table": {
                 "name": "rule_from_zone",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -20799,7 +20799,7 @@
             {
               "table": {
                 "name": "rule_metadata",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -20857,7 +20857,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -21055,8 +21055,8 @@
             },
             {
               "table": {
-                "name": "rule_nwobj_resolved",
-                "schema": "public"
+                "name": "rule_nw_object_resolved",
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -21558,7 +21558,7 @@
             {
               "table": {
                 "name": "rule_service",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -21748,8 +21748,8 @@
             },
             {
               "table": {
-                "name": "rule_svc_resolved",
-                "schema": "public"
+                "name": "rule_nw_service_resolved",
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -21924,7 +21924,7 @@
             {
               "table": {
                 "name": "rule_time",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -22131,7 +22131,7 @@
             {
               "table": {
                 "name": "rule_to",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -22412,7 +22412,7 @@
             {
               "table": {
                 "name": "rule_to_zone",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -22584,8 +22584,8 @@
             },
             {
               "table": {
-                "name": "rule_user_resolved",
-                "schema": "public"
+                "name": "rule_nw_user_resolved",
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -22760,7 +22760,7 @@
             {
               "table": {
                 "name": "rulebase",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -22778,7 +22778,7 @@
                       "column": "from_rulebase_id",
                       "table": {
                         "name": "rulebase_link",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -22790,7 +22790,7 @@
                       "column": "to_rulebase_id",
                       "table": {
                         "name": "rulebase_link",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -22802,7 +22802,7 @@
                       "column": "rulebase_id",
                       "table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -22987,7 +22987,7 @@
             {
               "table": {
                 "name": "rulebase_link",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -23223,8 +23223,8 @@
             },
             {
               "table": {
-                "name": "service",
-                "schema": "public"
+                "name": "nw_service",
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -23356,7 +23356,7 @@
                       "column": "svc_id",
                       "table": {
                         "name": "rule_service",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -23367,8 +23367,8 @@
                     "foreign_key_constraint_on": {
                       "column": "svc_id",
                       "table": {
-                        "name": "rule_svc_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_service_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -23403,8 +23403,8 @@
                     "foreign_key_constraint_on": {
                       "column": "svcgrp_id",
                       "table": {
-                        "name": "svcgrp",
-                        "schema": "public"
+                        "name": "nw_service_group",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -23415,8 +23415,8 @@
                     "foreign_key_constraint_on": {
                       "column": "svcgrp_member_id",
                       "table": {
-                        "name": "svcgrp",
-                        "schema": "public"
+                        "name": "nw_service_group",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -23951,7 +23951,7 @@
                       "column": "action_id",
                       "table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -24232,8 +24232,8 @@
                     "foreign_key_constraint_on": {
                       "column": "obj_color_id",
                       "table": {
-                        "name": "object",
-                        "schema": "public"
+                        "name": "nw_object",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -24244,8 +24244,8 @@
                     "foreign_key_constraint_on": {
                       "column": "svc_color_id",
                       "table": {
-                        "name": "service",
-                        "schema": "public"
+                        "name": "nw_service",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -24256,8 +24256,8 @@
                     "foreign_key_constraint_on": {
                       "column": "user_color_id",
                       "table": {
-                        "name": "usr",
-                        "schema": "public"
+                        "name": "nw_user",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -24821,8 +24821,8 @@
                     "foreign_key_constraint_on": {
                       "column": "ip_proto_id",
                       "table": {
-                        "name": "service",
-                        "schema": "public"
+                        "name": "nw_service",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -25004,7 +25004,7 @@
                       "column": "link_type",
                       "table": {
                         "name": "rulebase_link",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -25125,8 +25125,8 @@
                     "foreign_key_constraint_on": {
                       "column": "obj_typ_id",
                       "table": {
-                        "name": "object",
-                        "schema": "public"
+                        "name": "nw_object",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -25239,8 +25239,8 @@
                     "foreign_key_constraint_on": {
                       "column": "svc_typ_id",
                       "table": {
-                        "name": "service",
-                        "schema": "public"
+                        "name": "nw_service",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -25381,7 +25381,7 @@
                       "column": "track_id",
                       "table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -25526,8 +25526,8 @@
                     "foreign_key_constraint_on": {
                       "column": "usr_typ_id",
                       "table": {
-                        "name": "usr",
-                        "schema": "public"
+                        "name": "nw_user",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -25623,8 +25623,8 @@
             },
             {
               "table": {
-                "name": "svcgrp",
-                "schema": "public"
+                "name": "nw_service_group",
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -26122,8 +26122,8 @@
                     "foreign_key_constraint_on": {
                       "column": "tenant_id",
                       "table": {
-                        "name": "usr",
-                        "schema": "public"
+                        "name": "nw_user",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -27037,7 +27037,7 @@
                       "column": "time_obj_id",
                       "table": {
                         "name": "rule_time",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -27671,8 +27671,8 @@
                     "foreign_key_constraint_on": {
                       "column": "last_change_admin",
                       "table": {
-                        "name": "object",
-                        "schema": "public"
+                        "name": "nw_object",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -27768,7 +27768,7 @@
                       "column": "last_change_admin",
                       "table": {
                         "name": "rule",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -27779,8 +27779,8 @@
                     "foreign_key_constraint_on": {
                       "column": "last_change_admin",
                       "table": {
-                        "name": "service",
-                        "schema": "public"
+                        "name": "nw_service",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -27851,8 +27851,8 @@
                     "foreign_key_constraint_on": {
                       "column": "last_change_admin",
                       "table": {
-                        "name": "usr",
-                        "schema": "public"
+                        "name": "nw_user",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -28377,8 +28377,8 @@
             },
             {
               "table": {
-                "name": "usergrp",
-                "schema": "public"
+                "name": "nw_user_group",
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -28812,8 +28812,8 @@
             },
             {
               "table": {
-                "name": "usr",
-                "schema": "public"
+                "name": "nw_user",
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -28933,7 +28933,7 @@
                       "column": "user_id",
                       "table": {
                         "name": "rule_from",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -28945,7 +28945,7 @@
                       "column": "user_id",
                       "table": {
                         "name": "rule_to",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -28956,8 +28956,8 @@
                     "foreign_key_constraint_on": {
                       "column": "user_id",
                       "table": {
-                        "name": "rule_user_resolved",
-                        "schema": "public"
+                        "name": "rule_nw_user_resolved",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -28992,8 +28992,8 @@
                     "foreign_key_constraint_on": {
                       "column": "usergrp_id",
                       "table": {
-                        "name": "usergrp",
-                        "schema": "public"
+                        "name": "nw_user_group",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -29004,8 +29004,8 @@
                     "foreign_key_constraint_on": {
                       "column": "usergrp_member_id",
                       "table": {
-                        "name": "usergrp",
-                        "schema": "public"
+                        "name": "nw_user_group",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -29451,7 +29451,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule_from",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -29466,7 +29466,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule_service",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -29481,7 +29481,7 @@
                       "insertion_order": null,
                       "remote_table": {
                         "name": "rule_to",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -29649,7 +29649,7 @@
             {
               "table": {
                 "name": "zone",
-                "schema": "public"
+                "schema": "firewall"
               },
               "object_relationships": [
                 {
@@ -29672,8 +29672,8 @@
                     "foreign_key_constraint_on": {
                       "column": "zone_id",
                       "table": {
-                        "name": "object",
-                        "schema": "public"
+                        "name": "nw_object",
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -29685,7 +29685,7 @@
                       "column": "zone_id",
                       "table": {
                         "name": "rule_from_zone",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
@@ -29697,7 +29697,7 @@
                       "column": "zone_id",
                       "table": {
                         "name": "rule_to_zone",
-                        "schema": "public"
+                        "schema": "firewall"
                       }
                     }
                   }
