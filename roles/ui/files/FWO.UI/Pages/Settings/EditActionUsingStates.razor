@@ -40,7 +40,7 @@
 
 <SelectStatePopup @bind-Display="selectStateMode"
                   Title="@(userConfig.GetText("select_state"))"
-                  States="AvailableStateLinks"
+                  States="AvailableStateLinks()"
                   @bind-SelectedState="selectedStateLink"
                   StateToString="@(s => DisplayService.DisplayStateWithId(userConfig, s))"
                   NoneSelectedText="@(userConfig.GetText("select_state"))"
@@ -82,7 +82,7 @@
 
         if (selectedStateLink == null)
         {
-            selectedStateLink = AvailableStateLinks.FirstOrDefault();
+            selectedStateLink = AvailableStateLinks().FirstOrDefault();
         }
     }
 
@@ -98,7 +98,7 @@
 
     private void SelectStateLink()
     {
-        selectedStateLink = AvailableStateLinks.FirstOrDefault();
+        selectedStateLink = AvailableStateLinks().FirstOrDefault();
         selectStateMode = true;
     }
 
@@ -108,10 +108,12 @@
         selectedStateLink = null;
     }
 
-    private List<WfState> AvailableStateLinks => States
-        .Where(state => state.Id > 0 && pendingStateLinks.All(link => link.State.Id != state.Id))
-        .OrderBy(state => state.Id)
-        .ToList();
+    private List<WfState> AvailableStateLinks()
+    {
+        return [.. States
+            .Where(state => state.Id > 0 && pendingStateLinks.All(link => link.State.Id != state.Id))
+            .OrderBy(state => state.Id)];
+    }
 
     private Task AddStateLink()
     {

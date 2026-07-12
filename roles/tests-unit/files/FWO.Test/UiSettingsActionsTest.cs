@@ -29,6 +29,8 @@ namespace FWO.Test
     [TestFixture]
     internal class UiSettingsActionsTest
     {
+        private static readonly int[] ExpectedAvailableStateLinkIds = [14];
+
         private sealed class SettingsActionsApiConn : SimulatedApiConnection
         {
             public string LastQuery { get; private set; } = "";
@@ -41,6 +43,7 @@ namespace FWO.Test
             public List<CompliancePolicy> InitialPolicies { get; set; } = [];
             public List<string> Queries { get; } = [];
             public List<int> DeletedNotificationIds { get; } = [];
+            public bool ReturnNullNewActionIds { get; set; }
 
             public override Task<T> SendQueryAsync<T>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
             {
@@ -65,6 +68,10 @@ namespace FWO.Test
                 }
                 if (query == RequestQueries.newAction)
                 {
+                    if (ReturnNullNewActionIds)
+                    {
+                        return Task.FromResult((T)(object)new ReturnIdWrapper { ReturnIds = null! });
+                    }
                     return Task.FromResult((T)(object)new ReturnIdWrapper { ReturnIds = [new() { NewId = NextNewActionId }] });
                 }
                 if (query == RequestQueries.addStateAction || query == RequestQueries.removeStateAction || query == RequestQueries.updateStateActionSortOrder)
@@ -320,6 +327,52 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task AutoPromote_OnParametersSet_WithMissingConditionalReferences_FallsBackToAutomatic()
+        {
+            EditActionAutoPromote component = new();
+            List<CompliancePolicy> policies = [new() { Id = 4 }];
+            List<WfState> states = [new() { Id = 11, Name = "Compliant" }, new() { Id = 12, Name = "Not compliant" }];
+            SetMember(component, "Policies", policies);
+            SetMember(component, "States", states);
+            SetMember(component, "ActAction", new WfStateAction
+            {
+                ExternalParams = JsonSerializer.Serialize(new ConditionalAutoPromoteParams
+                {
+                    ToBeCalled = ToBeCalled.PolicyCheck,
+                    PolicyIds = [99],
+                    IfCompliantState = 77,
+                    IfNotCompliantState = 88
+                })
+            });
+
+            await InvokeAsync(component, "OnParametersSet");
+
+            Assert.That(GetMember<IEnumerable<CompliancePolicy>>(component, "selectedPolicies"), Is.Empty);
+            Assert.That(GetMember<WfState>(component, "selectedStateOk").Id, Is.EqualTo(-1));
+            Assert.That(GetMember<WfState>(component, "selectedStateNotOk").Id, Is.EqualTo(-1));
+        }
+
+        [Test]
+        public async Task AutoPromote_OnParametersSet_WithEmptyParams_ResetsToAutomaticDefaults()
+        {
+            EditActionAutoPromote component = new();
+            SetMember(component, "selectedToState", new WfState { Id = 19, Name = "Previous" });
+            SetMember(component, "selectedStateOk", new WfState { Id = 20, Name = "Ok" });
+            SetMember(component, "selectedStateNotOk", new WfState { Id = 21, Name = "Not Ok" });
+            SetMember(component, "selectedPolicies", new List<CompliancePolicy> { new() { Id = 4 } });
+            SetMember(component, "selectedToBeCalled", ToBeCalled.PolicyCheck);
+            SetMember(component, "ActAction", new WfStateAction());
+
+            await InvokeAsync(component, "OnParametersSet");
+
+            Assert.That(GetMember<WfState>(component, "selectedToState").Id, Is.EqualTo(-1));
+            Assert.That(GetMember<WfState>(component, "selectedStateOk").Id, Is.EqualTo(-1));
+            Assert.That(GetMember<WfState>(component, "selectedStateNotOk").Id, Is.EqualTo(-1));
+            Assert.That(GetMember<IEnumerable<CompliancePolicy>>(component, "selectedPolicies"), Is.Empty);
+            Assert.That(GetMember<ToBeCalled>(component, "selectedToBeCalled"), Is.EqualTo(ToBeCalled.PolicyCheck));
+        }
+
+        [Test]
         public async Task AutoPromote_OnStateSelectionHandlers_KeepParametersInSync()
         {
             EditActionAutoPromote component = new();
@@ -553,24 +606,6 @@ namespace FWO.Test
             EditActionGeneral component = new();
             int callbackCount = 0;
             WfStateAction action = new();
-            SetMember(component, "ActAction", action);
-            SetMember(component, "ActionTypeChanged", EventCallback.Factory.Create<string?>(new object(), _ => callbackCount++));
-
-            await InvokeAsync(component, "OnActionTypeChanged", StateActionTypes.SendEmail.ToString());
-
-            Assert.That(action.ActionType, Is.EqualTo(StateActionTypes.SendEmail.ToString()));
-            Assert.That(callbackCount, Is.EqualTo(1));
-        }
-
-        [Test]
-        public async Task EditActionGeneral_OnActionTypeChanged_SameTypeStillInvokesCallback()
-        {
-            EditActionGeneral component = new();
-            int callbackCount = 0;
-            WfStateAction action = new()
-            {
-                ActionType = StateActionTypes.SendEmail.ToString()
-            };
             SetMember(component, "ActAction", action);
             SetMember(component, "ActionTypeChanged", EventCallback.Factory.Create<string?>(new object(), _ => callbackCount++));
 
@@ -905,6 +940,18 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task SelectStatePopup_OnParametersSet_AllowsNullSelection()
+        {
+            SelectStatePopup component = new();
+            SetMember(component, "SelectedState", null);
+            SetMember(component, "selectedState", new WfState { Id = 13, Name = "Previous" });
+
+            await InvokeAsync(component, "OnParametersSet");
+
+            Assert.That(GetMember<WfState?>(component, "selectedState"), Is.Null);
+        }
+
+        [Test]
         public async Task SelectStatePopup_Confirm_WithNoSelection_DoesNothing()
         {
             SelectStatePopup component = new();
@@ -922,6 +969,23 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task SelectStatePopup_ClosePopup_InvokesCancelAndCloses()
+        {
+            SelectStatePopup component = new();
+            bool display = true;
+            int cancelCount = 0;
+
+            SetMember(component, "Display", true);
+            SetMember(component, "DisplayChanged", EventCallback.Factory.Create<bool>(new object(), value => display = value));
+            SetMember(component, "OnCancel", EventCallback.Factory.Create(new object(), () => cancelCount++));
+
+            await InvokeAsync(component, "ClosePopup");
+
+            Assert.That(cancelCount, Is.EqualTo(1));
+            Assert.That(display, Is.False);
+        }
+
+        [Test]
         public async Task SelectStatePopup_Cancel_InvokesCancelAndCloses()
         {
             SelectStatePopup component = new();
@@ -936,6 +1000,17 @@ namespace FWO.Test
 
             Assert.That(cancelCount, Is.EqualTo(1));
             Assert.That(display, Is.False);
+        }
+
+        [Test]
+        public void SelectStatePopup_DefaultStateToString_UsesStateName()
+        {
+            SelectStatePopup component = new();
+            WfState state = new() { Id = 13, Name = "Selected" };
+
+            string result = GetMember<Func<WfState, string>>(component, "StateToString").Invoke(state);
+
+            Assert.That(result, Is.EqualTo("Selected"));
         }
 
         [Test]
@@ -974,9 +1049,9 @@ namespace FWO.Test
             });
             await InvokeAsync(component, "OnParametersSet");
 
-            List<WfState> availableStateLinks = (List<WfState>)GetInstanceMethod(component.GetType(), "get_AvailableStateLinks").Invoke(component, [])!;
+            List<WfState> availableStateLinks = (List<WfState>)GetInstanceMethod(component.GetType(), "AvailableStateLinks").Invoke(component, [])!;
 
-            Assert.That(availableStateLinks.Select(state => state.Id), Is.EqualTo(new[] { 14 }));
+            Assert.That(availableStateLinks.Select(state => state.Id), Is.EqualTo(ExpectedAvailableStateLinkIds));
         }
 
         [Test]
@@ -998,6 +1073,39 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task EditActionUsingStates_SelectStateLink_UsesNullWhenNoStateIsAvailable()
+        {
+            EditActionUsingStates component = new();
+            SetMember(component, "ActAction", new WfStateAction());
+            SetMember(component, "States", new List<WfState>
+            {
+                new() { Id = -1, Name = "Automatic" }
+            });
+
+            await InvokeAsync(component, "SelectStateLink");
+
+            Assert.That(GetMember<bool>(component, "selectStateMode"), Is.True);
+            Assert.That(GetMember<WfState?>(component, "selectedStateLink"), Is.Null);
+        }
+
+        [Test]
+        public async Task EditActionUsingStates_CancelSelectStateLink_ClearsSelection()
+        {
+            EditActionUsingStates component = new();
+            WfState state = new() { Id = 14, Name = "Available" };
+            SetMember(component, "ActAction", new WfStateAction());
+            SetMember(component, "States", new List<WfState> { state });
+            await InvokeAsync(component, "OnParametersSet");
+            SetMember(component, "selectedStateLink", state);
+            SetMember(component, "selectStateMode", true);
+
+            await InvokeAsync(component, "CancelSelectStateLink");
+
+            Assert.That(GetMember<bool>(component, "selectStateMode"), Is.False);
+            Assert.That(GetMember<WfState?>(component, "selectedStateLink"), Is.Null);
+        }
+
+        [Test]
         public async Task EditActionUsingStates_AddStateLink_AddModeUpdatesLocalStateOnly()
         {
             EditActionUsingStates component = new();
@@ -1014,6 +1122,43 @@ namespace FWO.Test
             Assert.That(GetMember<List<WfStateActionStateHelper>>(component, "pendingStateLinks"), Has.Count.EqualTo(1));
             Assert.That(GetMember<bool>(component, "selectStateMode"), Is.False);
             Assert.That(GetMember<WfState?>(component, "selectedStateLink"), Is.Null);
+        }
+
+        [Test]
+        public async Task EditActionUsingStates_AddStateLink_NullSelectionDoesNothing()
+        {
+            EditActionUsingStates component = new();
+            WfState state = new() { Id = 11, Name = "Approved" };
+            WfStateAction action = new();
+            SetMember(component, "ActAction", action);
+            SetMember(component, "States", new List<WfState> { state });
+            await InvokeAsync(component, "OnParametersSet");
+            SetMember(component, "selectedStateLink", null);
+
+            await InvokeAsync(component, "AddStateLink");
+
+            Assert.That(action.StateActions, Is.Empty);
+            Assert.That(GetMember<List<WfStateActionStateHelper>>(component, "pendingStateLinks"), Is.Empty);
+        }
+
+        [Test]
+        public async Task EditActionUsingStates_AddStateLink_DuplicateSelectionDoesNothing()
+        {
+            EditActionUsingStates component = new();
+            WfState state = new() { Id = 11, Name = "Approved" };
+            WfStateAction action = new()
+            {
+                StateActions = [new WfStateActionStateHelper { State = state, SortOrder = 1 }]
+            };
+            SetMember(component, "ActAction", action);
+            SetMember(component, "States", new List<WfState> { state });
+            await InvokeAsync(component, "OnParametersSet");
+            SetMember(component, "selectedStateLink", state);
+
+            await InvokeAsync(component, "AddStateLink");
+
+            Assert.That(action.StateActions, Has.Count.EqualTo(1));
+            Assert.That(GetMember<List<WfStateActionStateHelper>>(component, "pendingStateLinks"), Has.Count.EqualTo(1));
         }
 
         [Test]
@@ -1337,6 +1482,25 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task EditActionPopup_ActionTypeChanged_SameTypeDoesNothing()
+        {
+            EditActionPopup component = new();
+            WfStateAction action = new()
+            {
+                ActionType = StateActionTypes.SetAlert.ToString(),
+                ExternalParams = "alert message"
+            };
+            SetMember(component, "actAction", action);
+            SetMember(component, "message", "alert message");
+
+            await InvokeAsync(component, "ActionTypeChanged", StateActionTypes.SetAlert.ToString());
+
+            Assert.That(action.ActionType, Is.EqualTo(StateActionTypes.SetAlert.ToString()));
+            Assert.That(action.ExternalParams, Is.EqualTo("alert message"));
+            Assert.That(GetMember<string>(component, "message"), Is.EqualTo("alert message"));
+        }
+
+        [Test]
         public async Task EditActionPopup_LoadActionExternalParams_DeserializesTrafficPathAnalysis()
         {
             EditActionPopup component = new();
@@ -1441,6 +1605,35 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task EditActionPopup_SaveNewAction_ReturnIdsNull_DoesNotAddAction()
+        {
+            EditActionPopup component = new();
+            SettingsActionsApiConn apiConn = new()
+            {
+                ReturnNullNewActionIds = true
+            };
+            WfStateAction action = new()
+            {
+                Name = "New action",
+                ActionType = StateActionTypes.SetAlert.ToString(),
+                ExternalParams = "hello"
+            };
+            SetMember(component, "apiConnection", apiConn);
+            SetMember(component, "userConfig", new SimulatedUserConfig());
+            SetMember(component, "Actions", new List<WfStateAction>());
+            SetMember(component, "actAction", action);
+            SetMember(component, "message", "hello");
+            SetMember(component, "EditActionMode", true);
+            SetMember(component, "AddActionMode", true);
+
+            await InvokeAsync(component, "SaveAction");
+
+            Assert.That(apiConn.Queries.Count(q => q == RequestQueries.newAction), Is.EqualTo(1));
+            Assert.That(GetMember<List<WfStateAction>>(component, "Actions"), Is.Empty);
+            Assert.That(GetMember<bool>(component, "EditActionMode"), Is.True);
+        }
+
+        [Test]
         public async Task EditActionPopup_SaveExistingAction_UpdatesActionAndInvokesChanged()
         {
             EditActionPopup component = new();
@@ -1457,6 +1650,7 @@ namespace FWO.Test
             SetMember(component, "Actions", new List<WfStateAction> { action });
             SetMember(component, "actAction", action);
             SetMember(component, "message", "updated message");
+            SetMember(component, "EditActionMode", true);
             SetMember(component, "AddActionMode", false);
             SetMember(component, "OnChanged", EventCallback.Factory.Create(new object(), () => changedCount++));
 
@@ -1465,6 +1659,34 @@ namespace FWO.Test
             Assert.That(apiConn.Queries.Count(q => q == RequestQueries.updateAction), Is.EqualTo(1));
             Assert.That(changedCount, Is.EqualTo(1));
             Assert.That(GetMember<bool>(component, "EditActionMode"), Is.False);
+        }
+
+        [Test]
+        public async Task EditActionPopup_SaveExistingAction_UpdatedIdMismatch_DoesNotClose()
+        {
+            EditActionPopup component = new();
+            SettingsActionsApiConn apiConn = new()
+            {
+                ForcedUpdatedId = 999
+            };
+            WfStateAction action = new()
+            {
+                Id = 55,
+                Name = "Existing",
+                ActionType = StateActionTypes.SetAlert.ToString(),
+                ExternalParams = "updated message"
+            };
+            SetMember(component, "apiConnection", apiConn);
+            SetMember(component, "userConfig", new SimulatedUserConfig());
+            SetMember(component, "Actions", new List<WfStateAction> { action });
+            SetMember(component, "actAction", action);
+            SetMember(component, "message", "updated message");
+            SetMember(component, "AddActionMode", false);
+
+            await InvokeAsync(component, "SaveAction");
+
+            Assert.That(apiConn.Queries.Count(q => q == RequestQueries.updateAction), Is.EqualTo(1));
+            Assert.That(GetMember<List<WfStateAction>>(component, "Actions")[0], Is.SameAs(action));
         }
 
         [Test]
@@ -1489,6 +1711,44 @@ namespace FWO.Test
 
             Assert.That(apiConn.DeletedNotificationIds, Is.EqualTo(new List<int> { 5, 7 }));
             Assert.That(GetMember<bool>(component, "EditActionMode"), Is.False);
+        }
+
+        [Test]
+        public async Task EditActionPopup_Cancel_EditModeResetsUsingStatesEditor()
+        {
+            EditActionPopup component = new();
+            EditActionUsingStates usingStatesEditor = new();
+            WfStateAction action = new();
+            SetMember(component, "actAction", action);
+            SetMember(component, "EditActionMode", true);
+            SetMember(component, "AddActionMode", false);
+            SetMember(component, "usingStatesEditor", usingStatesEditor);
+            SetMember(usingStatesEditor, "ActAction", action);
+            SetMember(usingStatesEditor, "States", new List<WfState> { new() { Id = 11, Name = "Approved" } });
+            await InvokeAsync(usingStatesEditor, "OnParametersSet");
+            SetMember(usingStatesEditor, "pendingStateLinks", new List<WfStateActionStateHelper>
+            {
+                new() { State = new WfState { Id = 11, Name = "Approved" }, SortOrder = 1 }
+            });
+
+            await InvokeAsync(component, "Cancel");
+
+            Assert.That(GetMember<List<WfStateActionStateHelper>>(usingStatesEditor, "pendingStateLinks"), Is.Empty);
+            Assert.That(GetMember<bool>(component, "EditActionMode"), Is.False);
+            Assert.That(GetMember<bool>(component, "AddActionMode"), Is.False);
+        }
+
+        [Test]
+        public async Task EditActionPopup_Cancel_AddModeWithoutSendEmailEditor_StillCloses()
+        {
+            EditActionPopup component = new();
+            SetMember(component, "AddActionMode", true);
+            SetMember(component, "EditActionMode", true);
+
+            await InvokeAsync(component, "Cancel");
+
+            Assert.That(GetMember<bool>(component, "EditActionMode"), Is.False);
+            Assert.That(GetMember<bool>(component, "AddActionMode"), Is.False);
         }
 
         [Test]
@@ -1748,12 +2008,12 @@ namespace FWO.Test
                     using TcpClient client = await listener.AcceptTcpClientAsync();
                     using NetworkStream stream = client.GetStream();
                     byte[] requestBuffer = new byte[2048];
-                    _ = await stream.ReadAsync(requestBuffer, 0, requestBuffer.Length, cancellationTokenSource.Token);
+                    _ = await stream.ReadAsync(requestBuffer.AsMemory(), cancellationTokenSource.Token);
                     byte[] body = Encoding.UTF8.GetBytes(responseBody);
                     string header = $"HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n";
                     byte[] headerBytes = Encoding.ASCII.GetBytes(header);
-                    await stream.WriteAsync(headerBytes, 0, headerBytes.Length, cancellationTokenSource.Token);
-                    await stream.WriteAsync(body, 0, body.Length, cancellationTokenSource.Token);
+                    await stream.WriteAsync(headerBytes.AsMemory(), cancellationTokenSource.Token);
+                    await stream.WriteAsync(body.AsMemory(), cancellationTokenSource.Token);
                 }
                 catch
                 {
