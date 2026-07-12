@@ -44,7 +44,10 @@ namespace FWO.Test
             if (testConfigFilePath != null)
             {
                 Environment.SetEnvironmentVariable(kConfigFilePathEnvVar, null);
-                File.Delete(testConfigFilePath);
+                if (File.Exists(testConfigFilePath))
+                {
+                    File.Delete(testConfigFilePath);
+                }
             }
 
             if (logLockDirSet)
