@@ -971,6 +971,82 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task WorkflowRecipientResolver_ResolveUsers_ReturnsEmptyWhenDnsAreBlank()
+        {
+            RecipientResolverApiConn apiConn = new();
+            WorkflowRecipientResolver resolver = new(apiConn, []);
+
+            List<UiUser> users = await resolver.ResolveUsers(["", "   "]);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(users, Is.Empty);
+                Assert.That(apiConn.Queries, Is.Empty);
+            });
+        }
+
+        [Test]
+        public async Task WorkflowRecipientResolver_ResolveUsers_ReturnsCachedUserWithoutEmailWhenLdapLookupUnavailable()
+        {
+            RecipientResolverApiConn apiConn = new()
+            {
+                Users =
+                [
+                    new() { Dn = "uid=user,ou=users,dc=test", Name = "user" }
+                ]
+            };
+            WorkflowRecipientResolver resolver = new(apiConn, []);
+
+            List<UiUser> users = await resolver.ResolveUsers(["uid=user,ou=users,dc=test"]);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(apiConn.Queries, Is.EqualTo(new[] { AuthQueries.getUserEmails }));
+                Assert.That(users, Has.Count.EqualTo(1));
+                Assert.That(users[0].Dn, Is.EqualTo("uid=user,ou=users,dc=test"));
+                Assert.That(users[0].Email, Is.Null);
+            });
+        }
+
+        [Test]
+        public async Task WorkflowRecipientResolver_ResolveUsers_ReturnsEmptyWhenDnCannotBeResolved()
+        {
+            RecipientResolverApiConn apiConn = new();
+            WorkflowRecipientResolver resolver = new(apiConn, []);
+
+            List<UiUser> users = await resolver.ResolveUsers(["uid=missing,ou=users,dc=test"]);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(apiConn.Queries, Is.EqualTo(new[] { AuthQueries.getUserEmails }));
+                Assert.That(users, Is.Empty);
+            });
+        }
+
+        [Test]
+        public async Task WorkflowRecipientResolver_ResolveUserDns_UsesGroupHandlingLdapForDistinctDirectDns()
+        {
+            Ldap ldap = new()
+            {
+                GroupSearchPath = "ou=groups,dc=test",
+                GroupWritePath = "ou=write,dc=test",
+                UserSearchPath = ""
+            };
+            WorkflowRecipientResolver resolver = new(new RecipientResolverApiConn(), [ldap]);
+
+            List<string> resolvedDns = await resolver.ResolveUserDns([
+                "uid=user,ou=users,dc=test",
+                "UID=USER,ou=users,dc=test",
+                "cn=group,ou=groups,dc=test"
+            ]);
+
+            Assert.That(resolvedDns, Is.EqualTo(new[]
+            {
+                "uid=user,ou=users,dc=test"
+            }));
+        }
+
+        [Test]
         public void ActionHandler_Constructor_UsesExplicitResolverAndPolicyChecker()
         {
             TestWorkflowRecipientResolver resolver = new();
