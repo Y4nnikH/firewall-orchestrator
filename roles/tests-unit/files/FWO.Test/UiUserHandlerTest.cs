@@ -13,6 +13,13 @@ namespace FWO.Test
     [TestFixture]
     public class UiUserHandlerTest
     {
+        private static readonly int[] kExpectedOwnerships = [1, 2];
+        private static readonly int[] kExpectedRecertOwnerships = [3];
+        private static readonly int[] kExpectedVisibilityGroupIds = [7];
+        private static readonly string[] kGetWorkflowVisibilityGroupsQuery = [RequestQueries.getWorkflowVisibilityGroups];
+        private static readonly string[] kUpsertUiUserQuery = [AuthQueries.upsertUiUser];
+        private static readonly string[] kUpdatePasswordChangeQuery = [AuthQueries.updateUserPasswordChange];
+
         [Test]
         public async Task GetExpirationTime_WhenConfigExistsInDatabase_ReturnsDatabaseValue()
         {
@@ -59,8 +66,8 @@ namespace FWO.Test
 
             await UiUserHandler.GetOwnershipsFromOwnerLdap(apiConnection, user);
 
-            Assert.That(user.Ownerships, Is.EquivalentTo(new[] { 1, 2 }));
-            Assert.That(user.RecertOwnerships, Is.EquivalentTo(new[] { 3 }));
+            Assert.That(user.Ownerships, Is.EquivalentTo(kExpectedOwnerships));
+            Assert.That(user.RecertOwnerships, Is.EquivalentTo(kExpectedRecertOwnerships));
             Assert.That(apiConnection.Queries, Does.Contain(OwnerQueries.getOwnersForUser));
             Assert.That(apiConnection.Queries, Does.Contain(OwnerQueries.getOwnersFromGroups));
             Assert.That(apiConnection.Queries, Does.Contain(OwnerQueries.getOwnersForDnsWithRecertification));
@@ -165,8 +172,8 @@ namespace FWO.Test
             Assert.Multiple(() =>
             {
                 Assert.That(loaded, Is.True);
-                Assert.That(apiConnection.Queries, Is.EqualTo(new[] { RequestQueries.getWorkflowVisibilityGroups }));
-                Assert.That(user.WorkflowVisibilityGroupIds, Is.EqualTo(new[] { 7 }));
+                Assert.That(apiConnection.Queries, Is.EqualTo(kGetWorkflowVisibilityGroupsQuery));
+                Assert.That(user.WorkflowVisibilityGroupIds, Is.EqualTo(kExpectedVisibilityGroupIds));
             });
         }
 
@@ -225,9 +232,9 @@ namespace FWO.Test
             {
                 Assert.That(result.DbId, Is.EqualTo(42));
                 Assert.That(result.PasswordMustBeChanged, Is.True);
-                Assert.That(result.Ownerships, Is.EquivalentTo(new[] { 1, 2 }));
-                Assert.That(result.RecertOwnerships, Is.EquivalentTo(new[] { 3 }));
-                Assert.That(result.WorkflowVisibilityGroupIds, Is.EquivalentTo(new[] { 7 }));
+                Assert.That(result.Ownerships, Is.EquivalentTo(kExpectedOwnerships));
+                Assert.That(result.RecertOwnerships, Is.EquivalentTo(kExpectedRecertOwnerships));
+                Assert.That(result.WorkflowVisibilityGroupIds, Is.EquivalentTo(kExpectedVisibilityGroupIds));
                 Assert.That(apiConnection.Queries, Does.Contain(AuthQueries.getUserByDn));
                 Assert.That(apiConnection.Queries, Does.Contain(OwnerQueries.getOwnersForUser));
                 Assert.That(apiConnection.Queries, Does.Contain(OwnerQueries.getOwnersFromGroups));
@@ -347,7 +354,7 @@ namespace FWO.Test
 
             await UiUserHandler.UpsertUiUser(apiConnection, user, loginHappened: false);
 
-            Assert.That(apiConnection.Queries, Is.EqualTo(new[] { AuthQueries.upsertUiUser }));
+                Assert.That(apiConnection.Queries, Is.EqualTo(kUpsertUiUserQuery));
         }
 
         [Test]
@@ -357,7 +364,7 @@ namespace FWO.Test
 
             await UiUserHandler.UpdateUserPasswordChanged(apiConnection, "uid=user,ou=users,dc=example,dc=com", true);
 
-            Assert.That(apiConnection.Queries, Is.EqualTo(new[] { AuthQueries.updateUserPasswordChange }));
+            Assert.That(apiConnection.Queries, Is.EqualTo(kUpdatePasswordChangeQuery));
         }
 
         private sealed class OwnershipApiConnection : SimulatedApiConnection

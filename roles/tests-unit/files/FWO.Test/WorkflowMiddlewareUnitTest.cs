@@ -28,6 +28,8 @@ namespace FWO.Test
             "cn=a,dc=fworch,dc=internal",
             "cn=b,dc=fworch,dc=internal"
         ];
+        private static readonly string[] kGetUserEmailsQuery = [AuthQueries.getUserEmails];
+        private static readonly string[] kExpectedResolvedUserDns = ["uid=user,ou=users,dc=test"];
 
         private sealed class RecipientResolverApiConn : SimulatedApiConnection
         {
@@ -794,7 +796,7 @@ namespace FWO.Test
             bool allowed = InvokePrivateStatic<bool>(typeof(WorkflowController), "CallerCanAccessVisibility",
                 PrincipalWithRolesAndClaims(
                     [Roles.Approver],
-                    new Claim("x-hasura-groups", System.Text.Json.JsonSerializer.Serialize(new[] { approvalGroupDn }))),
+                    new Claim("x-hasura-groups", System.Text.Json.JsonSerializer.Serialize(new List<string> { approvalGroupDn }))),
                 handler, WfObjectScopes.Approval, approval);
 
             Assert.That(allowed, Is.True);
@@ -854,7 +856,7 @@ namespace FWO.Test
             };
 
             bool allowed = InvokePrivateStatic<bool>(typeof(WorkflowController), "CallerCanAccessVisibility",
-                PrincipalWithRolesAndClaims([Roles.Approver], new Claim("x-hasura-groups", System.Text.Json.JsonSerializer.Serialize(new[] { assignedGroupDn }))),
+                PrincipalWithRolesAndClaims([Roles.Approver], new Claim("x-hasura-groups", System.Text.Json.JsonSerializer.Serialize(new List<string> { assignedGroupDn }))),
                 handler, WfObjectScopes.Ticket, ticket);
 
             Assert.That(allowed, Is.True);
@@ -871,7 +873,7 @@ namespace FWO.Test
                 ""
             ]);
 
-            Assert.That(resolvedDns, Is.EqualTo(new[] { "uid=user,ou=users,dc=test" }));
+            Assert.That(resolvedDns, Is.EqualTo(kExpectedResolvedUserDns));
         }
 
         [Test]
@@ -964,7 +966,7 @@ namespace FWO.Test
 
             Assert.Multiple(() =>
             {
-                Assert.That(apiConn.Queries, Is.EqualTo(new[] { AuthQueries.getUserEmails }));
+                Assert.That(apiConn.Queries, Is.EqualTo(kGetUserEmailsQuery));
                 Assert.That(users, Has.Count.EqualTo(1));
                 Assert.That(users[0].Email, Is.EqualTo("user@example.test"));
             });
@@ -1001,7 +1003,7 @@ namespace FWO.Test
 
             Assert.Multiple(() =>
             {
-                Assert.That(apiConn.Queries, Is.EqualTo(new[] { AuthQueries.getUserEmails }));
+                Assert.That(apiConn.Queries, Is.EqualTo(kGetUserEmailsQuery));
                 Assert.That(users, Has.Count.EqualTo(1));
                 Assert.That(users[0].Dn, Is.EqualTo("uid=user,ou=users,dc=test"));
                 Assert.That(users[0].Email, Is.Null);
@@ -1018,7 +1020,7 @@ namespace FWO.Test
 
             Assert.Multiple(() =>
             {
-                Assert.That(apiConn.Queries, Is.EqualTo(new[] { AuthQueries.getUserEmails }));
+                Assert.That(apiConn.Queries, Is.EqualTo(kGetUserEmailsQuery));
                 Assert.That(users, Is.Empty);
             });
         }
@@ -1040,10 +1042,7 @@ namespace FWO.Test
                 "cn=group,ou=groups,dc=test"
             ]);
 
-            Assert.That(resolvedDns, Is.EqualTo(new[]
-            {
-                "uid=user,ou=users,dc=test"
-            }));
+            Assert.That(resolvedDns, Is.EqualTo(kExpectedResolvedUserDns));
         }
 
         [Test]
