@@ -44,6 +44,10 @@ namespace FWO.Services
             }
 
             string resolvedContent = content.BodyForLayout(notification.Layout);
+            if (notification.Layout == NotificationLayout.HtmlInBody && !string.IsNullOrWhiteSpace(resolvedContent))
+            {
+                resolvedContent = NotificationTableBodyBuilder.HtmlTableStyleBlock + resolvedContent;
+            }
             if (notificationBody.Contains(Placeholder.CONTENT))
             {
                 return notificationBody.Replace(Placeholder.CONTENT, resolvedContent);

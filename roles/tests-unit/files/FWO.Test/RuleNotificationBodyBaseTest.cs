@@ -2,6 +2,7 @@ using FWO.Basics;
 using FWO.Config.Api;
 using FWO.Data;
 using FWO.Middleware.Server;
+using FWO.Services;
 using NUnit.Framework;
 
 namespace FWO.Test
@@ -43,6 +44,7 @@ namespace FWO.Test
                 "Frame Title");
 
             Assert.That(body, Does.Contain("Rules for Owner A/APP-1 during 2026-07"));
+            Assert.That(body, Does.Contain(NotificationTableBodyBuilder.HtmlTableStyleBlock));
             Assert.That(body, Does.Contain("<h2>Frame Title</h2>"));
             Assert.That(body, Does.Contain("<p>Owners: Owner A</p>"));
             Assert.That(body, Does.Contain("Uid"));

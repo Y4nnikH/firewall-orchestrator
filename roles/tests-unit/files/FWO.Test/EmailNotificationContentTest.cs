@@ -116,7 +116,9 @@ namespace FWO.Test
                 EmailBody = $"before {Placeholder.CONTENT} after"
             };
 
-            Assert.That(NotificationEmailLayoutHelper.BuildBody(htmlNotification, content), Is.EqualTo("before <strong>html content</strong> after"));
+            string htmlBody = NotificationEmailLayoutHelper.BuildBody(htmlNotification, content);
+            Assert.That(htmlBody, Does.StartWith("before <style>table {font-family: arial, sans-serif;font-size: 10px;border-collapse: collapse;width: 100%;}"));
+            Assert.That(htmlBody, Does.Contain("<strong>html content</strong>"));
             Assert.That(NotificationEmailLayoutHelper.BuildBody(textNotification, content), Is.EqualTo("plain content"));
             Assert.That(NotificationEmailLayoutHelper.BuildBody(attachmentNotification, content), Is.EqualTo("before  after"));
         }
@@ -143,6 +145,36 @@ namespace FWO.Test
             };
 
             Assert.That(NotificationEmailLayoutHelper.BuildBody(notification, (NotificationEmailLayoutContent?)null), Is.EqualTo("intro  tail"));
+        }
+
+        [Test]
+        public void BuildBodyWithWorkflowHtmlInBodyPrefixesSharedTableStyle()
+        {
+            WfReqTask task = new()
+            {
+                Id = 7,
+                TaskNumber = 101,
+                Title = "Open web",
+                RequestAction = RequestAction.create.ToString(),
+                Elements =
+                {
+                    new WfReqElement { Field = ElemFieldType.source.ToString(), Name = "src-a" },
+                    new WfReqElement { Field = ElemFieldType.destination.ToString(), IpString = "10.0.0.1" },
+                    new WfReqElement { Field = ElemFieldType.service.ToString(), Port = 80, PortEnd = 443, ProtoId = 6 }
+                }
+            };
+            WorkflowEmailContent content = WorkflowEmailContent.FromRequestTasks([task], new EmailNotificationUserConfig());
+            FwoNotification notification = new()
+            {
+                Layout = NotificationLayout.HtmlInBody,
+                EmailBody = "prefix "
+            };
+
+            string body = NotificationEmailLayoutHelper.BuildBody(notification, content);
+
+            Assert.That(body, Does.StartWith("prefix <style>table {font-family: arial, sans-serif;font-size: 10px;border-collapse: collapse;width: 100%;}"));
+            Assert.That(body, Does.Contain("<h2>Requested Connections</h2>"));
+            Assert.That(body, Does.Contain("<table border=\"1\" cellspacing=\"0\" cellpadding=\"4\">"));
         }
 
         [Test]
