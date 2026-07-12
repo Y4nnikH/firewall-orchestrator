@@ -119,7 +119,7 @@ namespace FWO.ExternalSystems.Tufin.SecureChange
             {
                 return FillNwObjGroupTemplate(template, svc.GroupName, mgtName ?? "");
             }
-            if (svc.ProtoId <= 0) // no protocol (e.g. rule service "Any"): must not be resolved as ip protocol 0 (HOPOPT)
+            if (!svc.HasProtocol || svc.ProtoId < 0) // no protocol (e.g. rule service "Any"): must not be resolved as ip protocol 0 (HOPOPT)
             {
                 return SCConstants.SCAnyServiceJson;
             }
