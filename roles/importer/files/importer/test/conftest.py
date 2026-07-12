@@ -4,8 +4,17 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[5]
-os.environ.setdefault("FWO_GRAPHQL_QUERY_PATH", str(REPO_ROOT / "roles" / "common" / "files" / "fwo-api-calls"))
+
+def find_repo_graphql_query_path(start_path: Path) -> Path | None:
+    for parent in start_path.resolve().parents:
+        query_path = parent / "roles" / "common" / "files" / "fwo-api-calls"
+        if query_path.is_dir():
+            return query_path
+    return None
+
+
+if repo_graphql_query_path := find_repo_graphql_query_path(Path(__file__)):
+    os.environ.setdefault("FWO_GRAPHQL_QUERY_PATH", str(repo_graphql_query_path))
 
 from fwo_api import FwoApi
 from fwo_api_call import FwoApiCall
