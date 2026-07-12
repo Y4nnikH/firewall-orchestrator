@@ -63,6 +63,7 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
         OpenApiApiExampleOperationTransformer transformer = CreateTransformer();
 
         await transformer.TransformAsync(operation, CreateOwnerContext(), CancellationToken.None);
+        string description = operation.Description!.ReplaceLineEndings("\n");
 
         string normalizedDescription = NormalizeLineEndings(operation.Description);
         Assert.Multiple(() =>
@@ -84,8 +85,8 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
     "appIdExternal": "APP-4711",
     "type": "standard",
 """));
-            Assert.That(operation.Description, Does.Not.Contain("{\"active\":true"));
-            Assert.That(operation.Description, Does.Not.Contain("{\"id\":42"));
+            Assert.That(description, Does.Not.Contain("{\"active\":true"));
+            Assert.That(description, Does.Not.Contain("{\"id\":42"));
         });
     }
 
