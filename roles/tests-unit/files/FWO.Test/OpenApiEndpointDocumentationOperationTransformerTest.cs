@@ -1,10 +1,12 @@
 using FWO.Middleware.Server.Controllers;
 using FWO.Middleware.Server.OpenApi;
 using FWO.Middleware.Server.Requests;
+using FWO.Middleware.Server.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -246,6 +248,98 @@ public class OpenApiEndpointDocumentationOperationTransformerTest
         IEnumerable<IOpenApiEndpointDocumentationProvider> providers = provider.GetServices<IOpenApiEndpointDocumentationProvider>();
 
         Assert.That(providers, Has.One.InstanceOf<OpenApiOwnerDocumentationProvider>());
+    }
+
+    /// <summary>
+    /// Verifies request body examples from the catalog are applied to all media types.
+    /// </summary>
+    [Test]
+    public async Task TransformAsync_WithBodyParameter_AppliesRequestExample()
+    {
+        OpenApiOperation operation = CreateOperation();
+        operation.RequestBody = new OpenApiRequestBody
+        {
+            Content = new Dictionary<string, OpenApiMediaType> { ["application/json"] = new OpenApiMediaType() }
+        };
+        OpenApiOperationTransformerContext context = CreateContext(new ControllerActionDescriptor(), "api/flow/get-owners");
+        context.Description.ParameterDescriptions.Add(new ApiParameterDescription
+        {
+            Source = BindingSource.Body,
+            Type = typeof(GetOwnersRequest)
+        });
+        OpenApiApiExampleOperationTransformer transformer = CreateTransformerWithExamples();
+
+        await transformer.TransformAsync(operation, context, CancellationToken.None);
+
+        System.Text.Json.Nodes.JsonNode? example = operation.RequestBody.Content!["application/json"].Example;
+        Assert.Multiple(() =>
+        {
+            Assert.That(example, Is.Not.Null);
+            Assert.That(example!.ToJsonString(), Does.Contain("\"appIdExternal\":\"APP-42\""));
+            Assert.That(example.ToJsonString(), Does.Contain("\"showDetails\":true"));
+        });
+    }
+
+    /// <summary>
+    /// Verifies response examples are applied per status code and void or unknown codes are skipped.
+    /// </summary>
+    [Test]
+    public async Task TransformAsync_WithSupportedResponseTypes_AppliesResponseExamples()
+    {
+        OpenApiOperation operation = CreateOperation();
+        operation.Responses!["200"] = new OpenApiResponse
+        {
+            Content = new Dictionary<string, OpenApiMediaType> { ["application/json"] = new OpenApiMediaType() }
+        };
+        OpenApiOperationTransformerContext context = CreateContext(new ControllerActionDescriptor(), "api/flow/get-owners");
+        context.Description.SupportedResponseTypes.Add(new ApiResponseType { Type = typeof(List<GetOwnerResponse>), StatusCode = 200 });
+        context.Description.SupportedResponseTypes.Add(new ApiResponseType { Type = typeof(void), StatusCode = 401 });
+        context.Description.SupportedResponseTypes.Add(new ApiResponseType { Type = typeof(GetOwnerResponse), StatusCode = 400 });
+        context.Description.SupportedResponseTypes.Add(new ApiResponseType { Type = typeof(GetOwnerResponse), StatusCode = 404 });
+        OpenApiApiExampleOperationTransformer transformer = CreateTransformerWithExamples();
+
+        await transformer.TransformAsync(operation, context, CancellationToken.None);
+
+        System.Text.Json.Nodes.JsonNode? example = operation.Responses["200"].Content!["application/json"].Example;
+        Assert.Multiple(() =>
+        {
+            Assert.That(example, Is.Not.Null);
+            Assert.That(example!.ToJsonString(), Does.StartWith("["));
+            Assert.That(example.ToJsonString(), Does.Contain("\"name\":\"Payments\""));
+        });
+    }
+
+    /// <summary>
+    /// Verifies operations without responses or request body content are left untouched.
+    /// </summary>
+    [Test]
+    public async Task TransformAsync_WithoutResponsesAndBodyContent_DoesNotThrow()
+    {
+        OpenApiOperation operation = new() { Responses = null, RequestBody = null };
+        OpenApiOperationTransformerContext context = CreateContext(new ControllerActionDescriptor(), "api/flow/get-owners");
+        context.Description.ParameterDescriptions.Add(new ApiParameterDescription
+        {
+            Source = BindingSource.Body,
+            Type = typeof(GetOwnersRequest)
+        });
+        OpenApiApiExampleOperationTransformer transformer = CreateTransformerWithExamples();
+
+        await transformer.TransformAsync(operation, context, CancellationToken.None);
+
+        Assert.That(operation.Responses, Is.Null);
+    }
+
+    private static OpenApiApiExampleOperationTransformer CreateTransformerWithExamples()
+    {
+        ServiceCollection services = new();
+        services.AddOptions<JsonOptions>().Configure(ApiDocumentationJsonOptions.Configure);
+        services.AddApiExamples();
+        ServiceProvider provider = services.BuildServiceProvider();
+
+        return new OpenApiApiExampleOperationTransformer(
+            provider.GetRequiredService<ApiExampleCatalog>(),
+            provider.GetRequiredService<IOptions<JsonOptions>>(),
+            provider.GetServices<IOpenApiEndpointDocumentationProvider>());
     }
 
     private static OpenApiApiExampleOperationTransformer CreateTransformer()
