@@ -21,6 +21,9 @@ namespace FWO.Test
     [NonParallelizable]
     internal class SettingsUsersHandlerTest
     {
+        private static readonly string[] kExpectedAdminReporterRoles = ["admin", "reporter"];
+        private static readonly string[] kExpectedTenantName = ["t2"];
+
         [Test]
         public void BuildUsersByNormalizedDnGroupsEquivalentDns()
         {
@@ -108,7 +111,7 @@ namespace FWO.Test
 
             List<Tenant> fixedTenant = SettingsUsersHandler.GetAvailableTenants(
                 new UiLdapConnection { TenantId = 2, TenantLevel = 0 }, tenants);
-            Assert.That(fixedTenant.Select(t => t.Name), Is.EqualTo(new[] { "t2" }));
+            Assert.That(fixedTenant.Select(t => t.Name), Is.EqualTo(kExpectedTenantName));
 
             List<Tenant> allTenants = SettingsUsersHandler.GetAvailableTenants(
                 new UiLdapConnection { TenantId = null, TenantLevel = 1 }, tenants);
@@ -407,7 +410,7 @@ namespace FWO.Test
                 Assert.That(handler.ShowSampleRemoveButton, Is.True);
                 Assert.That(handler.UiUsers[0].Groups, Is.EqualTo(new List<string> { "admins" }));
                 Assert.That(handler.UiUsers[0].Roles, Is.EqualTo(new List<string> { "admin" }));
-                Assert.That(handler.AvailableRoles.Select(r => r.Name), Is.EqualTo(new[] { "admin", "reporter" }));
+                Assert.That(handler.AvailableRoles.Select(r => r.Name), Is.EqualTo(kExpectedAdminReporterRoles));
             });
         }
 
@@ -621,6 +624,318 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task SaveNewUserRejectsMissingRequiredFields()
+        {
+            List<(string Title, string Message)> messages = [];
+            (SettingsUsersHandler handler, _, _, _) = CreateHandler(messages: messages);
+            handler.AddMode = true;
+            handler.SelectedLdap = new UiLdapConnection
+            {
+                Id = 5,
+                Type = (int)LdapType.ActiveDirectory,
+                TenantLevel = 0,
+                UserSearchPath = "ou=users,dc=fworch,dc=internal"
+            };
+            handler.ActUser = new UiUser
+            {
+                Name = "",
+                Password = "",
+                Email = "alice@example.com",
+                LdapConnection = handler.SelectedLdap
+            };
+
+            await handler.Save();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(messages, Has.Count.EqualTo(1));
+                Assert.That(messages[0].Title, Is.EqualTo("add_user"));
+                Assert.That(messages[0].Message, Is.EqualTo("E5211"));
+                Assert.That(handler.UiUsers, Is.Empty);
+            });
+        }
+
+        [Test]
+        public async Task SaveNewUserRejectsInvalidTenant()
+        {
+            List<(string Title, string Message)> messages = [];
+            (SettingsUsersHandler handler, _, _, _) = CreateHandler(messages: messages);
+            handler.Tenants = [new Tenant { Id = 1, Name = "tenant1" }];
+            handler.AddMode = true;
+            handler.SelectedLdap = new UiLdapConnection
+            {
+                Id = 5,
+                Type = (int)LdapType.OpenLdap,
+                TenantLevel = 1,
+                UserSearchPath = "ou=users,dc=fworch,dc=internal"
+            };
+            handler.SelectedTenant = new Tenant { Id = 99, Name = "unknown" };
+            handler.SelectedRole = new Role { Name = "auditor", Dn = "cn=auditor,ou=roles,dc=fworch,dc=internal" };
+            handler.ActUser = new UiUser
+            {
+                Name = "alice",
+                Password = "Password1!",
+                Email = "alice@example.com",
+                LdapConnection = handler.SelectedLdap,
+                Tenant = handler.SelectedTenant,
+                Roles = [handler.SelectedRole.Name]
+            };
+
+            await handler.Save();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(messages, Has.Count.EqualTo(1));
+                Assert.That(messages[0].Title, Is.EqualTo("add_user"));
+                Assert.That(messages[0].Message, Is.EqualTo("E5212"));
+                Assert.That(handler.UiUsers, Is.Empty);
+            });
+        }
+
+        [Test]
+        public async Task SaveNewUserRejectsDuplicateDn()
+        {
+            List<(string Title, string Message)> messages = [];
+            (SettingsUsersHandler handler, _, _, _) = CreateHandler(messages: messages);
+            handler.AddMode = true;
+            handler.SelectedLdap = new UiLdapConnection
+            {
+                Id = 5,
+                Type = (int)LdapType.ActiveDirectory,
+                TenantLevel = 0,
+                UserSearchPath = "ou=users,dc=fworch,dc=internal"
+            };
+            handler.SelectedRole = new Role { Name = "auditor", Dn = "cn=auditor,ou=roles,dc=fworch,dc=internal" };
+            handler.UiUsers = [new UiUser { Dn = "cn=alice,ou=users,dc=fworch,dc=internal" }];
+            handler.ActUser = new UiUser
+            {
+                Name = "alice",
+                Password = "Password1!",
+                Email = "alice@example.com",
+                LdapConnection = handler.SelectedLdap,
+                Roles = [handler.SelectedRole.Name]
+            };
+
+            await handler.Save();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(messages, Has.Count.EqualTo(1));
+                Assert.That(messages[0].Title, Is.EqualTo("add_user"));
+                Assert.That(messages[0].Message, Is.EqualTo("E5210"));
+                Assert.That(handler.UiUsers, Has.Count.EqualTo(1));
+            });
+        }
+
+        [Test]
+        public async Task SaveNewUserRejectsPasswordPolicyViolation()
+        {
+            List<(string Title, string Message)> messages = [];
+            SimulatedGlobalConfig globalConfig = new()
+            {
+                PwMinLength = 12,
+                PwUpperCaseRequired = false,
+                PwLowerCaseRequired = false,
+                PwNumberRequired = false,
+                PwSpecialCharactersRequired = false
+            };
+            (SettingsUsersHandler handler, _, _, _) = CreateHandler(messages: messages, globalConfig: globalConfig);
+            handler.AddMode = true;
+            handler.SelectedLdap = new UiLdapConnection
+            {
+                Id = 5,
+                Type = (int)LdapType.ActiveDirectory,
+                TenantLevel = 0,
+                UserSearchPath = "ou=users,dc=fworch,dc=internal"
+            };
+            handler.SelectedRole = new Role { Name = "auditor", Dn = "cn=auditor,ou=roles,dc=fworch,dc=internal" };
+            handler.ActUser = new UiUser
+            {
+                Name = "alice",
+                Password = "short",
+                Email = "alice@example.com",
+                LdapConnection = handler.SelectedLdap,
+                Roles = [handler.SelectedRole.Name]
+            };
+
+            await handler.Save();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(messages, Has.Count.EqualTo(1));
+                Assert.That(messages[0].Title, Is.EqualTo("add_user"));
+                Assert.That(messages[0].Message, Is.EqualTo("E541112"));
+                Assert.That(handler.UiUsers, Is.Empty);
+            });
+        }
+
+        [Test]
+        public async Task RemoveSampleDataKeepsButtonVisibleWhenCleanupFails()
+        {
+            await using TestMiddlewareServer server = new(request =>
+            {
+                if (request.Method == "DELETE" && request.Path == "/api/User/AllGroupsAndRoles")
+                {
+                    return new TestResponse(200, JsonSerializer.Serialize(false));
+                }
+
+                return new TestResponse(404, "{}");
+            });
+
+            (SettingsUsersHandler handler, _, _, List<(string Title, string Message)> messages) = CreateHandler(middlewareClient: new MiddlewareClient(server.BaseUrl));
+            UiUser sample = new()
+            {
+                DbId = 11,
+                Name = "alice_demo",
+                Dn = "uid=alice,dc=fworch,dc=internal",
+                LdapConnection = new UiLdapConnection { Id = 5 }
+            };
+            handler.SampleUsers = [sample];
+            handler.UiUsers = [sample];
+            handler.ShowSampleRemoveButton = true;
+
+            await handler.RemoveSampleData();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(handler.ShowSampleRemoveButton, Is.True);
+                Assert.That(handler.UiUsers, Has.Count.EqualTo(1));
+                Assert.That(handler.WorkInProgress, Is.False);
+                Assert.That(messages, Has.Count.EqualTo(1));
+                Assert.That(messages[0].Title, Is.EqualTo("remove_sample_data"));
+                Assert.That(messages[0].Message, Is.EqualTo("E5221"));
+            });
+        }
+
+        [Test]
+        public async Task SaveExistingUserReportsMiddlewareFailure()
+        {
+            await using TestMiddlewareServer server = new(request =>
+            {
+                if (request.Method == "PUT" && request.Path == "/api/User")
+                {
+                    return new TestResponse(200, JsonSerializer.Serialize(false));
+                }
+
+                return new TestResponse(404, "{}");
+            });
+
+            List<(string Title, string Message)> messages = [];
+            (SettingsUsersHandler handler, _, _, _) = CreateHandler(messages: messages, middlewareClient: new MiddlewareClient(server.BaseUrl));
+            handler.UiUsers = [new UiUser
+            {
+                DbId = 11,
+                Name = "alice",
+                Email = "alice@old.example",
+                LdapConnection = new UiLdapConnection { Id = 5 }
+            }];
+            handler.ActUser = new UiUser(handler.UiUsers[0]) { Email = "alice@new.example" };
+            handler.EditMode = true;
+
+            await handler.Save();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(messages, Has.Count.EqualTo(1));
+                Assert.That(messages[0].Title, Is.EqualTo("update_user"));
+                Assert.That(messages[0].Message, Is.EqualTo("E5214"));
+                Assert.That(handler.EditMode, Is.True);
+                Assert.That(handler.UiUsers[0].Email, Is.EqualTo("alice@old.example"));
+            });
+        }
+
+        [Test]
+        public async Task DeleteReportsMiddlewareFailure()
+        {
+            await using TestMiddlewareServer server = new(request =>
+            {
+                if (request.Method == "DELETE" && request.Path == "/api/User")
+                {
+                    return new TestResponse(200, JsonSerializer.Serialize(false));
+                }
+
+                return new TestResponse(404, "{}");
+            });
+
+            List<(string Title, string Message)> messages = [];
+            (SettingsUsersHandler handler, _, _, _) = CreateHandler(messages: messages, middlewareClient: new MiddlewareClient(server.BaseUrl));
+            handler.UiUsers = [new UiUser
+            {
+                DbId = 11,
+                Name = "alice",
+                Dn = "uid=alice,dc=fworch,dc=internal",
+                LdapConnection = new UiLdapConnection { Id = 5 }
+            }];
+            handler.ActUser = handler.UiUsers[0];
+
+            await handler.Delete();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(messages, Has.Count.EqualTo(1));
+                Assert.That(messages[0].Title, Is.EqualTo("delete_user"));
+                Assert.That(messages[0].Message, Is.EqualTo("E5216"));
+                Assert.That(handler.UiUsers, Has.Count.EqualTo(1));
+            });
+        }
+
+        [Test]
+        public async Task SaveNewUserReportsGroupAndRoleAssignmentFailures()
+        {
+            await using TestMiddlewareServer server = new(request =>
+            {
+                if (request.Method == "POST" && request.Path == "/api/User")
+                {
+                    return new TestResponse(200, JsonSerializer.Serialize(23));
+                }
+
+                if (request.Method == "POST" && request.Path == "/api/Group/User")
+                {
+                    return new TestResponse(200, JsonSerializer.Serialize(false));
+                }
+
+                if (request.Method == "POST" && request.Path == "/api/Role/User")
+                {
+                    return new TestResponse(200, JsonSerializer.Serialize(false));
+                }
+
+                return new TestResponse(404, "{}");
+            });
+
+            List<(string Title, string Message)> messages = [];
+            (SettingsUsersHandler handler, _, _, _) = CreateHandler(messages: messages, middlewareClient: new MiddlewareClient(server.BaseUrl));
+            handler.SelectedLdap = new UiLdapConnection
+            {
+                Id = 5,
+                Type = (int)LdapType.ActiveDirectory,
+                TenantLevel = 0,
+                UserSearchPath = "ou=users,dc=fworch,dc=internal"
+            };
+            handler.SelectedGroup = new UserGroup { Name = "admins", Dn = "cn=admins,ou=groups,dc=fworch,dc=internal" };
+            handler.SelectedRole = new Role { Name = "auditor", Dn = "cn=auditor,ou=roles,dc=fworch,dc=internal" };
+            handler.Groups = [handler.SelectedGroup];
+            handler.Roles = [handler.SelectedRole];
+            handler.AddMode = true;
+            handler.ActUser = new UiUser
+            {
+                Name = "alice",
+                Password = "Password1!",
+                Email = "alice@example.com",
+                LdapConnection = handler.SelectedLdap,
+                Roles = [handler.SelectedRole.Name]
+            };
+
+            await handler.Save();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(messages.Count(message => message.Title == "assign_user_to_group" && message.Message == "E5242"), Is.EqualTo(1));
+                Assert.That(messages.Count(message => message.Title == "assign_user_group_to_role" && message.Message == "E5255"), Is.EqualTo(1));
+                Assert.That(handler.UiUsers, Has.Count.EqualTo(1));
+            });
+        }
+
+        [Test]
         public async Task DeleteRemovesTheSelectedUser()
         {
             await using TestMiddlewareServer server = new(request =>
@@ -731,7 +1046,8 @@ namespace FWO.Test
         private static (SettingsUsersHandler Handler, EchoUserConfig UserConfig, RecordingApiConnection ApiConnection, List<(string Title, string Message)> Messages) CreateHandler(
             List<(string Title, string Message)>? messages = null,
             RecordingApiConnection? apiConnection = null,
-            MiddlewareClient? middlewareClient = null)
+            MiddlewareClient? middlewareClient = null,
+            SimulatedGlobalConfig? globalConfig = null)
         {
             EchoUserConfig userConfig = new();
             userConfig.User.Name = "tester";
@@ -740,7 +1056,7 @@ namespace FWO.Test
 
             RecordingApiConnection effectiveApiConnection = apiConnection ?? new RecordingApiConnection();
             MiddlewareClient effectiveMiddlewareClient = middlewareClient ?? new MiddlewareClient("http://127.0.0.1:1/");
-            SimulatedGlobalConfig globalConfig = new()
+            SimulatedGlobalConfig effectiveGlobalConfig = globalConfig ?? new()
             {
                 PwMinLength = 3,
                 PwUpperCaseRequired = false,
@@ -754,7 +1070,7 @@ namespace FWO.Test
                 effectiveApiConnection,
                 effectiveMiddlewareClient,
                 userConfig,
-                globalConfig,
+                effectiveGlobalConfig,
                 (exception, title, message, _) => effectiveMessages.Add((title, message)));
 
             return (handler, userConfig, effectiveApiConnection, effectiveMessages);
