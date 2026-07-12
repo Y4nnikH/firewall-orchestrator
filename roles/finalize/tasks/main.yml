@@ -22,7 +22,7 @@
   when: not already_installed and installation_mode == "upgrade"
 
 - name: Modify the product version in the config file
-  block:      
+  block:
     - name: Read config file
       slurp:
         path: "{{ fworch_conf_file }}"
@@ -39,7 +39,8 @@
         owner: "{{ fworch_user }}"
         group: "{{ fworch_group }}"
         mode: "0640"
-      become: true     
+      become: true
+  become: true
   when: installation_mode == "upgrade"
   
 - name: include upgrade script
@@ -143,7 +144,6 @@
   become: true
   when: "'middlewareserver' in group_names and (mw_deploy_changed | default(false))"
 
-# TODO - find out why UI sometimes crashes during upgrade of heavy data installations
 - name: finally restart UI
   ansible.builtin.systemd:
     name: "{{ product_name }}-ui"
