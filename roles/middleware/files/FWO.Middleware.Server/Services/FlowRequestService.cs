@@ -7,6 +7,7 @@ using FWO.Data;
 using FWO.Middleware.Server.Requests;
 using FWO.Middleware.Server.Responses;
 using FWO.Services.Workflow;
+using System.Globalization;
 using System.Text.Json;
 
 namespace FWO.Middleware.Server.Services;
@@ -230,7 +231,7 @@ public sealed class FlowRequestService
     /// <summary>
     /// Builds the access tasks for the request rules.
     /// </summary>
-    private static IEnumerable<WfReqTask> BuildRuleTasks(CreateRequestRequest request, Dictionary<int, CreateRequestEntity> entities,
+    private static List<WfReqTask> BuildRuleTasks(CreateRequestRequest request, Dictionary<int, CreateRequestEntity> entities,
         int ticketStateId, Dictionary<string, int> ruleActionIds, ref int taskNumber)
     {
         List<WfReqTask> tasks = [];
@@ -244,7 +245,7 @@ public sealed class FlowRequestService
     /// <summary>
     /// Builds ticket tasks that create object groups.
     /// </summary>
-    private static IEnumerable<WfReqTask> BuildGroupTasks(CreateRequestRequest request, Dictionary<int, CreateRequestEntity> entities,
+    private static List<WfReqTask> BuildGroupTasks(CreateRequestRequest request, Dictionary<int, CreateRequestEntity> entities,
         int ticketStateId, ref int taskNumber)
     {
         List<WfReqTask> tasks = [];
@@ -636,7 +637,7 @@ public sealed class FlowRequestService
 
         private static DateTime? TryParseDateTime(string value)
         {
-            return DateTime.TryParse(value, out DateTime parsed) ? parsed : null;
+            return DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTime parsed) ? parsed : null;
         }
 
         private static int ResolveProtocolId(string protocol, Dictionary<string, int> protocolIds)
