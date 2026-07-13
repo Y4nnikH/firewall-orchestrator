@@ -810,6 +810,7 @@ def test_auth_validation_and_token_helpers(monkeypatch: MonkeyPatch):
     args.guardicore_token = None
     args.guardicore_user = "user"
     args.guardicore_password = "password"
+
     def fake_login_fwo(
         user: str,
         password: str,
@@ -847,6 +848,7 @@ def test_fetch_connections_from_fwo_filters_invalid_payloads(monkeypatch: Monkey
         {"data": {"modelling_connection": "bad"}},
         {"data": {"modelling_connection": [{"id": 1}, "ignored"]}},
     ]
+
     def fake_run_graphql_query(
         config: Any,
         query: str,
@@ -911,6 +913,7 @@ def test_runtime_config_logging_and_processing_helpers(monkeypatch: MonkeyPatch)
         section_position="ALLOW",
         publish_comments="publish",
     )
+
     class FakeLogger:
         def info(self, message: str, *args: Any, **kwargs: Any) -> None:
             del message, args, kwargs

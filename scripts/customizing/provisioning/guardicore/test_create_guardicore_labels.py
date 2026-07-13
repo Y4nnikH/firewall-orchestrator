@@ -407,6 +407,7 @@ def test_guardicore_label_auth_and_fetch_helpers(monkeypatch: MonkeyPatch):
             }
         },
     ]
+
     def fake_run_graphql_query(
         config: Any,
         query: str,
