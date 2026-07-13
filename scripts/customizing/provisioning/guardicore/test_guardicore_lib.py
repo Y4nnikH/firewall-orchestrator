@@ -7,6 +7,7 @@ import pytest
 import requests
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from types import TracebackType
     from typing import Self
 
@@ -23,6 +24,34 @@ from scripts.customizing.provisioning.guardicore.guardicore_lib import (
 
 SAMPLE_FWO_CA_CERT = "/etc/ssl/certs/fwo-ca.pem"
 SAMPLE_GUARDICORE_CA_CERT = "/etc/ssl/certs/guardicore-ca.pem"
+
+
+class SessionStub:
+    def __init__(self, post_handler: Callable[..., Any]) -> None:
+        self.headers: dict[str, Any] = {}
+        self.verify = True
+        self._post_handler = post_handler
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        del exc_type, exc, tb
+
+    def post(self, *args: Any, **kwargs: Any) -> Any:
+        return self._post_handler(*args, **kwargs)
+
+
+def install_session_stub(monkeypatch: MonkeyPatch, post_handler: Callable[..., Any]) -> None:
+    def fake_session() -> SessionStub:
+        return SessionStub(post_handler)
+
+    monkeypatch.setattr(requests, "Session", fake_session)
 
 
 def test_extract_label_items_reads_objects_list():
@@ -76,26 +105,11 @@ def test_login_fwo_returns_jwt_and_rejects_non_ok_response(monkeypatch: MonkeyPa
         status_code = 200
         text = "jwt"
 
-    class FakeSession:
-        def __init__(self) -> None:
-            self.verify = True
+    def post_fwo_login(endpoint: str, json: dict[str, Any], headers: dict[str, str], timeout: int) -> FakeResponse:
+        del endpoint, json, headers, timeout
+        return FakeResponse()
 
-        def __enter__(self) -> Self:
-            return self
-
-        def __exit__(
-            self,
-            exc_type: type[BaseException] | None,
-            exc: BaseException | None,
-            tb: TracebackType | None,
-        ) -> None:
-            return None
-
-        def post(self, endpoint: str, json: dict[str, Any], headers: dict[str, str], timeout: int) -> FakeResponse:
-            del endpoint, json, headers, timeout
-            return FakeResponse()
-
-    monkeypatch.setattr(requests, "Session", FakeSession)
+    install_session_stub(monkeypatch, post_fwo_login)
 
     assert login_fwo("user", "secret", "https://fwo", True, 10, RuntimeError) == "jwt"
 
@@ -113,26 +127,16 @@ def test_login_guardicore_accepts_supported_token_keys(monkeypatch: MonkeyPatch)
         def json(self) -> dict[str, Any]:
             return {"accessToken": "gc-token"}
 
-    class FakeSession:
-        def __init__(self) -> None:
-            self.verify = True
+    def post_guardicore_login(
+        endpoint: str,
+        json: dict[str, Any],
+        headers: dict[str, str],
+        timeout: int,
+    ) -> FakeResponse:
+        del endpoint, json, headers, timeout
+        return FakeResponse()
 
-        def __enter__(self) -> Self:
-            return self
-
-        def __exit__(
-            self,
-            exc_type: type[BaseException] | None,
-            exc: BaseException | None,
-            tb: TracebackType | None,
-        ) -> None:
-            return None
-
-        def post(self, endpoint: str, json: dict[str, Any], headers: dict[str, str], timeout: int) -> FakeResponse:
-            del endpoint, json, headers, timeout
-            return FakeResponse()
-
-    monkeypatch.setattr(requests, "Session", FakeSession)
+    install_session_stub(monkeypatch, post_guardicore_login)
 
     assert login_guardicore("user", "secret", "https://gc", True, 10, RuntimeError) == "gc-token"
 
@@ -149,26 +153,16 @@ def test_login_guardicore_rejects_invalid_json_and_missing_token(monkeypatch: Mo
                 raise ValueError("invalid")
             return self.payload
 
-    class FakeSession:
-        def __init__(self) -> None:
-            self.verify = True
+    def post_guardicore_login(
+        endpoint: str,
+        json: dict[str, Any],
+        headers: dict[str, str],
+        timeout: int,
+    ) -> FakeResponse:
+        del endpoint, json, headers, timeout
+        return FakeResponse()
 
-        def __enter__(self) -> Self:
-            return self
-
-        def __exit__(
-            self,
-            exc_type: type[BaseException] | None,
-            exc: BaseException | None,
-            tb: TracebackType | None,
-        ) -> None:
-            return None
-
-        def post(self, endpoint: str, json: dict[str, Any], headers: dict[str, str], timeout: int) -> FakeResponse:
-            del endpoint, json, headers, timeout
-            return FakeResponse()
-
-    monkeypatch.setattr(requests, "Session", FakeSession)
+    install_session_stub(monkeypatch, post_guardicore_login)
 
     with pytest.raises(RuntimeError, match="not valid JSON"):
         login_guardicore("user", "secret", "https://gc", True, 10, RuntimeError)
@@ -188,28 +182,12 @@ def test_run_graphql_query_removes_line_breaks_in_payload(monkeypatch: MonkeyPat
         def json(self) -> dict[str, Any]:
             return {"data": {"ok": True}}
 
-    class FakeSession:
-        def __init__(self) -> None:
-            self.headers: dict[str, Any] = {}
-            self.verify = True
+    def post_graphql_query(url: str, json: dict[str, Any], timeout: int) -> FakeResponse:
+        del url, timeout
+        captured_payload.update(json)
+        return FakeResponse()
 
-        def __enter__(self) -> Self:
-            return self
-
-        def __exit__(
-            self,
-            exc_type: type[BaseException] | None,
-            exc: BaseException | None,
-            tb: TracebackType | None,
-        ) -> None:
-            return None
-
-        def post(self, url: str, json: dict[str, Any], timeout: int) -> FakeResponse:
-            del url, timeout
-            captured_payload.update(json)
-            return FakeResponse()
-
-    monkeypatch.setattr(requests, "Session", FakeSession)
+    install_session_stub(monkeypatch, post_graphql_query)
 
     config = FwoConfig(
         graphql_url="https://fwo/graphql",
