@@ -95,7 +95,7 @@ namespace FWO.Test
         }
 
         /// <summary>
-        /// Resolves the repository path to the shared GraphQL API call files.
+        /// Resolves the repository or installed path to the shared GraphQL API call files.
         /// </summary>
         private static string FindGraphQlRootDirectory()
         {
@@ -103,16 +103,22 @@ namespace FWO.Test
 
             while (currentDirectory is not null)
             {
-                string candidatePath = Path.Combine(currentDirectory.FullName, "roles", "common", "files", "fwo-api-calls");
-                if (Directory.Exists(candidatePath))
+                string repositoryPath = Path.Combine(currentDirectory.FullName, "roles", "common", "files", "fwo-api-calls");
+                if (Directory.Exists(repositoryPath))
                 {
-                    return candidatePath;
+                    return repositoryPath;
+                }
+
+                string installedPath = Path.Combine(currentDirectory.FullName, "fwo-api-calls");
+                if (Directory.Exists(installedPath))
+                {
+                    return installedPath;
                 }
 
                 currentDirectory = currentDirectory.Parent;
             }
 
-            Assert.Fail("Could not locate roles/common/files/fwo-api-calls from the test output directory.");
+            Assert.Fail("Could not locate the repository or installed fwo-api-calls directory from the test output directory.");
             return string.Empty;
         }
     }
