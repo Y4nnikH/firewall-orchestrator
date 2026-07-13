@@ -89,13 +89,15 @@ namespace FWO.Test
             SimulatedGlobalConfig globalConfig = new();
             globalConfig.RawConfigItems =
             [
-                new() { Key = "reqOwnerBased", Value = "true", User = 0 }
+                new() { Key = "reqOwnerBased", Value = "true", User = 0 },
+                new() { Key = "reqVisibilityBased", Value = "true", User = 0 }
             ];
 
             using UserConfigApiConnection apiConnection = new([]);
             UserConfig userConfig = new(globalConfig, apiConnection, new UiUser { DbId = 50, Language = "English" });
 
             Assert.That(userConfig.ReqOwnerBased, Is.True);
+            Assert.That(userConfig.ReqVisibilityBased, Is.True);
         }
 
         [Test]
@@ -113,12 +115,14 @@ namespace FWO.Test
             SimulatedGlobalConfig globalConfig = new();
             globalConfig.RawConfigItems =
             [
-                new() { Key = "reqOwnerBased", Value = "true", User = 0 }
+                new() { Key = "reqOwnerBased", Value = "true", User = 0 },
+                new() { Key = "reqVisibilityBased", Value = "true", User = 0 }
             ];
 
             UserConfig userConfig = UserConfig.ForTextOnly(globalConfig);
 
             Assert.That(userConfig.ReqOwnerBased, Is.False);
+            Assert.That(userConfig.ReqVisibilityBased, Is.False);
         }
 
         [Test]
@@ -126,11 +130,12 @@ namespace FWO.Test
         {
             SimulatedGlobalConfig globalConfig = new();
             using UserConfigApiConnection apiConnection =
-                new([new() { Key = "reqOwnerBased", Value = "true", User = 0 }]);
+                new([new() { Key = "reqOwnerBased", Value = "true", User = 0 }, new() { Key = "reqVisibilityBased", Value = "true", User = 0 }]);
 
             UserConfig userConfig = UserConfig.ForGlobalSettings(globalConfig, apiConnection);
 
             Assert.That(userConfig.ReqOwnerBased, Is.True);
+            Assert.That(userConfig.ReqVisibilityBased, Is.True);
         }
 
         [Test]
@@ -219,6 +224,7 @@ namespace FWO.Test
             globalConfig.RawConfigItems =
             [
                 new() { Key = "reqOwnerBased", Value = "true", User = 0 },
+                new() { Key = "reqVisibilityBased", Value = "true", User = 0 },
                 new() { Key = "elementsPerFetch", Value = "777", User = 0 }
             ];
 
@@ -227,6 +233,7 @@ namespace FWO.Test
             UserConfig userConfig = new(globalConfig, apiConnection, new UiUser { DbId = 50, Language = "English" });
 
             Assert.That(userConfig.ReqOwnerBased, Is.True);
+            Assert.That(userConfig.ReqVisibilityBased, Is.True);
             Assert.That(userConfig.ElementsPerFetch, Is.EqualTo(55));
         }
 
@@ -258,6 +265,33 @@ namespace FWO.Test
                 Assert.That(globalConfig.WelcomeMessage, Is.EqualTo("new"));
                 Assert.That(globalConfig.RawConfigItems.First(item => item.Key == "welcomeMessage").Value, Is.EqualTo("new"));
                 Assert.That(globalConfig.RawConfigItems.First(item => item.Key == "importSleepTime").Value, Is.EqualTo("40"));
+            });
+        }
+
+        [Test]
+        public async Task WriteToDatabase_PersistsDesignatedZoneMatrixSelection()
+        {
+            SimulatedGlobalConfig globalConfig = new()
+            {
+                ComplianceDesignatedZoneMatrixId = 0,
+                RawConfigItems =
+                [
+                    new() { Key = "complianceDesignatedZoneMatrix", Value = "0", User = 0 }
+                ]
+            };
+            ConfigData editableConfig = await globalConfig.GetEditableConfig();
+            editableConfig.ComplianceDesignatedZoneMatrixId = 17;
+
+            using UserConfigApiConnection apiConnection = new([]);
+            await globalConfig.WriteToDatabase(editableConfig, apiConnection);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(apiConnection.UpsertConfigCallCount, Is.EqualTo(1));
+                Assert.That(apiConnection.LastConfigItems, Has.Count.EqualTo(1));
+                Assert.That(apiConnection.LastConfigItems[0].Key, Is.EqualTo("complianceDesignatedZoneMatrix"));
+                Assert.That(apiConnection.LastConfigItems[0].Value, Is.EqualTo("17"));
+                Assert.That(globalConfig.ComplianceDesignatedZoneMatrixId, Is.EqualTo(17));
             });
         }
 
@@ -295,9 +329,10 @@ namespace FWO.Test
         }
 
         [Test]
-        public void FlowSyncSubscription_ContainsFlowSyncSleepTime()
+        public void FlowSyncSubscription_ContainsFlowSyncConfigSettings()
         {
             Assert.That(ConfigQueries.subscribeFlowSyncConfigChanges, Does.Contain("flowSyncSleepTime"));
+            Assert.That(ConfigQueries.subscribeFlowSyncConfigChanges, Does.Contain("flowNamingSourceManagementRanking"));
         }
 
         [Test]
@@ -306,6 +341,43 @@ namespace FWO.Test
             ConfigData configData = new();
 
             Assert.That(configData.FlowSyncSleepTime, Is.Zero);
+        }
+
+        [Test]
+        public void ConfigData_DefaultsReqConsiderBundlingToFalse()
+        {
+            ConfigData configData = new();
+
+            Assert.That(configData.ReqConsiderBundling, Is.False);
+        }
+
+        [Test]
+        public void ConfigData_DefaultsReqVisibilityBasedToFalse()
+        {
+            ConfigData configData = new();
+
+            Assert.That(configData.ReqVisibilityBased, Is.False);
+        }
+
+        [Test]
+        public void ConfigData_DefaultsComplianceDesignatedZoneMatrixIdToZero()
+        {
+            ConfigData configData = new();
+
+            Assert.That(configData.ComplianceDesignatedZoneMatrixId, Is.Zero);
+        }
+
+        [Test]
+        public void Update_ParsesReqConsiderBundling()
+        {
+            SimulatedUserConfig userConfig = new();
+
+            InvokeUpdate(userConfig,
+            [
+                new() { Key = "reqConsiderBundling", Value = "True", User = 0 }
+            ]);
+
+            Assert.That(userConfig.ReqConsiderBundling, Is.True);
         }
 
         [Test]
@@ -339,6 +411,83 @@ namespace FWO.Test
             ConfigData configData = new();
 
             Assert.That(configData.FlowNamingSourceManagementRanking, Is.EqualTo("[]"));
+        }
+
+        [Test]
+        public void ConfigData_DefaultsReducedProtocolSetProtocolsToCurrentSelection()
+        {
+            ConfigData configData = new();
+
+            Assert.That(configData.ReducedProtocolSetProtocols, Is.EqualTo("""["tcp","udp","icmp","esp"]"""));
+        }
+
+        [Test]
+        public void ConfigData_ReducedProtocolSetProtocolsRoundTripAsJson()
+        {
+            ConfigData configData = new()
+            {
+                ReducedProtocolSetProtocols = """["tcp","udp","icmp","esp"]"""
+            };
+
+            List<string>? parsed = System.Text.Json.JsonSerializer.Deserialize<List<string>>(configData.ReducedProtocolSetProtocols);
+
+            Assert.That(parsed, Is.EqualTo(["tcp", "udp", "icmp", "esp"]));
+        }
+
+        [Test]
+        public void RuleRecognitionOption_DefaultsMatchCurrentSelectionLogic()
+        {
+            RuleRecognitionOption option = new();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(option.NwRegardIp, Is.True);
+                Assert.That(option.NwRegardName, Is.False);
+                Assert.That(option.NwRegardGroupName, Is.False);
+                Assert.That(option.NwResolveGroup, Is.False);
+                Assert.That(option.NwSeparateGroupAnalysis, Is.True);
+                Assert.That(option.SvcRegardPortAndProt, Is.True);
+                Assert.That(option.SvcRegardName, Is.False);
+                Assert.That(option.SvcRegardGroupName, Is.False);
+                Assert.That(option.SvcResolveGroup, Is.True);
+                Assert.That(option.SvcSplitPortRanges, Is.False);
+            });
+        }
+
+        [Test]
+        public void RuleRecognitionOption_SerializesAndDeserializesWithoutLoss()
+        {
+            RuleRecognitionOption option = new()
+            {
+                NwRegardIp = false,
+                NwRegardName = true,
+                NwRegardGroupName = true,
+                NwResolveGroup = true,
+                NwSeparateGroupAnalysis = false,
+                SvcRegardPortAndProt = false,
+                SvcRegardName = true,
+                SvcRegardGroupName = true,
+                SvcResolveGroup = false,
+                SvcSplitPortRanges = true
+            };
+
+            string serialized = System.Text.Json.JsonSerializer.Serialize(option);
+            RuleRecognitionOption? parsed = System.Text.Json.JsonSerializer.Deserialize<RuleRecognitionOption>(serialized);
+
+            Assert.That(parsed, Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(parsed!.NwRegardIp, Is.False);
+                Assert.That(parsed.NwRegardName, Is.True);
+                Assert.That(parsed.NwRegardGroupName, Is.True);
+                Assert.That(parsed.NwResolveGroup, Is.True);
+                Assert.That(parsed.NwSeparateGroupAnalysis, Is.False);
+                Assert.That(parsed.SvcRegardPortAndProt, Is.False);
+                Assert.That(parsed.SvcRegardName, Is.True);
+                Assert.That(parsed.SvcRegardGroupName, Is.True);
+                Assert.That(parsed.SvcResolveGroup, Is.False);
+                Assert.That(parsed.SvcSplitPortRanges, Is.True);
+            });
         }
 
         [Test]

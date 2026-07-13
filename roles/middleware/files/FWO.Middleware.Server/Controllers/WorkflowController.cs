@@ -155,6 +155,7 @@ namespace FWO.Middleware.Server.Controllers
         {
             using UserConfig userConfig = UserConfig.ForGlobalSettings(globalConfig, actionApiConnection, globalConfig.DefaultLanguage);
             WfHandler wfHandler = CreateWorkflowHandler(actionApiConnection, userConfig, phase, result);
+            wfHandler.userConfig.User.WorkflowVisibilityGroupIds = GetClaimIds(User, "x-hasura-workflow-visibility-groups").ToList();
             if (!await InitWorkflowHandler(wfHandler, result))
             {
                 return result;
@@ -180,7 +181,13 @@ namespace FWO.Middleware.Server.Controllers
                 return result;
             }
 
-            if (!ValidateExecutionRequest(User, wfHandler, parameters, scope, phase, statefulObject, result))
+            if (!CallerCanAccessVisibility(User, wfHandler, scope, statefulObject))
+            {
+                SetWarning(result, $"User is not authorized to access workflow visibility for scope '{scope}' and state {statefulObject.StateId}.");
+                return result;
+            }
+
+            if (!ValidateExecutionRequest(wfHandler, parameters, scope, phase, statefulObject, result))
             {
                 return result;
             }
@@ -206,12 +213,12 @@ namespace FWO.Middleware.Server.Controllers
             }
         }
 
-        private static bool ValidateExecutionRequest(ClaimsPrincipal user, WfHandler wfHandler, WorkflowActionParameters parameters, WfObjectScopes scope,
-            WorkflowPhases phase, WfStatefulObject statefulObject, WorkflowActionResult result)
+        private static bool ValidateExecutionRequest(WfHandler wfHandler, WorkflowActionParameters parameters, WfObjectScopes scope, WorkflowPhases phase,
+            WfStatefulObject statefulObject, WorkflowActionResult result)
         {
             return parameters.ActionId > 0
                 ? ValidateOfferedAction(wfHandler, parameters, scope, phase, statefulObject, result)
-                : ValidatePersistedStateTransition(user, wfHandler, parameters, statefulObject, result);
+                : ValidatePersistedStateTransition(parameters, statefulObject, result);
         }
 
         private static bool ValidateOfferedAction(WfHandler wfHandler, WorkflowActionParameters parameters, WfObjectScopes scope,
@@ -234,8 +241,7 @@ namespace FWO.Middleware.Server.Controllers
             return true;
         }
 
-        private static bool ValidatePersistedStateTransition(ClaimsPrincipal user, WfHandler wfHandler, WorkflowActionParameters parameters,
-            WfStatefulObject statefulObject, WorkflowActionResult result)
+        private static bool ValidatePersistedStateTransition(WorkflowActionParameters parameters, WfStatefulObject statefulObject, WorkflowActionResult result)
         {
             if (parameters.OldStateId == parameters.NewStateId)
             {
@@ -249,23 +255,7 @@ namespace FWO.Middleware.Server.Controllers
                 return false;
             }
 
-            if (parameters.StateChangedByCreation || CanForceStateTransition(user, parameters.ExecutionMode))
-            {
-                return true;
-            }
-
-            if (!wfHandler.ActStateMatrix.getAllowedTransitions(parameters.OldStateId, true).Contains(parameters.NewStateId))
-            {
-                SetWarning(result, $"State-change action execution rejected because transition {parameters.OldStateId}->{parameters.NewStateId} is not allowed.");
-                return false;
-            }
-
             return true;
-        }
-
-        private static bool CanForceStateTransition(ClaimsPrincipal user, string executionMode)
-        {
-            return CallerCanUseRole(user, executionMode, Roles.Admin) || CallerCanUseRole(user, executionMode, Roles.FwAdmin);
         }
 
         private static async Task<bool> InitWorkflowHandler(WfHandler wfHandler, WorkflowActionResult result)
@@ -336,6 +326,20 @@ namespace FWO.Middleware.Server.Controllers
             return editableOwnerIds.Count > 0 && ticket.Tasks.Any(task => CallerOwnsTask(task, editableOwnerIds));
         }
 
+        private static bool CallerCanAccessVisibility(ClaimsPrincipal user, WfHandler wfHandler, WfObjectScopes scope, WfStatefulObject statefulObject)
+        {
+            if (!wfHandler.userConfig.ReqVisibilityBased)
+            {
+                return true;
+            }
+
+            StateMatrix stateMatrix = scope == WfObjectScopes.Ticket ? wfHandler.MasterStateMatrix : wfHandler.ActStateMatrix;
+            HashSet<int> visibilityGroupIds = GetClaimIds(user, "x-hasura-workflow-visibility-groups");
+            List<string> userGroups = GetClaimStrings(user, "x-hasura-groups");
+            return WorkflowVisibilityHelper.CanAccessStatefulObject(statefulObject, stateMatrix, visibilityGroupIds, wfHandler.GetWorkflowExclusiveVisibilityGroupIds())
+                || IsExplicitlyAssigned(user, userGroups, statefulObject);
+        }
+
         private static bool CallerCanUseRole(ClaimsPrincipal user, string executionMode, string role)
         {
             return ExecutionModeHelper.HasAnyRoleInExecutionMode(ExecutionModeHelper.GetUserRoles(user), executionMode, [role]);
@@ -370,6 +374,48 @@ namespace FWO.Middleware.Server.Controllers
         private static int? GetClaimInt(ClaimsPrincipal user, string claimName)
         {
             return int.TryParse(GetClaimValue(user, claimName), out int value) ? value : null;
+        }
+
+        private static List<string> GetClaimStrings(ClaimsPrincipal user, string claimName)
+        {
+            string? claimValue = GetClaimValue(user, claimName);
+            if (string.IsNullOrWhiteSpace(claimValue))
+            {
+                return [];
+            }
+
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(claimValue) ?? [];
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return [];
+            }
+        }
+
+        private static bool IsExplicitlyAssigned(ClaimsPrincipal user, List<string> userGroups, WfStatefulObject statefulObject)
+        {
+            return IsAssignedToCurrentUser(user, statefulObject.CurrentHandler)
+                || IsAssignedToCurrentUserGroup(userGroups, statefulObject.AssignedGroup)
+                || (statefulObject is WfApproval approval && (IsAssignedToCurrentUserDn(user, approval.ApproverDn)
+                    || IsAssignedToCurrentUserGroup(userGroups, approval.ApproverGroup)));
+        }
+
+        private static bool IsAssignedToCurrentUser(ClaimsPrincipal user, UiUser? handler)
+        {
+            int? userId = GetClaimInt(user, "x-hasura-user-id");
+            return handler != null && ((userId != null && handler.DbId == userId) || IsAssignedToCurrentUserDn(user, handler.Dn));
+        }
+
+        private static bool IsAssignedToCurrentUserDn(ClaimsPrincipal user, string? dn)
+        {
+            return DistName.DnEquals(dn, GetClaimValue(user, "x-hasura-uuid"));
+        }
+
+        private static bool IsAssignedToCurrentUserGroup(List<string> userGroups, string? groupDn)
+        {
+            return !string.IsNullOrWhiteSpace(groupDn) && userGroups.Any(group => DistName.DnEquals(group, groupDn));
         }
 
         private static string? GetClaimValue(ClaimsPrincipal user, string claimName)

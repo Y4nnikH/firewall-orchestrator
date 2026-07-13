@@ -5,7 +5,6 @@
 @using FWO.Config.Api.Data
 @using FWO.Data
 @using FWO.Data.Flow
-@using FWO.Middleware.Client
 @using Microsoft.AspNetCore.Components.Authorization
 @using Newtonsoft.Json
 @using System.Text.Json.Serialization
@@ -361,29 +360,11 @@ else
     </Footer>
 </PopUp>
 
-<PopUp Title="@(userConfig.GetText("recalculate_flow_names"))" Show="@RecalculateConfirmMode" Size=PopupSize.Small OnClose="CloseRecalculateConfirm">
-    <Body>
-        <p>@(userConfig.GetText("recalculate_flow_names_confirm"))</p>
-    </Body>
-    <Footer>
-        <div class="btn-group">
-            <button type="button" class="btn btn-sm btn-warning" @onclick="RecalculateFlowNames">@(DisplayService.DisplayButton(userConfig, "recalculate_flow_names", Icons.Refresh))</button>
-            <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseRecalculateConfirm">@(DisplayService.DisplayButton(userConfig, "cancel", Icons.Cancel))</button>
-        </div>
-    </Footer>
-</PopUp>
+<Confirm @bind-Display="RecalculateConfirmMode" PerformAction="RecalculateFlowNames" Title="@(userConfig.GetText("recalculate_flow_names"))"
+         Message="@(userConfig.GetText("recalculate_flow_names_confirm"))" />
 
-<PopUp Title="@(userConfig.GetText("reset_flow_db"))" Show="@ResetFlowDbConfirmMode" Size=PopupSize.Small OnClose="CloseResetFlowDbConfirm">
-    <Body>
-        <p>@(userConfig.GetText("reset_flow_db_confirm"))</p>
-    </Body>
-    <Footer>
-        <div class="btn-group">
-            <button type="button" class="btn btn-sm btn-danger" @onclick="ResetFlowDb">@(DisplayService.DisplayButton(userConfig, "reset_flow_db", Icons.Refresh))</button>
-            <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseResetFlowDbConfirm">@(DisplayService.DisplayButton(userConfig, "cancel", Icons.Cancel))</button>
-        </div>
-    </Footer>
-</PopUp>
+<Confirm @bind-Display="ResetFlowDbConfirmMode" PerformAction="ResetFlowDb" Title="@(userConfig.GetText("reset_flow_db"))"
+         Message="@(userConfig.GetText("reset_flow_db_confirm"))" />
 
 <InProgress Display="workInProgress"/>
 
@@ -539,11 +520,6 @@ else
         RecalculateConfirmMode = true;
     }
 
-    private void CloseRecalculateConfirm()
-    {
-        RecalculateConfirmMode = false;
-    }
-
     private async Task RecalculateFlowNames()
     {
         try
@@ -594,11 +570,6 @@ else
         ResetFlowDbConfirmMode = true;
     }
 
-    private void CloseResetFlowDbConfirm()
-    {
-        ResetFlowDbConfirmMode = false;
-    }
-
     private async Task ResetFlowDb()
     {
         try
@@ -607,7 +578,7 @@ else
             workInProgress = true;
             StateHasChanged();
 
-            await apiConnection.SendQueryAsync<ResetFlowDbMutationResult>(FlowMutations.resetFlowDB);
+            await apiConnection.SendQueryAsync<MutationResult>(FlowMutations.resetFlowDB);
 
             workInProgress = false;
             await Refresh();
@@ -1063,39 +1034,4 @@ else
                 : FlowAdminHelper.FilterCustomObjectCandidates(Candidates, SearchText);
     }
 
-    private sealed class ResetFlowDbMutationResult
-    {
-        [JsonProperty("update_import_control"), JsonPropertyName("update_import_control")]
-        public MutationResult UpdateImportControl { get; set; } = new();
-
-        [JsonProperty("update_rule"), JsonPropertyName("update_rule")]
-        public MutationResult UpdateRule { get; set; } = new();
-
-        [JsonProperty("update_object"), JsonPropertyName("update_object")]
-        public MutationResult UpdateObject { get; set; } = new();
-
-        [JsonProperty("update_service"), JsonPropertyName("update_service")]
-        public MutationResult UpdateService { get; set; } = new();
-
-        [JsonProperty("update_time_object"), JsonPropertyName("update_time_object")]
-        public MutationResult UpdateTimeObject { get; set; } = new();
-
-        [JsonProperty("delete_flow_access"), JsonPropertyName("delete_flow_access")]
-        public MutationResult DeleteFlowAccess { get; set; } = new();
-
-        [JsonProperty("delete_flow_nwobject"), JsonPropertyName("delete_flow_nwobject")]
-        public MutationResult DeleteFlowNwObject { get; set; } = new();
-
-        [JsonProperty("delete_flow_nwgroup"), JsonPropertyName("delete_flow_nwgroup")]
-        public MutationResult DeleteFlowNwGroup { get; set; } = new();
-
-        [JsonProperty("delete_flow_svcobject"), JsonPropertyName("delete_flow_svcobject")]
-        public MutationResult DeleteFlowSvcObject { get; set; } = new();
-
-        [JsonProperty("delete_flow_svcgroup"), JsonPropertyName("delete_flow_svcgroup")]
-        public MutationResult DeleteFlowSvcGroup { get; set; } = new();
-
-        [JsonProperty("delete_flow_timeobject"), JsonPropertyName("delete_flow_timeobject")]
-        public MutationResult DeleteFlowTimeObject { get; set; } = new();
-    }
 }
