@@ -926,6 +926,21 @@ namespace FWO.Test
         }
 
         [Test]
+        public void WorkflowController_GetTicketId_UsesExplicitTicketIdForTicketScope()
+        {
+            WorkflowActionParameters parameters = new()
+            {
+                Scope = WfObjectScopes.Ticket.ToString(),
+                ObjectId = 42,
+                TicketId = 99
+            };
+
+            long ticketId = InvokePrivateStatic<long>(typeof(WorkflowController), "GetTicketId", parameters, WfObjectScopes.Ticket);
+
+            Assert.That(ticketId, Is.EqualTo(99));
+        }
+
+        [Test]
         public void WorkflowController_ResolveActionContext_ReturnsTicketScopeTuple()
         {
             WfTicket ticket = new()
@@ -1043,6 +1058,26 @@ namespace FWO.Test
             ]);
 
             Assert.That(resolvedDns, Is.EqualTo(kExpectedResolvedUserDns));
+        }
+
+        [Test]
+        public async Task WorkflowRecipientResolver_ResolveUserDns_IgnoresLdapsWithoutGroupHandling()
+        {
+            Ldap ldap = new()
+            {
+                UserSearchPath = "ou=users,dc=test"
+            };
+            WorkflowRecipientResolver resolver = new(new RecipientResolverApiConn(), [ldap]);
+
+            List<string> resolvedDns = await resolver.ResolveUserDns([
+                "uid=user,ou=users,dc=test",
+                "cn=group,ou=groups,dc=test"
+            ]);
+
+            Assert.That(resolvedDns, Is.EqualTo([
+                "uid=user,ou=users,dc=test",
+                "cn=group,ou=groups,dc=test"
+            ]));
         }
 
         [Test]
