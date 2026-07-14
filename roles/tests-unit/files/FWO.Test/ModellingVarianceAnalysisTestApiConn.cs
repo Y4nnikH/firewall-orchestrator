@@ -31,7 +31,8 @@ namespace FWO.Test
             MgmtId = 1,
             Froms = [new(new(), NwObj2)],
             Tos = [new(new(), Nwgroup1)],
-            Services = [new() { Content = Svc1 }]
+            Services = [new() { Content = Svc1 }],
+            EnforcingGateways = [new() { Content = new() { Id = 1, Name = "Gateway1" } }, new() { Content = new() { Id = 2, Name = "Gateway2" } }]
         };
         static readonly Rule Rule2 = new()
         {
