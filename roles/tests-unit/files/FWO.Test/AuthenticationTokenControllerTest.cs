@@ -145,7 +145,9 @@ namespace FWO.Test
         {
             AuthenticationTokenController controller = CreateController();
 
-            await controller.RevokeToken(new RefreshTokenRequest());
+            ActionResult result = await controller.RevokeToken(new RefreshTokenRequest());
+
+            Assert.That(result, Is.TypeOf<BadRequestObjectResult>());
         }
 
         [Test]
@@ -155,7 +157,7 @@ namespace FWO.Test
 
             ActionResult result = await controller.RevokeToken(null!);
 
-            Assert.That(result, Is.Not.Null);
+            Assert.That(result, Is.TypeOf<BadRequestObjectResult>());
         }
 
         [Test]
@@ -270,6 +272,50 @@ namespace FWO.Test
             Assert.That(apiConnection.CallCount, Is.EqualTo(0));
         }
 
+        [Test]
+        public async Task ControllerBuildJwtAuditText_IncludesExpirationInformation()
+        {
+            object authManager = CreateAuthManager(new RecordingApiConnection(), new FixedTokenLifetimeProvider());
+            UiUser user = new()
+            {
+                Name = "audit-user",
+                DbId = 17,
+                Roles = [Roles.Reporter]
+            };
+            TokenPair tokenPair = await InvokeAuthManagerAsync<TokenPair>(authManager, "CreateTokenPair", user, TimeSpan.FromMinutes(5), false);
+
+            string auditText = InvokeControllerPrivateStatic<string>("BuildJwtAuditText", tokenPair.AccessToken, "Issued access token.");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(auditText, Does.StartWith("Issued access token."));
+                Assert.That(auditText, Does.Contain("access_jti="));
+                Assert.That(auditText, Does.Contain("access_expires="));
+            });
+        }
+
+        [Test]
+        public async Task ControllerBuildTokenPairAuditText_IncludesRefreshExpirationWhenPresent()
+        {
+            object authManager = CreateAuthManager(new RecordingApiConnection(), new FixedTokenLifetimeProvider());
+            UiUser user = new()
+            {
+                Name = "audit-user",
+                DbId = 17,
+                Roles = [Roles.Reporter]
+            };
+            TokenPair tokenPair = await InvokeAuthManagerAsync<TokenPair>(authManager, "CreateTokenPair", user, TimeSpan.FromMinutes(5), true);
+
+            string auditText = InvokeControllerPrivateStatic<string>("BuildTokenPairAuditText", tokenPair, "Issued token pair.");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(auditText, Does.StartWith("Issued token pair."));
+                Assert.That(auditText, Does.Contain("access_jti="));
+                Assert.That(auditText, Does.Contain("refresh_expires="));
+            });
+        }
+
         private static AuthenticationTokenController CreateController()
         {
             RSA rsa = RSA.Create(2048);
@@ -307,6 +353,13 @@ namespace FWO.Test
                 ?? throw new MissingMethodException(authManager.GetType().FullName, methodName);
             Task task = (Task)method.Invoke(authManager, arguments)!;
             await task;
+        }
+
+        private static T InvokeControllerPrivateStatic<T>(string methodName, params object?[] arguments)
+        {
+            MethodInfo method = typeof(AuthenticationTokenController).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)
+                ?? throw new MissingMethodException(typeof(AuthenticationTokenController).FullName, methodName);
+            return (T)method.Invoke(null, arguments)!;
         }
 
         private static string ExtractOkString(ActionResult<string> result)

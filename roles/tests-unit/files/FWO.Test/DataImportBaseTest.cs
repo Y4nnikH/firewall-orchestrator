@@ -13,6 +13,25 @@ namespace FWO.Test
     [TestFixture]
     public class DataImportBaseTest
     {
+        private static readonly string[] kExpectedSingleQuotesAndEscapesArguments =
+        [
+            "alpha",
+            "beta gamma",
+            "delta value",
+            "quoted value"
+        ];
+
+        private static readonly string[] kExpectedPreservedQuotedArguments =
+        [
+            "--filterColumn",
+            "Aktive Firewallregel",
+            "--includeValues",
+            "Ja",
+            "--compositeIdFields",
+            "Applikation",
+            "Teilapplikation"
+        ];
+
         [Test]
         public void RunImportScriptReturnsFalseWhenScriptMissing()
         {
@@ -129,16 +148,7 @@ namespace FWO.Test
 
             Assert.That(
                 arguments,
-                Is.EqualTo(
-                [
-                    "--filterColumn",
-                    "Aktive Firewallregel",
-                    "--includeValues",
-                    "Ja",
-                    "--compositeIdFields",
-                    "Applikation",
-                    "Teilapplikation"
-                ])
+                Is.EqualTo(kExpectedPreservedQuotedArguments)
             );
         }
 
@@ -149,13 +159,7 @@ namespace FWO.Test
                 "alpha 'beta gamma' delta\\ value \"quoted value\""
             );
 
-            Assert.That(arguments, Is.EqualTo(new[]
-            {
-                "alpha",
-                "beta gamma",
-                "delta value",
-                "quoted value"
-            }));
+            Assert.That(arguments, Is.EqualTo(kExpectedSingleQuotesAndEscapesArguments));
         }
 
         [Test]

@@ -16,6 +16,9 @@ namespace FWO.Test
     [Parallelizable]
     internal class ImportChangeNotifierTest
     {
+        private static readonly int[] kExpectedImportedManagements = [3, 5];
+        private static readonly int[] kExpectedExpandedManagementIds = [10, 11, 2];
+
         [Test]
         public async Task Run_ReturnsWithoutSendingWhenNoNewImportsFound()
         {
@@ -88,7 +91,7 @@ namespace FWO.Test
 
             Assert.That(found, Is.True);
             Assert.That(apiConnection.LastQuery, Is.EqualTo(ReportQueries.getImportsToNotifyForAnyChanges));
-            Assert.That(GetPrivateField<List<int>>(notifier, "importedManagements"), Is.EqualTo(new[] { 3, 5 }));
+            Assert.That(GetPrivateField<List<int>>(notifier, "importedManagements"), Is.EqualTo(kExpectedImportedManagements));
         }
 
         [Test]
@@ -170,7 +173,7 @@ namespace FWO.Test
             DeviceFilter deviceFilter = GetPrivateField<DeviceFilter>(notifier, "deviceFilter");
             Assert.That(reportParams.IncludeObjects, Is.True);
             Assert.That(reportParams.TimeFilter.TimeRangeType, Is.EqualTo(TimeRangeType.Fixeddates));
-            Assert.That(deviceFilter.Managements.Select(m => m.Id), Is.EqualTo(new[] { 10, 11, 2 }));
+            Assert.That(deviceFilter.Managements.Select(m => m.Id), Is.EqualTo(kExpectedExpandedManagementIds));
         }
 
         [Test]

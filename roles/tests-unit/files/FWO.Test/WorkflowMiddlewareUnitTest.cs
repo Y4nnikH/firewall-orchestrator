@@ -1,6 +1,7 @@
 using FWO.Api.Client;
 using FWO.Api.Client.Queries;
 using FWO.Basics;
+using FWO.Config.Api.Data;
 using FWO.Config.Api;
 using FWO.Data;
 using FWO.Data.Middleware;
@@ -65,6 +66,123 @@ namespace FWO.Test
             public Task<List<UiUser>> ResolveUsers(IEnumerable<string> dns)
             {
                 return Task.FromResult(dns.Select(dn => new UiUser { Dn = dn, Email = $"{dn}@example.test" }).ToList());
+            }
+        }
+
+        private sealed class WorkflowExecutionApiConn : ApiConnection
+        {
+            public List<string> Queries { get; } = [];
+            public List<string> Roles { get; } = [];
+            public List<WfState> States { get; set; } = [];
+            public WfTicket Ticket { get; set; } = new();
+
+            public override GraphQlApiSubscription<SubscriptionResponseType> GetSubscription<SubscriptionResponseType>(Action<Exception> exceptionHandler,
+                GraphQlApiSubscription<SubscriptionResponseType>.SubscriptionUpdate subscriptionUpdateHandler, string subscription, object? variables = null,
+                string? operationName = null)
+            {
+                throw new NotImplementedException();
+            }
+
+            public override Task<T> SendQueryAsync<T>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
+            {
+                Queries.Add(query);
+                if (query == RequestQueries.getStates)
+                {
+                    return Task.FromResult((T)(object)States);
+                }
+
+                if (query == RequestQueries.getTicketById)
+                {
+                    return Task.FromResult((T)(object)Ticket);
+                }
+
+                if (query.Contains("getConfigItemsByUser", StringComparison.OrdinalIgnoreCase)
+                    || query.Contains("getConfigItemByKey", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Task.FromResult(CreateEmptyQueryResult<T>());
+                }
+
+                throw new AssertionException($"Unexpected query: {query}");
+            }
+
+            public override Task<ApiResponse<T>> SendQuerySafeAsync<T>(string query, object? variables = null, string? operationName = null)
+            {
+                throw new NotImplementedException();
+            }
+
+            public override void SetAuthHeader(string jwt)
+            { }
+
+            public override Task ReconnectSubscriptionsAsync(string jwt, CancellationToken ct)
+            {
+                return Task.CompletedTask;
+            }
+
+            public override void SetRole(string role)
+            {
+                Roles.Add(role);
+            }
+
+            public override void SetBestRole(System.Security.Claims.ClaimsPrincipal user, List<string> targetRoleList)
+            { }
+
+            public override void SwitchBack()
+            {
+                Roles.Add("<switch>");
+            }
+
+            protected override void Dispose(bool disposing)
+            { }
+
+            public override void DisposeSubscriptions<T>()
+            { }
+        }
+
+        private sealed class TestGlobalStateMatrix : GlobalStateMatrix
+        {
+            public override Task Init(ApiConnection apiConnection, WfTaskType taskType = WfTaskType.master)
+            {
+                GlobalMatrix = BuildMatrices();
+                return Task.CompletedTask;
+            }
+
+            private static Dictionary<WorkflowPhases, StateMatrix> BuildMatrices()
+            {
+                return new Dictionary<WorkflowPhases, StateMatrix>
+                {
+                    [WorkflowPhases.request] = BuildMatrix(8),
+                    [WorkflowPhases.approval] = BuildMatrix(8),
+                    [WorkflowPhases.planning] = BuildMatrix(8),
+                    [WorkflowPhases.verification] = BuildMatrix(8),
+                    [WorkflowPhases.implementation] = BuildMatrix(8),
+                    [WorkflowPhases.review] = BuildMatrix(8),
+                    [WorkflowPhases.recertification] = BuildMatrix(8)
+                };
+            }
+
+            private static StateMatrix BuildMatrix(int lowestEndState)
+            {
+                return new StateMatrix
+                {
+                    Matrix = new Dictionary<int, List<int>>(),
+                    DerivedStates = new Dictionary<int, int>(),
+                    LowestInputState = 1,
+                    LowestStartedState = 1,
+                    LowestEndState = lowestEndState,
+                    Active = true,
+                    StateVisibilityGroupIds = new Dictionary<int, List<int>>(),
+                    ExclusiveVisibilityGroupIds = new HashSet<int>(),
+                    PhaseActive = new Dictionary<WorkflowPhases, bool>
+                    {
+                        [WorkflowPhases.request] = true,
+                        [WorkflowPhases.approval] = true,
+                        [WorkflowPhases.planning] = true,
+                        [WorkflowPhases.verification] = true,
+                        [WorkflowPhases.implementation] = true,
+                        [WorkflowPhases.review] = true,
+                        [WorkflowPhases.recertification] = true
+                    }
+                };
             }
         }
 
@@ -293,6 +411,85 @@ namespace FWO.Test
             {
                 SetApiServerUri(previousApiServerUri);
             }
+        }
+
+        [Test]
+        public async Task WorkflowController_ExecuteActionsInMiddlewareContext_CompletesTicketStateChange()
+        {
+            WorkflowController controller = CreateWorkflowController(PrincipalWithRoles(Roles.Admin));
+            WorkflowExecutionApiConn apiConnection = new()
+            {
+                States = []
+            };
+            apiConnection.Ticket = new WfTicket
+            {
+                Id = 42,
+                StateId = 8,
+                Requester = new UiUser { Dn = "uid=requester,dc=fworch,dc=internal" }
+            };
+            WorkflowActionParameters parameters = new()
+            {
+                Scope = WfObjectScopes.Ticket.ToString(),
+                Phase = WorkflowPhases.request.ToString(),
+                ExecutionMode = Roles.Admin,
+                OldStateId = 5,
+                NewStateId = 8
+            };
+            WorkflowActionResult result = new();
+            Func<GlobalStateMatrix> previousFactory = GlobalStateMatrix.Factory;
+            GlobalStateMatrix.Factory = () => new TestGlobalStateMatrix();
+
+            try
+            {
+                WorkflowActionResult executed = await InvokePrivateAsync<WorkflowActionResult>(controller, "ExecuteActionsInMiddlewareContext",
+                    apiConnection, parameters, WfObjectScopes.Ticket, WorkflowPhases.request, 42L, result);
+
+                Assert.Multiple(() =>
+                {
+                Assert.That(executed.Success, Is.True);
+                Assert.That(executed.ErrorMessage, Is.Empty);
+                Assert.That(executed.Messages, Is.Empty);
+                Assert.That(apiConnection.Queries, Has.Some.EqualTo(RequestQueries.getStates));
+                Assert.That(apiConnection.Queries, Has.Some.EqualTo(RequestQueries.getTicketById));
+                Assert.That(apiConnection.Roles, Does.Contain(Roles.MiddlewareServer));
+            });
+            }
+            finally
+            {
+                GlobalStateMatrix.Factory = previousFactory;
+            }
+        }
+
+        [Test]
+        public void WorkflowController_InitWorkflowHandler_ReturnsWarningWhenInitializationFails()
+        {
+            WfHandler handler = new();
+            WorkflowActionResult result = new();
+
+            bool initialized = InvokePrivateStaticAsync<bool>(typeof(WorkflowController), "InitWorkflowHandler", handler, result).GetAwaiter().GetResult();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(initialized, Is.False);
+                Assert.That(result.ErrorMessage, Is.EqualTo("Workflow handler initialization failed."));
+            });
+        }
+
+        [Test]
+        public void WorkflowController_AddWorkflowMessage_UsesExceptionMessageWhenTextMissing()
+        {
+            WorkflowActionResult result = new();
+
+            InvokePrivateStatic<object?>(typeof(WorkflowController), "AddWorkflowMessage", result,
+                new InvalidOperationException("boom"), "Title", " ", true);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Messages, Has.Count.EqualTo(1));
+                Assert.That(result.Messages[0].Title, Is.EqualTo("Title"));
+                Assert.That(result.Messages[0].Message, Is.EqualTo("boom"));
+                Assert.That(result.Messages[0].ErrorFlag, Is.True);
+            });
         }
 
         [Test]
@@ -1116,6 +1313,36 @@ namespace FWO.Test
             return (T)method.Invoke(null, parameters)!;
         }
 
+        private static async Task<T> InvokePrivateStaticAsync<T>(Type type, string methodName, params object?[] parameters)
+        {
+            MethodInfo method = type.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)
+                ?? throw new InvalidOperationException($"{methodName} not found.");
+            return await (Task<T>)method.Invoke(null, parameters)!;
+        }
+
+        private static T CreateEmptyQueryResult<T>()
+        {
+            Type resultType = typeof(T);
+            if (resultType.IsArray)
+            {
+                return (T)(object)Array.CreateInstance(resultType.GetElementType()!, 0);
+            }
+
+            if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(List<>))
+            {
+                return (T)Activator.CreateInstance(resultType)!;
+            }
+
+            return default!;
+        }
+
+        private static async Task<T> InvokePrivateAsync<T>(object instance, string methodName, params object?[] parameters)
+        {
+            MethodInfo method = instance.GetType().GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance)
+                ?? throw new InvalidOperationException($"{methodName} not found.");
+            return await (Task<T>)method.Invoke(instance, parameters)!;
+        }
+
         private static T InvokePrivateStaticWithRef<T>(Type type, string methodName, object?[] parameters)
         {
             MethodInfo method = type.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)
@@ -1138,7 +1365,7 @@ namespace FWO.Test
         private static WorkflowController CreateWorkflowController(ClaimsPrincipal user)
         {
             RSA rsa = RSA.Create(2048);
-            WorkflowController controller = new(new GlobalConfig(), [], new JwtWriter(new RsaSecurityKey(rsa)), new TokenLifetimeProvider())
+            WorkflowController controller = new(new SimulatedGlobalConfig(), [], new JwtWriter(new RsaSecurityKey(rsa)), new TokenLifetimeProvider())
             {
                 ControllerContext = new ControllerContext
                 {
