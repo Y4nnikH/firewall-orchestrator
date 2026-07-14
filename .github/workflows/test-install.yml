@@ -91,6 +91,31 @@ jobs:
         with:
           version-file: "roles/importer/files/importer/requirements.txt"
 
+      - name: Check Ruff version pin
+        run: |
+          required_ruff_version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["tool"]["ruff"]["required-version"])')"
+          installed_ruff_version="$(ruff --version | awk '{print $2}')"
+          requirements_ruff_version="$(python -c 'from pathlib import Path; import re; text = Path("roles/importer/files/importer/requirements.txt").read_text(encoding="utf-8"); match = re.search(r"^ruff==(.+)$", text, re.MULTILINE); print(match.group(1) if match else "")')"
+
+          if [ "${requirements_ruff_version}" != "${required_ruff_version}" ]; then
+            echo "::error title=Ruff version mismatch::requirements.txt pins ruff ${requirements_ruff_version}, but pyproject.toml requires ${required_ruff_version}."
+            echo "Fix this by keeping the ruff pins in sync:"
+            echo "  update roles/importer/files/importer/requirements.txt to ruff==${required_ruff_version}"
+            echo "  or change pyproject.toml [tool.ruff].required-version to ${requirements_ruff_version} if that is the intended project version"
+            echo "Then rerun: python -m pip install -r roles/importer/files/importer/requirements.txt"
+            echo "Then rerun: ruff check --fix && ruff format"
+            exit 1
+          fi
+
+          if [ "${installed_ruff_version}" != "${required_ruff_version}" ]; then
+            echo "::error title=Ruff version mismatch::Installed ruff ${installed_ruff_version}, but pyproject.toml requires ${required_ruff_version}."
+            echo "Fix this by keeping the ruff pins in sync:"
+            echo "  python -m pip install --upgrade ruff==${required_ruff_version}"
+            echo "  update roles/importer/files/importer/requirements.txt to ruff==${required_ruff_version}"
+            echo "Then rerun: ruff check --fix && ruff format"
+            exit 1
+          fi
+
       - name: pyright
         run: |
           pyright --version
