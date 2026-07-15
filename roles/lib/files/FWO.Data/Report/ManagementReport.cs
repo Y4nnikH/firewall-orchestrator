@@ -238,12 +238,19 @@ namespace FWO.Data.Report
             {
                 if (source != null && source.Length > 0)
                 {
-                    target ??= Array.Empty<T>(); // sicherstellen, dass target nicht null ist
                     newObjects = true;
                     maxAddedCounts[key] = Math.Max(maxAddedCounts[key], source.Length);
-                    return [.. target, .. source];
+                    if (target == null || target.Length == 0)
+                    {
+                        return [.. source];
+                    }
+
+                    List<T> merged = new(target.Length + source.Length);
+                    merged.AddRange(target);
+                    merged.AddRange(source);
+                    return [.. merged];
                 }
-                return target ?? Array.Empty<T>(); // falls target null, leeres Array zurückgeben
+                return target ?? Array.Empty<T>();
             }
 
             managementReport.Objects = MergeArray(managementReport.Objects, managementReportToMerge.Objects, "NetworkObjects");
@@ -256,14 +263,19 @@ namespace FWO.Data.Report
 
             MergeReportObjects(managementReport, managementReportToMerge, maxAddedCounts, ref newObjects);
 
+            Dictionary<int, RulebaseReport> rulebasesToMergeById = managementReportToMerge.Rulebases.ToDictionary(rulebase => rulebase.Id);
             foreach (RulebaseReport rulebaseReport in managementReport.Rulebases)
             {
-                if (!managementReportToMerge.Rulebases.Any(rbr => rbr.Id == rulebaseReport.Id))
+                if (!rulebasesToMergeById.TryGetValue(rulebaseReport.Id, out RulebaseReport? rulebaseReportToMerge))
+                {
                     throw new NotSupportedException("Cannot merge ManagementReports with different Rulebases.");
-                RulebaseReport rulebaseReportToMerge = managementReportToMerge.Rulebases.First(rbr => rbr.Id == rulebaseReport.Id);
+                }
                 if (rulebaseReportToMerge.Rules.Length > 0)
                 {
-                    rulebaseReport.Rules = [.. rulebaseReport.Rules, .. rulebaseReportToMerge.Rules];
+                    List<Rule> mergedRules = new(rulebaseReport.Rules.Length + rulebaseReportToMerge.Rules.Length);
+                    mergedRules.AddRange(rulebaseReport.Rules);
+                    mergedRules.AddRange(rulebaseReportToMerge.Rules);
+                    rulebaseReport.Rules = [.. mergedRules];
                     newObjects = true;
                     maxAddedCounts["Rules"] = Math.Max(maxAddedCounts["Rules"], rulebaseReportToMerge.Rules.Length);
                 }

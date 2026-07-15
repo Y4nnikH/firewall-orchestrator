@@ -300,12 +300,15 @@
 
     private ITable<RuleTreeItem>? _reportTable;
     private bool[] _emptyColumns = new bool[ColumnsCount];
+    private readonly Dictionary<(int managementId, int deviceId), VisibleRuleTreeItemsCacheEntry> _visibleRuleTreeItemsCache = [];
 
     private NatRuleDisplayHtml? _ruleDisplay;
     private bool _showLastModifiedAfterLastHit => SelectedReportType == ReportType.UnusedRules || SelectedReportType == ReportType.AppRules;
     private bool ShowLastHitColumn => ReportTypeGroups.IsRuleReport(SelectedReportType);
 
     private Rule? _lastClickedRule = null;
+
+    private sealed record VisibleRuleTreeItemsCacheEntry(RuleTreeItem RuleTree, RuleTreeItem[] Items);
 
     #endregion
 
@@ -352,27 +355,28 @@
 
     private RuleTreeItem[] GetRuleTreeItems(ManagementReport managementReport, DeviceReport deviceReport)
     {
-        List<RuleTreeItem> ruleTreeItems = new();
+        RuleTreeItem ruleTree = GetRuleTree(managementReport, deviceReport);
+        (int managementId, int deviceId) cacheKey = (managementReport.Id, deviceReport.Id);
 
-        if (ruleTreeBuilder.RuleTreeCache.TryGetValue((managementReport.Id, deviceReport.Id), out RuleTreeItem? ruleTreeFromCache))
+        if (_visibleRuleTreeItemsCache.TryGetValue(cacheKey, out VisibleRuleTreeItemsCacheEntry? cacheEntry)
+            && ReferenceEquals(cacheEntry.RuleTree, ruleTree))
         {
-            for (int i = 0; i < ruleTreeFromCache.ElementsFlat.Count; i++)
-            {
-                RuleTreeItem ruleTreeItem = (RuleTreeItem)ruleTreeFromCache.ElementsFlat[i];
-
-                if (ruleTreeItem.IsVisible)
-                {
-                    ruleTreeItems.Add(ruleTreeItem);
-                }
-            }
+            return cacheEntry.Items;
         }
 
-        return ruleTreeItems.ToArray();
+        RuleTreeItem[] ruleTreeItems = ruleTree.ElementsFlat
+            .Where(ruleTreeItem => ruleTreeItem.IsVisible)
+            .ToArray();
+
+        _visibleRuleTreeItemsCache[cacheKey] = new VisibleRuleTreeItemsCacheEntry(ruleTree, ruleTreeItems);
+
+        return ruleTreeItems;
     }
 
     private void ToggleAll(ManagementReport management, DeviceReport device, bool collapse)
     {
         RuleTreeItem.SetExpandedRecursively(GetRuleTree(management, device), !collapse);
+        InvalidateVisibleRuleTreeItems(management, device);
     }
 
     private string GetToggleArrow(Rule rule, ManagementReport managementReport, DeviceReport deviceReport)
@@ -380,7 +384,7 @@
         // Get corresponding tree item for rule
 
         RuleTreeItem ruleTree = GetRuleTree(managementReport, deviceReport);
-        RuleTreeItem? treeItem = ruleTree.ElementsFlat.FirstOrDefault(element => element.Data == rule) as RuleTreeItem;
+        RuleTreeItem? treeItem = ruleTree.ItemsByRule.GetValueOrDefault(rule);
 
         if (treeItem == null)
         {
@@ -415,13 +419,14 @@
         // Get corresponding tree item for rule
 
         RuleTreeItem ruleTree = GetRuleTree(managementReport, deviceReport);
-        RuleTreeItem? treeItem = ruleTree.ElementsFlat.FirstOrDefault(element => element.Data == rule) as RuleTreeItem;
+        RuleTreeItem? treeItem = ruleTree.ItemsByRule.GetValueOrDefault(rule);
 
         if (treeItem != null)
         {
             // Update exapandable state
 
             treeItem.IsExpanded = !treeItem.IsExpanded;
+            InvalidateVisibleRuleTreeItems(managementReport, deviceReport);
         }
 
         InvokeAsync(StateHasChanged);
@@ -435,6 +440,11 @@
         }
 
         throw new InvalidOperationException("No rule tree found for management and device.");
+    }
+
+    private void InvalidateVisibleRuleTreeItems(ManagementReport managementReport, DeviceReport deviceReport)
+    {
+        _visibleRuleTreeItemsCache.Remove((managementReport.Id, deviceReport.Id));
     }
 
     #endregion
