@@ -13,6 +13,33 @@ namespace FWO.Test
     [Parallelizable]
     internal class DailyCheckJobTest
     {
+        private static readonly DailyCheckModule[] ExpectedImportsModules =
+        [
+            DailyCheckModule.Imports,
+            DailyCheckModule.OwnerActiveRules
+        ];
+
+        private static readonly AlertCode[] ExpectedEnabledCheckAlertCodes =
+        [
+            AlertCode.SampleDataExisting,
+            AlertCode.ImportRunningTooLong
+        ];
+
+        private static readonly AlertCode[] ExpectedSampleDataAlertCodes =
+        [
+            AlertCode.SampleDataExisting
+        ];
+
+        private static readonly AlertCode[] ExpectedImportAlertCodes =
+        [
+            AlertCode.ImportRunningTooLong,
+            AlertCode.NoImport,
+            AlertCode.SuccessfulImportOverdue
+        ];
+
+        private static readonly int[] ExpectedSuccessLogSeverities = [1];
+        private static readonly int[] ExpectedNoAlertLogSeverities = [0];
+
         [Test]
         public void LoadEnabledModules_ReturnsAllModules_WhenConfigIsBlank()
         {
@@ -49,11 +76,7 @@ namespace FWO.Test
 
             HashSet<DailyCheckModule> enabledModules = InvokeLoadEnabledModules(globalConfig);
 
-            Assert.That(enabledModules, Is.EquivalentTo(new[]
-            {
-                DailyCheckModule.Imports,
-                DailyCheckModule.OwnerActiveRules
-            }));
+            Assert.That(enabledModules, Is.EquivalentTo(ExpectedImportsModules));
         }
 
         [Test]
@@ -150,12 +173,8 @@ namespace FWO.Test
 
             await dailyCheckJob.Execute(null!);
 
-            Assert.That(apiConnection.AlertCodes, Is.EquivalentTo(new[]
-            {
-                AlertCode.SampleDataExisting,
-                AlertCode.ImportRunningTooLong
-            }));
-            Assert.That(apiConnection.LogSeverities, Is.EqualTo(new[] { 1, 1 }));
+            Assert.That(apiConnection.AlertCodes, Is.EquivalentTo(ExpectedEnabledCheckAlertCodes));
+            Assert.That(apiConnection.LogSeverities, Is.EqualTo([1, 1]));
         }
 
         [Test]
@@ -230,7 +249,7 @@ namespace FWO.Test
             await (Task)checkDemoData.Invoke(dailyCheckJob, null)!;
 
             Assert.That(apiConnection.AlertCodes, Is.Empty);
-            Assert.That(apiConnection.LogSeverities, Is.EqualTo(new[] { 0 }));
+            Assert.That(apiConnection.LogSeverities, Is.EqualTo(ExpectedNoAlertLogSeverities));
         }
 
         [Test]
@@ -249,8 +268,8 @@ namespace FWO.Test
 
             await (Task)checkDemoData.Invoke(dailyCheckJob, null)!;
 
-            Assert.That(apiConnection.AlertCodes, Is.EqualTo(new[] { AlertCode.SampleDataExisting }));
-            Assert.That(apiConnection.LogSeverities, Is.EqualTo(new[] { 1 }));
+            Assert.That(apiConnection.AlertCodes, Is.EqualTo(ExpectedSampleDataAlertCodes));
+            Assert.That(apiConnection.LogSeverities, Is.EqualTo(ExpectedSuccessLogSeverities));
         }
 
         [Test]
@@ -390,13 +409,8 @@ namespace FWO.Test
                 ?? throw new InvalidOperationException("CheckImports returned null task."));
             await task;
 
-            Assert.That(apiConnection.AlertCodes, Is.EquivalentTo(new[]
-            {
-                AlertCode.ImportRunningTooLong,
-                AlertCode.NoImport,
-                AlertCode.SuccessfulImportOverdue
-            }));
-            Assert.That(apiConnection.LogSeverities, Is.EqualTo(new[] { 1 }));
+            Assert.That(apiConnection.AlertCodes, Is.EquivalentTo(ExpectedImportAlertCodes));
+            Assert.That(apiConnection.LogSeverities, Is.EqualTo(ExpectedSuccessLogSeverities));
         }
 
         private static HashSet<DailyCheckModule> InvokeLoadEnabledModules(SimulatedGlobalConfig globalConfig)

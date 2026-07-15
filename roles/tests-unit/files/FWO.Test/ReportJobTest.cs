@@ -30,6 +30,9 @@ namespace FWO.Test
             internal int QueryCount { get; private set; }
             internal List<ReportSchedule> ReportSchedules { get; set; } = [];
             internal bool ThrowOnReportSchedules { get; set; }
+            internal bool ThrowOnGetReportSchedulesAsOperationCanceled { get; set; }
+            internal List<FwoNotification> Notifications { get; set; } = [];
+            internal int UpdateNotificationsLastSentAffectedRows { get; set; }
 
             public override void SetAuthHeader(string jwt) { }
             public override void SetRole(string role) { }
@@ -50,9 +53,17 @@ namespace FWO.Test
                 {
                     throw new TaskCanceledException("Canceled in test.");
                 }
+                if (ThrowOnGetReportSchedulesAsOperationCanceled && query == ReportQueries.getReportSchedules)
+                {
+                    throw new OperationCanceledException("Canceled in test.");
+                }
                 if (typeof(QueryResponseType) == typeof(List<ReportSchedule>) && query == ReportQueries.getReportSchedules)
                 {
                     return Task.FromResult((QueryResponseType)(object)ReportSchedules);
+                }
+                if (typeof(QueryResponseType) == typeof(List<FwoNotification>) && query == NotificationQueries.getNotifications)
+                {
+                    return Task.FromResult((QueryResponseType)(object)Notifications);
                 }
                 if (typeof(QueryResponseType) == typeof(List<ManagementSelect>) && query == DeviceQueries.getDevicesByManagement)
                 {
@@ -75,6 +86,10 @@ namespace FWO.Test
                 if (typeof(QueryResponseType) == typeof(object) && query == ReportQueries.addGeneratedReport)
                 {
                     return Task.FromResult((QueryResponseType)(object)new object());
+                }
+                if (typeof(QueryResponseType) == typeof(ReturnId) && query == NotificationQueries.updateNotificationsLastSent)
+                {
+                    return Task.FromResult((QueryResponseType)(object)new ReturnId { AffectedRows = UpdateNotificationsLastSentAffectedRows });
                 }
                 throw new NotImplementedException();
             }
@@ -328,6 +343,20 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task Execute_SwallowsOperationCancellation()
+        {
+            ReportJobApiConnection apiConnection = new()
+            {
+                ThrowOnGetReportSchedulesAsOperationCanceled = true
+            };
+            ReportJob reportJob = CreateReportJob(apiConnection);
+
+            await reportJob.Execute(null!);
+
+            Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public async Task ProcessScheduledReport_InactiveSchedule_DoesNothing()
         {
             MethodInfo processScheduledReport = GetPrivateInstanceMethod("ProcessScheduledReport");
@@ -400,6 +429,41 @@ namespace FWO.Test
             Assert.That(apiConnection.QueryCount, Is.EqualTo(0));
         }
 
+        [Test]
+        public async Task TrySendReportViaEmail_LoadsNotificationsAndUpdatesLastSent_WhenConfigured()
+        {
+            ReportJobApiConnection apiConnection = new()
+            {
+                UpdateNotificationsLastSentAffectedRows = 0
+            };
+            ReportJob reportJob = CreateReportJob(apiConnection);
+            ReportSchedule reportSchedule = new()
+            {
+                Notifications = []
+            };
+            TestReport report = new(ReportType.TicketReport, detailedView: false);
+            UserConfig userConfig = UserConfig.ForTextOnly(new SimulatedGlobalConfig());
+
+            await reportJob.TrySendReportViaEmail(reportSchedule, report, userConfig);
+
+            Assert.That(apiConnection.LastQuery, Is.EqualTo(NotificationQueries.updateNotificationsLastSent));
+            Assert.That(apiConnection.QueryCount, Is.EqualTo(2));
+        }
+
+        [Test]
+        public async Task SaveReportToArchive_ThrowsWhenPersistenceFails()
+        {
+            MethodInfo saveReportToArchive = GetPrivateStaticMethod("SaveReportToArchive");
+            FailingArchiveApiConnection apiConnection = new();
+            ReportFile reportFile = new()
+            {
+                Name = "scheduled-report"
+            };
+
+            Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await (Task)saveReportToArchive.Invoke(null, [reportFile, "description", apiConnection])!);
+        }
+
         private static T GetAnonymousProperty<T>(object obj, string propertyName)
         {
             return (T)(obj.GetType().GetProperty(propertyName)?.GetValue(obj)
@@ -448,6 +512,37 @@ namespace FWO.Test
             {
                 PdfInputs.Add(html);
                 return Task.FromResult<string?>("pdf-content");
+            }
+        }
+
+        private sealed class FailingArchiveApiConnection : ApiConnection
+        {
+            public override void SetAuthHeader(string jwt) { }
+            public override void SetRole(string role) { }
+            public override void SetBestRole(System.Security.Claims.ClaimsPrincipal user, List<string> targetRoleList) { }
+            public override void SwitchBack() { }
+            public override Task<ApiResponse<QueryResponseType>> SendQuerySafeAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null)
+            {
+                throw new NotImplementedException();
+            }
+            public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, FWO.Api.Client.QueryChunkingOptions? chunkingOptions = null)
+            {
+                if (query == ReportQueries.addGeneratedReport)
+                {
+                    throw new InvalidOperationException("Archive write failed.");
+                }
+
+                throw new NotImplementedException();
+            }
+            public override GraphQlApiSubscription<SubscriptionResponseType> GetSubscription<SubscriptionResponseType>(Action<Exception> exceptionHandler, GraphQlApiSubscription<SubscriptionResponseType>.SubscriptionUpdate subscriptionUpdateHandler, string subscription, object? variables = null, string? operationName = null)
+            {
+                throw new NotImplementedException();
+            }
+            public override void DisposeSubscriptions<T>() { }
+            protected override void Dispose(bool disposing) { }
+            public override Task ReconnectSubscriptionsAsync(string jwt, CancellationToken ct)
+            {
+                throw new NotImplementedException();
             }
         }
     }
