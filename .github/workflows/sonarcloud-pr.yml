@@ -66,6 +66,17 @@ jobs:
           # pull_request_target fork checkout block of checkout@v7 can be lifted
           allow-unsafe-pr-checkout: true
 
+      # The checkout above only contains the fork's refs; its copy of the base
+      # branch may be months stale, which would make Sonar treat everything
+      # merged upstream since then as new code of this PR.
+      - name: Fetch base branch from upstream
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git remote add base "https://github.com/${{ github.repository }}.git"
+          git fetch base "$BASE_REF"
+          git branch -f "$BASE_REF" "base/$BASE_REF"
+
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
@@ -108,6 +119,10 @@ jobs:
         run: python -m pip install -r roles/importer/files/importer/requirements.txt coverage==7.15.0
 
       - name: Build and analyze pull request
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           for attempt in 1 2 3; do
             if .sonar/scanner/dotnet-sonarscanner begin \
@@ -116,9 +131,9 @@ jobs:
               /d:sonar.token="${SONAR_TOKEN}" \
               /d:sonar.host.url="https://sonarcloud.io" \
               /d:sonar.qualitygate.wait=true \
-              /d:sonar.pullrequest.key="${{ github.event.pull_request.number }}" \
-              /d:sonar.pullrequest.branch="${{ github.event.pull_request.head.ref }}" \
-              /d:sonar.pullrequest.base="${{ github.event.pull_request.base.ref }}" \
+              /d:sonar.pullrequest.key="${PR_NUMBER}" \
+              /d:sonar.pullrequest.branch="${PR_HEAD_REF}" \
+              /d:sonar.pullrequest.base="${PR_BASE_REF}" \
               /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml \
               /d:sonar.python.coverage.reportPaths=python-coverage.xml; then
               break
