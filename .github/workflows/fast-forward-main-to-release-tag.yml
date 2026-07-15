@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   fast-forward-main:
+    environment: stable-release
     runs-on: ubuntu-latest
 
     steps:
