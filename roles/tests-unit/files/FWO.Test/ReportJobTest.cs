@@ -27,6 +27,9 @@ namespace FWO.Test
             internal string? LastQuery { get; private set; }
             internal object? LastVariables { get; private set; }
             internal int GetDevicesByManagementCalls { get; private set; }
+            internal int QueryCount { get; private set; }
+            internal List<ReportSchedule> ReportSchedules { get; set; } = [];
+            internal bool ThrowOnReportSchedules { get; set; }
 
             public override void SetAuthHeader(string jwt) { }
             public override void SetRole(string role) { }
@@ -40,8 +43,17 @@ namespace FWO.Test
 
             public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, FWO.Api.Client.QueryChunkingOptions? chunkingOptions = null)
             {
+                QueryCount++;
                 LastQuery = query;
                 LastVariables = variables;
+                if (ThrowOnReportSchedules && query == ReportQueries.getReportSchedules)
+                {
+                    throw new TaskCanceledException("Canceled in test.");
+                }
+                if (typeof(QueryResponseType) == typeof(List<ReportSchedule>) && query == ReportQueries.getReportSchedules)
+                {
+                    return Task.FromResult((QueryResponseType)(object)ReportSchedules);
+                }
                 if (typeof(QueryResponseType) == typeof(List<ManagementSelect>) && query == DeviceQueries.getDevicesByManagement)
                 {
                     GetDevicesByManagementCalls++;
@@ -263,6 +275,59 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task Execute_ReturnsWhenNoSchedulesAreConfigured()
+        {
+            ReportJobApiConnection apiConnection = new()
+            {
+                ReportSchedules = []
+            };
+            ReportJob reportJob = CreateReportJob(apiConnection);
+
+            await reportJob.Execute(null!);
+
+            Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.LastQuery, Is.EqualTo(ReportQueries.getReportSchedules));
+        }
+
+        [Test]
+        public async Task Execute_SkipsInactiveSchedule()
+        {
+            ReportJobApiConnection apiConnection = new()
+            {
+                ReportSchedules =
+                [
+                    new()
+                    {
+                        Active = false,
+                        StartTime = new DateTime(2026, 4, 21, 10, 0, 0),
+                        RepeatInterval = SchedulerInterval.Days,
+                        RepeatOffset = 1
+                    }
+                ]
+            };
+            ReportJob reportJob = CreateReportJob(apiConnection);
+
+            await reportJob.Execute(null!);
+
+            Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.LastQuery, Is.EqualTo(ReportQueries.getReportSchedules));
+        }
+
+        [Test]
+        public async Task Execute_SwallowsCancellation()
+        {
+            ReportJobApiConnection apiConnection = new()
+            {
+                ThrowOnReportSchedules = true
+            };
+            ReportJob reportJob = CreateReportJob(apiConnection);
+
+            await reportJob.Execute(null!);
+
+            Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public async Task ProcessScheduledReport_InactiveSchedule_DoesNothing()
         {
             MethodInfo processScheduledReport = GetPrivateInstanceMethod("ProcessScheduledReport");
@@ -298,6 +363,41 @@ namespace FWO.Test
             await (Task)processScheduledReport.Invoke(reportJob, [reportSchedule, currentTimeRounded, CancellationToken.None])!;
 
             Assert.That(reportSchedule.StartTime, Is.EqualTo(new DateTime(2026, 4, 22, 10, 0, 0)));
+        }
+
+        [Test]
+        public async Task ProcessScheduledReport_UnsupportedInterval_IsHandled()
+        {
+            MethodInfo processScheduledReport = GetPrivateInstanceMethod("ProcessScheduledReport");
+            ReportJob reportJob = CreateReportJob();
+            DateTime originalStartTime = new(2026, 4, 21, 10, 0, 0);
+            ReportSchedule reportSchedule = new()
+            {
+                Active = true,
+                StartTime = originalStartTime,
+                RepeatInterval = (SchedulerInterval)999,
+                RepeatOffset = 1
+            };
+
+            await (Task)processScheduledReport.Invoke(reportJob, [reportSchedule, originalStartTime.AddMinutes(5), CancellationToken.None])!;
+
+            Assert.That(reportSchedule.StartTime, Is.EqualTo(originalStartTime));
+        }
+
+        [Test]
+        public async Task TrySendReportViaEmail_DoesNothing_WhenUserConfigIsNull()
+        {
+            ReportJobApiConnection apiConnection = new();
+            ReportJob reportJob = CreateReportJob(apiConnection);
+            ReportSchedule reportSchedule = new()
+            {
+                Notifications = []
+            };
+            TestReport report = new(ReportType.TicketReport, detailedView: false);
+
+            await reportJob.TrySendReportViaEmail(reportSchedule, report, null);
+
+            Assert.That(apiConnection.QueryCount, Is.EqualTo(0));
         }
 
         private static T GetAnonymousProperty<T>(object obj, string propertyName)
