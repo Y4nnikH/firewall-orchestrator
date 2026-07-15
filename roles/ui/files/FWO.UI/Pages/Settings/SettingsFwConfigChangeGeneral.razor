@@ -147,6 +147,8 @@ else
 
         foreach (var state in managementStates)
         {
+            state.SelectedChanges ??= new Dictionary<string, string>();
+
             foreach (string change in AvailableChanges)
             {
                 if (!state.SelectedChanges.ContainsKey(change))
@@ -164,7 +166,7 @@ else
             new(ManagementFwConfigChangeTargets.Disabled, userConfig.GetText("disabled"))
         ];
 
-        if (change == ManagementFwConfigChangeCategories.RuleChanges || change == ManagementFwConfigChangeCategories.ObjectChanges)
+        if (change == ManagementFwConfigChangeCategories.RuleChanges) //  || change == ManagementFwConfigChangeCategories.ObjectChanges - currently only rule changes are supported for internal work
         {
             selections.Add(new(ManagementFwConfigChangeTargets.InternalWork, userConfig.GetText("internal_work")));
         }
