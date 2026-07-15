@@ -559,6 +559,9 @@ Not supported any longer are:
 - Ubuntu <  22.04
 - Debian <  11
 
-## 9.2.1 - 10.07.2026
+## 9.2.1 - 12.07.2026
+- migrate firewall tables to firewall schema
+
+## 9.2.2 - 15.07.2026
 - add generic firewall import
 - enable azure2022ff for normalized config import
