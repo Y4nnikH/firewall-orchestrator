@@ -221,6 +221,8 @@ namespace FWO.Middleware.Server.Controllers
             }
             catch (Exception exception)
             {
+                result.Success = false;
+                result.ErrorMessage = $"Could not continue external request chain after internal work. {exception.Message}";
                 AddWorkflowMessage(result, exception, "Internal Work", "Could not continue external request chain after internal work.", true);
             }
         }

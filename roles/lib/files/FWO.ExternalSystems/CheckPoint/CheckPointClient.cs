@@ -74,16 +74,25 @@ namespace FWO.ExternalSystems.CheckPoint
                 return;
             }
 
-            var request = new RestRequest("discard", Method.Post);
-            request.AddHeader("Content-Type", "application/json");
-            request.AddHeader("Accept", "application/json");
-            request.AddHeader("X-chkp-sid", SessionId);
-
-            var response = await restClient.ExecuteAsync<int>(request);
-
-            if (response.StatusCode != HttpStatusCode.OK)
+            try
             {
-                Log.WriteWarning("CheckPointClient", "Discard", "CheckPoint discard failed: " + response.Content, "", (int)response.StatusCode);
+
+                var request = new RestRequest("discard", Method.Post);
+                request.AddHeader("Content-Type", "application/json");
+                request.AddHeader("Accept", "application/json");
+                request.AddHeader("X-chkp-sid", SessionId);
+                request.AddStringBody("{}", ContentType.Json);
+
+                var response = await restClient.ExecuteAsync<int>(request);
+
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    Log.WriteWarning("CheckPointClient", "Discard", "CheckPoint discard failed: " + response.Content, "", (int)response.StatusCode);
+                }
+            }
+            catch (Exception exception)
+            {
+                Log.WriteWarning("CheckPointClient", "Discard", "CheckPoint discard threw an exception: " + exception.Message, "", 0);
             }
         }
 
@@ -105,13 +114,7 @@ namespace FWO.ExternalSystems.CheckPoint
 
                 if (response.StatusCode != HttpStatusCode.OK)
                 {
-                    Log.WriteWarning(
-                        "CheckPointClient",
-                        "Logout",
-                        "CheckPoint logout failed: " + response.Content,
-                        "",
-                        (int)response.StatusCode
-                    );
+                    Log.WriteWarning("CheckPointClient", "Logout", "CheckPoint logout failed: " + response.Content, "", (int)response.StatusCode);
                 }
             }
             finally

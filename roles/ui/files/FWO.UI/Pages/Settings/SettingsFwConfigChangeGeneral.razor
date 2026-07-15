@@ -166,7 +166,7 @@ else
             new(ManagementFwConfigChangeTargets.Disabled, userConfig.GetText("disabled"))
         ];
 
-        if (change == ManagementFwConfigChangeCategories.RuleChanges) //  || change == ManagementFwConfigChangeCategories.ObjectChanges - currently only rule changes are supported for internal work
+        if (change == ManagementFwConfigChangeCategories.RuleChanges)
         {
             selections.Add(new(ManagementFwConfigChangeTargets.InternalWork, userConfig.GetText("internal_work")));
         }

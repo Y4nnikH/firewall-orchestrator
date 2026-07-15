@@ -205,8 +205,6 @@ namespace FWO.Middleware.Server
             bool handledTask = false;
             bool handledInternalWork = false;
 
-            //string? internalWorkBatchCategory = null;
-
             while (true)
             {
                 WfReqTask? nextTask = ticket.Tasks.FirstOrDefault(ta => ta.TaskNumber == lastTaskNumber + 1);
@@ -229,13 +227,6 @@ namespace FWO.Middleware.Server
 
                 if (actInternalWork)
                 {
-                    //internalWorkBatchCategory ??= changeCategory;
-
-                    //if (changeCategory != internalWorkBatchCategory)
-                    //{
-                    //    return true;
-                    //}
-
                     await PromoteInternalWorkTaskToPlanning(ticket, nextTask);
                     Log.WriteInfo("CreateNextRequest", $"Promoted internal work task {nextTask.TaskNumber} for ticket {ticket.Id} to planning.");
 
@@ -358,7 +349,21 @@ namespace FWO.Middleware.Server
                 throw new InvalidOperationException("Could not initialize implementation workflow handler.");
             }
 
-            return batch.All(task => task.StateId >= implementationHandler.StateMatrix(task.TaskType).LowestEndState);
+            foreach (WfReqTask task in batch)
+            {
+                if (IsFailedInternalWorkState(task.StateId))
+                {
+                    Log.WriteWarning("Internal Work", $"Internal work task {task.Id} in ticket {task.TicketId} reached failure state {task.StateId}. Request chain will not continue.");
+                    return false;
+                }
+
+                if (task.StateId < implementationHandler.StateMatrix(task.TaskType).LowestEndState)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private void BundleTasks(WfTicket ticket, int lastTaskNumber, WfReqTask nextTask, List<WfReqTask> bundledTasks, List<WfReqTask> handledTasks, List<ManagementFwConfigChangeState> managementSettings, List<ExternalTicketSystem> extTicketSystems)
@@ -522,6 +527,12 @@ namespace FWO.Middleware.Server
             planningHandler.SetReqTaskEnv(planningTask);
 
             await planningHandler.SetAddInfoInReqTask(planningTask, AdditionalInfoKeys.FwConfigChangeTarget, ManagementFwConfigChangeTargets.InternalWork);
+
+            if (!IsInternalWorkTask(planningTask))
+            {
+                throw new InvalidOperationException($"Internal work marker could not be set for task {task.TaskNumber} in ticket {ticket.Id}.");
+            }
+
             await planningHandler.PromoteReqTask(planningTask);
 
             await LogRequestTasks([planningTask], ticket.Requester?.Name, ModellingTypes.ChangeType.Request);
@@ -615,6 +626,11 @@ namespace FWO.Middleware.Server
 
             if (selectedSystemValue == ManagementFwConfigChangeTargets.InternalWork)
             {
+                if (changeCategory != ManagementFwConfigChangeCategories.RuleChanges)
+                {
+                    throw new InvalidOperationException("Internal work is only supported for rule changes.");
+                }
+
                 actInternalWork = true;
                 actTaskType = "";
                 actSystem = new ExternalTicketSystem
@@ -795,6 +811,19 @@ namespace FWO.Middleware.Server
                 ModellingTypes.ChangeType.Reject => "Rejected",
                 _ => "",
             };
+        }
+
+        private bool IsFailedInternalWorkState(int stateId)
+        {
+            List<int?> failedStates =
+            [
+                extStateHandler?.GetInternalStateId(ExtStates.Rejected),
+                extStateHandler?.GetInternalStateId(ExtStates.ExtReqRejected),
+                extStateHandler?.GetInternalStateId(ExtStates.ExtReqAckRejected),
+                extStateHandler?.GetInternalStateId(ExtStates.ExtReqDiscarded)
+            ];
+
+            return failedStates.Any(failedState => failedState == stateId);
         }
 
         private static void LogMessage(Exception? exception = null, string title = "", string message = "", bool ErrorFlag = false)
