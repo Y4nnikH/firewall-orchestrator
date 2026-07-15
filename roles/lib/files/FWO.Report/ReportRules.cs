@@ -260,29 +260,34 @@ namespace FWO.Report
             {
                 managementReport.ReportedRuleIds.AddRange(managementReport.GetAllRuleIds());
             }
-            objQueryVariables.Add(QueryVar.RuleIds, "{" + string.Join(", ", managementReport.ReportedRuleIds) + "}");
-            if (!objQueryVariables.ContainsKey(QueryVar.ImportIdStart))
+            Dictionary<string, object> fetchQueryVariables = new(objQueryVariables)
             {
-                objQueryVariables.Add(QueryVar.ImportIdStart, managementReport.Import.ImportAggregate.ImportAggregateMax.RelevantImportId!);
+                [QueryVar.RuleIds] = "{" + string.Join(", ", managementReport.ReportedRuleIds) + "}",
+            };
+
+            if (!fetchQueryVariables.ContainsKey(QueryVar.ImportIdStart))
+            {
+                fetchQueryVariables.Add(QueryVar.ImportIdStart, managementReport.Import.ImportAggregate.ImportAggregateMax.RelevantImportId!);
             }
-            if (!objQueryVariables.ContainsKey(QueryVar.ImportIdEnd))
+            if (!fetchQueryVariables.ContainsKey(QueryVar.ImportIdEnd))
             {
-                objQueryVariables.Add(QueryVar.ImportIdEnd, managementReport.Import.ImportAggregate.ImportAggregateMax.RelevantImportId!);
+                fetchQueryVariables.Add(QueryVar.ImportIdEnd, managementReport.Import.ImportAggregate.ImportAggregateMax.RelevantImportId!);
             }
 
             string getObjQuery = GetQuery(objects);
             bool keepFetching = true;
             int fetchCount = 0;
-            int elementsPerFetch = (int)objQueryVariables.GetValueOrDefault(QueryVar.Limit)!;
+            int elementsPerFetch = (int)fetchQueryVariables.GetValueOrDefault(QueryVar.Limit)!;
             ManagementReport filteredObjects;
             ManagementReport allFilteredObjects = new();
             while (keepFetching && ++fetchCount <= maxFetchCycles)
             {
-                filteredObjects = (await apiConnection.SendQueryAsync<List<ManagementReport>>(getObjQuery, objQueryVariables))[0];
+                filteredObjects = (await apiConnection.SendQueryAsync<List<ManagementReport>>(getObjQuery, fetchQueryVariables))[0];
 
                 if (fetchCount == 1)
                 {
                     allFilteredObjects = filteredObjects;
+                    keepFetching = GetFetchedObjectCounts(filteredObjects, objects).Any(count => count >= elementsPerFetch);
                 }
                 else
                 {
@@ -292,7 +297,7 @@ namespace FWO.Report
 
                 FillReport(allFilteredObjects, managementReport, objects);
 
-                objQueryVariables[QueryVar.Offset] = (int)objQueryVariables[QueryVar.Offset] + elementsPerFetch;
+                fetchQueryVariables[QueryVar.Offset] = (int)fetchQueryVariables[QueryVar.Offset] + elementsPerFetch;
 
                 await callback(ReportData);
             }
@@ -300,6 +305,22 @@ namespace FWO.Report
             Log.WriteDebug("Lazy Fetch", $"Fetched sidebar objects in {fetchCount - 1} cycle(s) ({elementsPerFetch} at a time)");
 
             return fetchCount <= maxFetchCycles;
+        }
+
+        private static IEnumerable<int> GetFetchedObjectCounts(ManagementReport filteredObjects, ObjCategory objects)
+        {
+            if (objects == ObjCategory.all || objects == ObjCategory.nobj)
+            {
+                yield return filteredObjects.ReportObjects.Length;
+            }
+            if (objects == ObjCategory.all || objects == ObjCategory.nsrv)
+            {
+                yield return filteredObjects.ReportServices.Length;
+            }
+            if (objects == ObjCategory.all || objects == ObjCategory.user)
+            {
+                yield return filteredObjects.ReportUsers.Length;
+            }
         }
 
         private void FillReport(ManagementReport allFilteredObjects, ManagementReport managementReport, ObjCategory objects)

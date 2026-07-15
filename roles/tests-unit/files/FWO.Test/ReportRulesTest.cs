@@ -1,3 +1,4 @@
+using FWO.Api.Client;
 using FWO.Basics;
 using FWO.Basics.Enums;
 using FWO.Data;
@@ -560,6 +561,74 @@ namespace FWO.Test
             finally
             {
                 FWO.Services.ServiceProvider.Services = originalServices;
+            }
+        }
+
+        [Test]
+        public async Task Test_GetObjectsForManagementInReport_UsesScopedFetchVariablesAndStopsAfterShortFirstPage()
+        {
+            ManagementReport management = new()
+            {
+                Id = 1,
+                Import = new Import
+                {
+                    ImportAggregate = new ImportAggregate
+                    {
+                        ImportAggregateMax = new ImportAggregateMax { RelevantImportId = 77 }
+                    }
+                },
+                Rulebases =
+                [
+                    new RulebaseReport
+                    {
+                        Id = 10,
+                        Rules = [new Rule { Id = 100, RulebaseId = 10 }]
+                    }
+                ]
+            };
+            MockReportRules reportRules = new(new DynGraphqlQuery(""), new SimulatedUserConfig(), ReportType.ResolvedRules, () => [management]);
+            Dictionary<string, object> queryVariables = new()
+            {
+                { QueryVar.MgmIds, management.Id },
+                { QueryVar.Limit, 10 },
+                { QueryVar.Offset, 0 }
+            };
+            RecordingObjectFetchApiConnection apiConnection = new(
+                new ManagementReport
+                {
+                    ReportObjects = [new NetworkObject { Id = 1 }],
+                    ReportServices = [new NetworkService { Id = 2 }],
+                    ReportUsers = [new NetworkUser { Id = 3 }]
+                });
+
+            bool gotAllObjects = await reportRules.GetObjectsForManagementInReport(queryVariables, ObjCategory.all, 5, apiConnection, _ => Task.CompletedTask);
+
+            Assert.That(gotAllObjects, Is.True);
+            Assert.That(apiConnection.SentVariables, Has.Count.EqualTo(1));
+            Assert.That(apiConnection.SentVariables[0][QueryVar.RuleIds], Is.EqualTo("{100}"));
+            Assert.That(apiConnection.SentVariables[0][QueryVar.ImportIdStart], Is.EqualTo(77));
+            Assert.That(apiConnection.SentVariables[0][QueryVar.ImportIdEnd], Is.EqualTo(77));
+            Assert.That(queryVariables[QueryVar.Offset], Is.EqualTo(0));
+            Assert.That(queryVariables.ContainsKey(QueryVar.RuleIds), Is.False);
+            Assert.That(queryVariables.ContainsKey(QueryVar.ImportIdStart), Is.False);
+            Assert.That(management.ReportObjects.Select(reportObject => reportObject.Id), Is.EqualTo(new long[] { 1 }));
+            Assert.That(management.ReportServices.Select(reportService => reportService.Id), Is.EqualTo(new long[] { 2 }));
+            Assert.That(management.ReportUsers.Select(reportUser => reportUser.Id), Is.EqualTo(new long[] { 3 }));
+        }
+
+        private sealed class RecordingObjectFetchApiConnection(ManagementReport page) : SimulatedApiConnection
+        {
+            public List<Dictionary<string, object>> SentVariables { get; } = [];
+
+            public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
+            {
+                if (variables is Dictionary<string, object> queryVariables)
+                {
+                    SentVariables.Add(new Dictionary<string, object>(queryVariables));
+                }
+
+                object result = new List<ManagementReport> { page };
+                return Task.FromResult((QueryResponseType)result);
             }
         }
     }
