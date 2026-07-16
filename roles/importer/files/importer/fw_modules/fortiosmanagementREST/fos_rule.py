@@ -1,11 +1,17 @@
-from collections.abc import Generator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import fwo_const
 from fw_modules.fortiosmanagementREST import fos_zone
-from fw_modules.fortiosmanagementREST.fos_models import FortiOSConfig, Rule
 from fwo_exceptions import FwoImporterError
-from model_controllers.management_controller import ManagementController
 from models.rule import RuleAction, RuleNormalized, RuleTrack, RuleType
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from fw_modules.fortiosmanagementREST.fos_models import FortiOSConfig, Rule
+    from model_controllers.management_controller import ManagementController
 
 
 def get_rule_installon(mgm_details: ManagementController) -> str:
@@ -146,7 +152,6 @@ def normalize_access_rules(
         rule_track = RuleTrack.NONE if rule.logtraffic == "disable" else RuleTrack.LOG
 
         yield RuleNormalized(
-            rule_num=0,
             rule_num_numeric=0.0,
             rule_name=rule_name,
             rule_type=rule_type,

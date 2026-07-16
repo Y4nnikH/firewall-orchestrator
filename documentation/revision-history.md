@@ -528,3 +528,40 @@ This PR hardens FWO installation and security-sensitive workflows. It restricts 
 
 ## 9.1.13 - 29.06.2026 MAIN
 - fix: handle gateway without rule when generating reports
+
+## 9.1.14 - 01.07.2026
+- remove deprecated, unused rule.rule_num column (rule ordering is handled by rule_num_numeric)
+- remove deprecated, unused direct rule zone columns (rule_from_zone, rule_to_zone); rule zones remain available through the rule_from_zone and rule_to_zone link tables
+
+## 9.1.15 - 06.07.2026
+- make offered protocols configurable
+
+## 9.1.16 - 06.07.2026
+- move workflow state matrices to own database tables
+
+## 9.1.17 - 08.07.2026
+- credentials field in management for writing on Firewalls
+- migrate old Tufin template to list entry
+- Support for writing firewall configurations via templates
+- A template provider (Tufin or custom templates) must be configured before use
+- FW config change external workflow is only active after explicit assignment per management and change category in the settings
+
+## 9.2.0 - 10.07.2026 MAIN
+This release makes FWO compatible with the following operating systems:
+- Ubuntu 22.04 and 24.04
+- Debian 11 & 12
+- Red Hat 9 (new - tested with v9.8)
+- Rocky 9 (new - tested with v9.8)
+- Ubuntu 26.04 (new)
+- Debian 13 (new)
+
+Not supported any longer are:
+- Ubuntu <  22.04
+- Debian <  11
+
+## 9.2.1 - 12.07.2026
+- migrate firewall tables to firewall schema
+
+## 9.2.2 - 15.07.2026
+- add generic firewall import
+- enable azure2022ff for normalized config import
