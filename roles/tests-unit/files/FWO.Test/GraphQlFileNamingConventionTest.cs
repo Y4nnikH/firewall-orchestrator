@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace FWO.Test
 {
     [TestFixture]
-    [Parallelizable]
+    [NonParallelizable]
     internal class GraphQlFileNamingConventionTest
     {
         private static readonly HashSet<string> kKnownInconsistentFiles =
