@@ -140,6 +140,19 @@ namespace FWO.Services.Modelling
         {
             long? relImpId = await GetRelevantImportId(mgtId);
             await GetRuleDevices(mgtId, modellingFilter);
+
+            if (ShouldUseNameFieldRuleOwnerPreFilter(modellingFilter))
+            {
+                List<Rule>? preFilteredRules = await TryGetNameFieldRuleOwnerPrefilteredRules(mgtId, relImpId);
+                if (preFilteredRules?.Count > 0)
+                {
+                    return preFilteredRules;
+                }
+
+                Log.WriteDebug("Variance Rule Loading",
+                    $"NameField rule_owner prefilter returned no rules for owner {owner.Id}, management {mgtId}. Falling back to marker query.");
+            }
+
             if (modellingFilter.AnalyseRemainingRules)
             {
                 var RuleVariables = new
@@ -166,7 +179,41 @@ namespace FWO.Services.Modelling
                     MarkerLocation.Comment => RuleQueries.getModelledRulesByManagementComment,
                     _ => throw new NotSupportedException("invalid or undefined Marker Location")
                 };
+
                 return await apiConnection.SendQueryAsync<List<Rule>>(query, RuleVariables);
+            }
+        }
+
+        private bool ShouldUseNameFieldRuleOwnerPreFilter(ModellingFilter modellingFilter)
+        {
+            return userConfig.OwnerSoruceMappingID == (int)OwnerMappingSourceStm.NameField
+                && userConfig.ModModelledMarkerLocation == MarkerLocation.Rulename
+                && owner.Id > 0
+                && !string.IsNullOrWhiteSpace(userConfig.ModModelledMarker)
+                && !modellingFilter.AnalyseRemainingRules
+                && !modellingFilter.RulesForDeletedConns;
+        }
+
+        private async Task<List<Rule>?> TryGetNameFieldRuleOwnerPrefilteredRules(int mgtId, long? relImpId)
+        {
+            try
+            {
+                var RuleVariables = new
+                {
+                    mgmId = mgtId,
+                    ownerId = owner.Id,
+                    ownerMappingSourceId = (short)(int)OwnerMappingSourceStm.NameField,
+                    import_id_start = relImpId,
+                    import_id_end = relImpId
+                };
+
+                return await apiConnection.SendQueryAsync<List<Rule>>(RuleQueries.getModelledRulesByRuleOwnerNameField, RuleVariables);
+            }
+            catch (Exception exception)
+            {
+                Log.WriteWarning("Variance Rule Loading",
+                    $"NameField rule_owner prefilter failed for owner {owner.Id}, management {mgtId}. Falling back to marker query. {exception.Message}");
+                return null;
             }
         }
 
