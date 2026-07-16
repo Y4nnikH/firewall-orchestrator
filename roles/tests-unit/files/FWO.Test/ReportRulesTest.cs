@@ -1,4 +1,5 @@
 using FWO.Api.Client;
+using FWO.Api.Client.Queries;
 using FWO.Basics;
 using FWO.Basics.Enums;
 using FWO.Data;
@@ -616,6 +617,38 @@ namespace FWO.Test
             Assert.That(management.ReportUsers.Select(reportUser => reportUser.Id), Is.EqualTo(new long[] { 3 }));
         }
 
+        [Test]
+        public async Task Test_Generate_StandardRules_FetchesStructureOnceAndAttachesFlatRulePages()
+        {
+            DynGraphqlQuery query = new("")
+            {
+                FullQuery = "legacy-full-query",
+                StandardRulesStructureQuery = "standard-rules-structure-query",
+                StandardRulesPageQuery = "standard-rules-page-query",
+                RelevantManagementIds = [1]
+            };
+            RuleTreeBuilder ruleTreeBuilder = new();
+            ReportRules reportRules = new(query, new SimulatedUserConfig(), ReportType.Rules, ruleTreeBuilder);
+            StandardRulesSplitApiConnection apiConnection = new();
+            int callbackCount = 0;
+
+            await reportRules.Generate(2, apiConnection, _ =>
+            {
+                callbackCount++;
+                return Task.CompletedTask;
+            }, CancellationToken.None);
+
+            ManagementReport managementReport = reportRules.ReportData.ManagementData.Single();
+            Assert.That(apiConnection.StructureQueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.RulePageOffsets, Is.EqualTo(new[] { 0, 2 }));
+            Assert.That(apiConnection.LegacyFullQueryCount, Is.EqualTo(0));
+            Assert.That(callbackCount, Is.EqualTo(2));
+            Assert.That(managementReport.Rulebases.Single(rulebase => rulebase.Id == 10).Rules.Select(rule => rule.Id), Is.EqualTo(new long[] { 100, 101 }));
+            Assert.That(managementReport.Rulebases.Single(rulebase => rulebase.Id == 20).Rules.Select(rule => rule.Id), Is.EqualTo(new long[] { 200 }));
+            Assert.That(reportRules.ReportData.ElementsCount, Is.EqualTo(3));
+            Assert.That(ruleTreeBuilder.RuleTreeCache.ContainsKey((1, 1)), Is.True);
+        }
+
         private sealed class RecordingObjectFetchApiConnection(ManagementReport page) : SimulatedApiConnection
         {
             public List<Dictionary<string, object>> SentVariables { get; } = [];
@@ -628,6 +661,107 @@ namespace FWO.Test
                 }
 
                 object result = new List<ManagementReport> { page };
+                return Task.FromResult((QueryResponseType)result);
+            }
+        }
+
+        private sealed class StandardRulesSplitApiConnection : SimulatedApiConnection
+        {
+            public int StructureQueryCount { get; private set; }
+            public int LegacyFullQueryCount { get; private set; }
+            public List<int> RulePageOffsets { get; } = [];
+
+            public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
+            {
+                object result;
+                if (query == ReportQueries.getRelevantImportIdsAtTime)
+                {
+                    result = new List<ManagementReport>
+                    {
+                        new()
+                        {
+                            Id = 1,
+                            Name = "Management",
+                            Import = new Import
+                            {
+                                ImportAggregate = new ImportAggregate
+                                {
+                                    ImportAggregateMax = new ImportAggregateMax { RelevantImportId = 77 }
+                                }
+                            }
+                        }
+                    };
+                }
+                else if (query == "standard-rules-structure-query")
+                {
+                    StructureQueryCount++;
+                    result = new List<ManagementReport>
+                    {
+                        new()
+                        {
+                            Id = 1,
+                            Name = "Management",
+                            Devices =
+                            [
+                                new DeviceReport
+                                {
+                                    Id = 1,
+                                    Name = "Gateway",
+                                    RulebaseLinks =
+                                    [
+                                        new RulebaseLink
+                                        {
+                                            GatewayId = 1,
+                                            IsInitial = true,
+                                            LinkType = 2,
+                                            NextRulebaseId = 10
+                                        },
+                                        new RulebaseLink
+                                        {
+                                            GatewayId = 1,
+                                            LinkType = 2,
+                                            FromRulebaseId = 10,
+                                            NextRulebaseId = 20
+                                        }
+                                    ]
+                                }
+                            ],
+                            Rulebases =
+                            [
+                                new RulebaseReport { Id = 10, Name = "Layer 1" },
+                                new RulebaseReport { Id = 20, Name = "Layer 2" }
+                            ]
+                        }
+                    };
+                }
+                else if (query == "standard-rules-page-query" && variables is Dictionary<string, object> queryVariables)
+                {
+                    int offset = (int)queryVariables[QueryVar.Offset];
+                    RulePageOffsets.Add(offset);
+                    result = offset switch
+                    {
+                        0 => new List<Rule>
+                        {
+                            new() { Id = 100, RulebaseId = 10, RuleNumNumeric = 1, Name = "Rule 100" },
+                            new() { Id = 101, RulebaseId = 10, RuleNumNumeric = 2, Name = "Rule 101" }
+                        },
+                        2 => new List<Rule>
+                        {
+                            new() { Id = 200, RulebaseId = 20, RuleNumNumeric = 1, Name = "Rule 200" }
+                        },
+                        _ => []
+                    };
+                }
+                else if (query == "legacy-full-query")
+                {
+                    LegacyFullQueryCount++;
+                    result = new List<ManagementReport>();
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Unexpected query: {query}");
+                }
+
                 return Task.FromResult((QueryResponseType)result);
             }
         }

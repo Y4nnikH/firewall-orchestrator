@@ -52,6 +52,12 @@ namespace FWO.Report
             Stopwatch totalStopwatch = Stopwatch.StartNew();
             Stopwatch phaseStopwatch = Stopwatch.StartNew();
 
+            if (ReportType == ReportType.Rules && !string.IsNullOrWhiteSpace(Query.StandardRulesStructureQuery) && !string.IsNullOrWhiteSpace(Query.StandardRulesPageQuery))
+            {
+                await GenerateStandardRulesReport(elementsPerFetch, apiConnection, callback, ct, phaseStopwatch, totalStopwatch);
+                return;
+            }
+
             // Initial fetch
 
             Query.QueryVariables[QueryVar.Limit] = elementsPerFetch;
@@ -105,6 +111,107 @@ namespace FWO.Report
 
             await LogExecutionTime(phaseStopwatch, "Building rule tree", false);
             await LogExecutionTime(totalStopwatch, "Generating Rules Report", false);
+        }
+
+        /// <summary>
+        /// Generates standard Rules reports by fetching the static rulebase graph once and paging rules flat by management.
+        /// </summary>
+        private async Task GenerateStandardRulesReport(int elementsPerFetch, ApiConnection apiConnection, Func<ReportData, Task> callback, CancellationToken ct,
+            Stopwatch phaseStopwatch, Stopwatch totalStopwatch)
+        {
+            Query.QueryVariables[QueryVar.Limit] = elementsPerFetch;
+            Query.QueryVariables[QueryVar.Offset] = 0;
+
+            List<ManagementReport> managementsWithRelevantImportId = await GetRelevantImportIds(apiConnection);
+            ReportData.ManagementData = [];
+            foreach (ManagementReport management in managementsWithRelevantImportId)
+            {
+                ct.ThrowIfCancellationRequested();
+                SetMgtQueryVars(management);
+                List<ManagementReport> result = await apiConnection.SendQueryAsync<List<ManagementReport>>(Query.StandardRulesStructureQuery, Query.QueryVariables);
+                ManagementReport managementReport = result[0];
+                managementReport.Import = management.Import;
+                ClearRules(managementReport);
+                ReportData.ManagementData.Add(managementReport);
+            }
+
+            await LogExecutionTime(phaseStopwatch, "Initial structure fetch", true);
+
+            foreach (ManagementReport management in managementsWithRelevantImportId)
+            {
+                ct.ThrowIfCancellationRequested();
+                SetMgtQueryVars(management);
+                Query.QueryVariables[QueryVar.Offset] = 0;
+
+                ManagementReport? managementReport = ReportData.ManagementData.FirstOrDefault(report => report.Id == management.Id);
+                if (managementReport == null)
+                {
+                    continue;
+                }
+
+                bool keepFetching = true;
+                while (keepFetching)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    List<Rule> rules = await apiConnection.SendQueryAsync<List<Rule>>(Query.StandardRulesPageQuery, Query.QueryVariables);
+                    AttachRulesToRulebases(managementReport, rules);
+                    keepFetching = rules.Count >= elementsPerFetch;
+                    Query.QueryVariables[QueryVar.Offset] = (int)Query.QueryVariables[QueryVar.Offset] + elementsPerFetch;
+                    await callback(ReportData);
+                }
+            }
+
+            await LogExecutionTime(phaseStopwatch, "Filling report data", true);
+
+            TryBuildRuleTree();
+
+            await LogExecutionTime(phaseStopwatch, "Building rule tree", false);
+            await LogExecutionTime(totalStopwatch, "Generating Rules Report", false);
+        }
+
+        /// <summary>
+        /// Removes placeholder rule arrays from the structure query before flat rule pages are attached.
+        /// </summary>
+        private static void ClearRules(ManagementReport managementReport)
+        {
+            foreach (RulebaseReport rulebase in managementReport.Rulebases)
+            {
+                rulebase.Rules = [];
+            }
+        }
+
+        /// <summary>
+        /// Appends a flat page of rules to the matching rulebase shells already present in the management report.
+        /// </summary>
+        private static void AttachRulesToRulebases(ManagementReport managementReport, List<Rule> rules)
+        {
+            if (rules.Count == 0)
+            {
+                return;
+            }
+
+            Dictionary<int, List<Rule>> rulesByRulebaseId = rules
+                .GroupBy(rule => rule.RulebaseId)
+                .ToDictionary(group => group.Key, group => group.ToList());
+
+            foreach (RulebaseReport rulebase in managementReport.Rulebases)
+            {
+                if (!rulesByRulebaseId.TryGetValue(rulebase.Id, out List<Rule>? rulebaseRules))
+                {
+                    continue;
+                }
+
+                if (rulebase.Rules.Length == 0)
+                {
+                    rulebase.Rules = [.. rulebaseRules];
+                    continue;
+                }
+
+                List<Rule> mergedRules = new(rulebase.Rules.Length + rulebaseRules.Count);
+                mergedRules.AddRange(rulebase.Rules);
+                mergedRules.AddRange(rulebaseRules);
+                rulebase.Rules = [.. mergedRules];
+            }
         }
 
         private Task LogExecutionTime(Stopwatch stopwatch, string phaseName, bool reset)

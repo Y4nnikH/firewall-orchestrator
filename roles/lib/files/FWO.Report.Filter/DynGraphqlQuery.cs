@@ -16,6 +16,8 @@ namespace FWO.Report.Filter
         public int parameterCounter { get; set; } = 0;
         public Dictionary<string, object> QueryVariables { get; set; } = [];
         public string FullQuery { get; set; } = "";
+        public string StandardRulesStructureQuery { get; set; } = "";
+        public string StandardRulesPageQuery { get; set; } = "";
         public string RulebaseLinkWhereStatement { get; set; } = "";
         public string RuleWhereStatement { get; set; } = "";
         public string NwObjWhereStatement { get; set; } = "";
@@ -204,6 +206,82 @@ namespace FWO.Report.Filter
                         }}
                     }} 
                 }}";
+        }
+
+        /// <summary>
+        /// Builds the one-time management, device, and rulebase-link query for standard Rules reports.
+        /// </summary>
+        private static string ConstructStandardRulesStructureQuery(DynGraphqlQuery query, ReportTemplate filter)
+        {
+            string importParams = string.IsNullOrWhiteSpace(query.RulebaseLinkWhereStatement)
+                ? ""
+                : "$import_id_start: bigint $import_id_end: bigint";
+
+            return $@"
+                query standardRulesStructure ($mgmId: [Int!] {importParams})
+                {{
+                    management({mgmtWhereString})
+                    {{
+                        id: mgm_id
+                        name: mgm_name
+                        devices ({GetDevWhereFilter(filter.ReportParams.DeviceFilter)})
+                        {{
+                            id: dev_id
+                            name: dev_name
+                            rulebase_links(
+                                where: {{ {query.RulebaseLinkWhereStatement} }}
+                            ) {{
+                                link_type
+                                is_initial
+                                is_section
+                                from_rule_id
+                                from_rulebase_id
+                                to_rulebase_id
+                            }}
+                        }}
+                        rulebases {{
+                            name
+                            id
+                        }}
+                    }}
+                }}";
+        }
+
+        /// <summary>
+        /// Builds the paged flat-rule query used by standard Rules reports after the static rulebase graph was fetched once.
+        /// </summary>
+        private static string ConstructStandardRulesPageQuery(DynGraphqlQuery query, string paramString)
+        {
+            string pageParamString = EnsureQueryParameter(EnsureQueryParameter(paramString, "$import_id_start: bigint"), "$import_id_end: bigint");
+            return $@"
+                {RuleQueries.ruleOverviewFragments}
+                query standardRulesPage ({pageParamString})
+                {{
+                    firewall_rule(
+                        limit: $limit
+                        offset: $offset
+                        where: {{
+                            mgm_id: {{ _in: $mgmId }}
+                            access_rule: {{ _eq: true }}
+                            {query.RuleWhereStatement}
+                        }}
+                        order_by: [{{ rulebase_id: asc }}, {{ rule_num_numeric: asc }}]
+                    )
+                    {{
+                        mgm_id: mgm_id
+                        ...ruleOverview
+                    }}
+                }}";
+        }
+
+        /// <summary>
+        /// Adds a GraphQL parameter declaration when fragments require it but no report filter introduced it.
+        /// </summary>
+        private static string EnsureQueryParameter(string paramString, string parameter)
+        {
+            return paramString.Contains(parameter, StringComparison.Ordinal)
+                ? paramString
+                : $"{paramString} {parameter}";
         }
 
         private static string GetRulesFragmentDef(ReportTemplate filter)
@@ -466,6 +544,11 @@ namespace FWO.Report.Filter
                     break;
 
                 case ReportType.Rules:
+                    query.FullQuery = Queries.Compact(ConstructRulesQuery(query, paramString, filter));
+                    query.StandardRulesStructureQuery = Queries.Compact(ConstructStandardRulesStructureQuery(query, filter));
+                    query.StandardRulesPageQuery = Queries.Compact(ConstructStandardRulesPageQuery(query, paramString));
+                    break;
+
                 case ReportType.ResolvedRules:
                 case ReportType.ResolvedRulesTech:
                 case ReportType.UnusedRules:
