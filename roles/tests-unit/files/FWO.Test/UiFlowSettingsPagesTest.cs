@@ -277,7 +277,15 @@ namespace FWO.Test
             component.FindAll("button.btn-outline-primary")[^1].Click();
             component.FindAll("button.btn.btn-sm.btn-warning")[^1].Click();
 
-            component.WaitForAssertion(() => Assert.That(apiConnection.MappingCalls.Count, Is.EqualTo(2)));
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(apiConnection.Queries, Does.Contain(FlowMutations.upsertFlowSvcObjectMapping));
+                Assert.That(apiConnection.MappingCalls, Is.EqualTo(new List<(long ObjectId, long FlowNwobjId, bool ActiveOnMgm)>
+                {
+                    (11, 100, false),
+                    (12, 100, true)
+                }));
+            });
 
             component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
             component.WaitForAssertion(() => Assert.That(component.FindAll("input.form-control.form-control-sm"), Is.Not.Empty));
@@ -316,6 +324,78 @@ namespace FWO.Test
             IRenderedComponent<SettingsFlowTimeObjects> component = RenderPage<SettingsFlowTimeObjects>(context);
 
             component.WaitForAssertion(() => Assert.That(component.Markup, Does.Contain("Flow Time Object")));
+        }
+
+        [Test]
+        public async Task FlowNetworkGroupsPage_ResolveDuplicateMapping_SendsExpectedMutations()
+        {
+            await using BunitContext context = CreateContext(out FlowSettingsPagesTestApiConn apiConnection);
+
+            IRenderedComponent<SettingsFlowNetworkGroups> component = RenderPage<SettingsFlowNetworkGroups>(context);
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-warning"), Is.Not.Empty));
+
+            component.FindAll("button.btn.btn-sm.btn-warning")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-outline-primary"), Is.Not.Empty));
+            component.FindAll("button.btn-outline-primary")[^1].Click();
+            component.FindAll("button.btn.btn-sm.btn-warning")[^1].Click();
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(apiConnection.Queries, Does.Contain(FlowMutations.upsertFlowNwGroupMapping));
+                Assert.That(apiConnection.NetworkGroupMappingCalls, Is.EqualTo(new List<(long ObjectId, long FlowNwgrpId, bool ActiveOnMgm)>
+                {
+                    (21, 300, false),
+                    (22, 300, true)
+                }));
+            });
+        }
+
+        [Test]
+        public async Task FlowServiceGroupsPage_ResolveDuplicateMapping_SendsExpectedMutations()
+        {
+            await using BunitContext context = CreateContext(out FlowSettingsPagesTestApiConn apiConnection);
+
+            IRenderedComponent<SettingsFlowServiceGroups> component = RenderPage<SettingsFlowServiceGroups>(context);
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-warning"), Is.Not.Empty));
+
+            component.FindAll("button.btn.btn-sm.btn-warning")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-outline-primary"), Is.Not.Empty));
+            component.FindAll("button.btn-outline-primary")[^1].Click();
+            component.FindAll("button.btn.btn-sm.btn-warning")[^1].Click();
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(apiConnection.Queries, Does.Contain(FlowMutations.upsertFlowSvcGroupMapping));
+                Assert.That(apiConnection.ServiceGroupMappingCalls, Is.EqualTo(new List<(long ServiceId, long FlowSvcgrpId, bool ActiveOnMgm)>
+                {
+                    (11, 200, false),
+                    (12, 200, true)
+                }));
+            });
+        }
+
+        [Test]
+        public async Task FlowTimeObjectsPage_ResolveDuplicateMapping_SendsExpectedMutations()
+        {
+            await using BunitContext context = CreateContext(out FlowSettingsPagesTestApiConn apiConnection);
+
+            IRenderedComponent<SettingsFlowTimeObjects> component = RenderPage<SettingsFlowTimeObjects>(context);
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-warning"), Is.Not.Empty));
+
+            component.FindAll("button.btn.btn-sm.btn-warning")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-outline-primary"), Is.Not.Empty));
+            component.FindAll("button.btn-outline-primary")[^1].Click();
+            component.FindAll("button.btn.btn-sm.btn-warning")[^1].Click();
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(apiConnection.Queries, Does.Contain(FlowMutations.upsertFlowTimeObjectMapping));
+                Assert.That(apiConnection.TimeObjectMappingCalls, Is.EqualTo(new List<(long TimeObjectId, long FlowTimeobjId, bool ActiveOnMgm)>
+                {
+                    (31, 400, false),
+                    (32, 400, true)
+                }));
+            });
         }
 
         [Test]
@@ -405,12 +485,18 @@ namespace FWO.Test
 
         private static BunitContext CreateContext()
         {
+            return CreateContext(out _);
+        }
+
+        private static BunitContext CreateContext(out FlowSettingsPagesTestApiConn apiConnection)
+        {
             BunitContext context = new();
             context.JSInterop.Mode = JSRuntimeMode.Loose;
             context.Services.AddAuthorizationCore();
             context.Services.AddLocalization();
             context.Services.AddSingleton<IAuthorizationService, AllowAllAuthorizationService>();
-            context.Services.AddSingleton<ApiConnection>(new FlowSettingsPagesTestApiConn());
+            apiConnection = new FlowSettingsPagesTestApiConn();
+            context.Services.AddSingleton<ApiConnection>(apiConnection);
             context.Services.AddScoped<DomEventService>();
             context.Services.AddSingleton<UserConfig>(new SimulatedUserConfig
             {
@@ -761,6 +847,11 @@ namespace FWO.Test
             Name = "Management"
         };
 
+        public List<string> Queries { get; } = [];
+        public List<(long ServiceId, long FlowSvcgrpId, bool ActiveOnMgm)> ServiceGroupMappingCalls { get; } = [];
+        public List<(long ObjectId, long FlowNwgrpId, bool ActiveOnMgm)> NetworkGroupMappingCalls { get; } = [];
+        public List<(long TimeObjectId, long FlowTimeobjId, bool ActiveOnMgm)> TimeObjectMappingCalls { get; } = [];
+
         private static readonly List<IpProtocol> kIpProtocols =
         [
             new() { Id = 1, Name = "ICMP" },
@@ -857,6 +948,72 @@ namespace FWO.Test
 
         public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
         {
+            Queries.Add(query);
+
+            if (query == FlowMutations.upsertFlowSvcGroupMapping && typeof(QueryResponseType) == typeof(NetworkService))
+            {
+                long serviceId = GetAnonymousProperty<long>(variables, "svcId");
+                long flowSvcgrpId = GetAnonymousProperty<long>(variables, "flowSvcgrpId");
+                bool activeOnMgm = GetAnonymousProperty<bool>(variables, "activeOnMgm");
+                ServiceGroupMappingCalls.Add((serviceId, flowSvcgrpId, activeOnMgm));
+                return Task.FromResult((QueryResponseType)(object)new NetworkService
+                {
+                    Id = serviceId,
+                    Name = serviceId == 11 ? "Service A" : "Service B",
+                    Uid = serviceId == 11 ? "svc-a" : "svc-b",
+                    DestinationPort = 80,
+                    DestinationPortEnd = 80,
+                    ProtoId = 6,
+                    Active = true,
+                    Removed = null,
+                    FlowServiceGroupId = flowSvcgrpId,
+                    FlowActive = activeOnMgm
+                });
+            }
+
+            if (query == FlowMutations.upsertFlowNwGroupMapping && typeof(QueryResponseType) == typeof(NetworkObject))
+            {
+                long objectId = GetAnonymousProperty<long>(variables, "objId");
+                long flowNwgrpId = GetAnonymousProperty<long>(variables, "flowNwgrpId");
+                bool activeOnMgm = GetAnonymousProperty<bool>(variables, "activeOnMgm");
+                NetworkGroupMappingCalls.Add((objectId, flowNwgrpId, activeOnMgm));
+                return Task.FromResult((QueryResponseType)(object)new NetworkObject
+                {
+                    Id = objectId,
+                    Name = objectId == 21 ? "Object A" : "Object B",
+                    Uid = objectId == 21 ? "obj-a" : "obj-b",
+                    IP = objectId == 21 ? "10.0.0.1/32" : "10.0.0.2/32",
+                    IpEnd = "",
+                    Active = true,
+                    Removed = null,
+                    Type = new NetworkObjectType { Id = 1, Name = "host" },
+                    FlowNetworkGroupId = flowNwgrpId,
+                    FlowActive = activeOnMgm
+                });
+            }
+
+            if (query == FlowMutations.upsertFlowTimeObjectMapping && typeof(QueryResponseType) == typeof(TimeObject))
+            {
+                long timeObjectId = GetAnonymousProperty<long>(variables, "timeObjId");
+                long flowTimeobjId = GetAnonymousProperty<long>(variables, "flowTimeobjId");
+                bool activeOnMgm = GetAnonymousProperty<bool>(variables, "activeOnMgm");
+                TimeObjectMappingCalls.Add((timeObjectId, flowTimeobjId, activeOnMgm));
+                return Task.FromResult((QueryResponseType)(object)new TimeObject
+                {
+                    Id = timeObjectId,
+                    Name = timeObjectId == 31 ? "Time A" : "Time B",
+                    Uid = timeObjectId == 31 ? "time-a" : "time-b",
+                    StartTime = timeObjectId == 31
+                        ? new DateTime(2026, 5, 1, 8, 0, 0, DateTimeKind.Utc)
+                        : new DateTime(2026, 5, 1, 9, 0, 0, DateTimeKind.Utc),
+                    EndTime = timeObjectId == 31
+                        ? new DateTime(2026, 5, 1, 18, 0, 0, DateTimeKind.Utc)
+                        : new DateTime(2026, 5, 1, 19, 0, 0, DateTimeKind.Utc),
+                    FlowTimeObjectId = flowTimeobjId,
+                    FlowActive = activeOnMgm
+                });
+            }
+
             object result = query switch
             {
                 string q when q == FlowQueries.getFlowServiceObjects => new List<FlowSvcObject> { kFlowSvcObject },
@@ -872,6 +1029,17 @@ namespace FWO.Test
             };
 
             return Task.FromResult((QueryResponseType)result);
+        }
+
+        private static T GetAnonymousProperty<T>(object? variables, string propertyName)
+        {
+            if (variables == null)
+            {
+                throw new InvalidOperationException($"Missing variables for {propertyName}");
+            }
+
+            return (T)(variables.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)?.GetValue(variables)
+                ?? throw new InvalidOperationException($"Missing property {propertyName}"));
         }
     }
 

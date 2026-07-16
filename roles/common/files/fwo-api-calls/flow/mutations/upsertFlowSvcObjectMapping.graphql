@@ -3,7 +3,7 @@ mutation upsertFlowSvcObjectMapping(
   $flowSvcobjId: bigint!
   $activeOnMgm: Boolean!
 ) {
-  update_service_by_pk(
+  update_firewall_nw_service_by_pk(
     pk_columns: { svc_id: $svcId }
     _set: {
       flow_svcobj_id: $flowSvcobjId
