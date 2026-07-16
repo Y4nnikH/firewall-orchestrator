@@ -17,6 +17,8 @@ namespace FWO.Test
     [TestFixture]
     internal class ReportRulesTest
     {
+        private static readonly int[] ExpectedStandardRulePageOffsets = [0, 2];
+
         private List<ManagementReport> _managementReports = new();
         private DeviceReport? _deviceReport;
         private ManagementReport? _managementReport;
@@ -640,7 +642,7 @@ namespace FWO.Test
 
             ManagementReport managementReport = reportRules.ReportData.ManagementData.Single();
             Assert.That(apiConnection.StructureQueryCount, Is.EqualTo(1));
-            Assert.That(apiConnection.RulePageOffsets, Is.EqualTo(new[] { 0, 2 }));
+            Assert.That(apiConnection.RulePageOffsets, Is.EqualTo(ExpectedStandardRulePageOffsets));
             Assert.That(apiConnection.LegacyFullQueryCount, Is.EqualTo(0));
             Assert.That(callbackCount, Is.EqualTo(2));
             Assert.That(managementReport.Rulebases.Single(rulebase => rulebase.Id == 10).Rules.Select(rule => rule.Id), Is.EqualTo(new long[] { 100, 101 }));

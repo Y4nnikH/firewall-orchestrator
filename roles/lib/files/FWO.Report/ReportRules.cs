@@ -54,7 +54,7 @@ namespace FWO.Report
 
             if (ReportType == ReportType.Rules && !string.IsNullOrWhiteSpace(Query.StandardRulesStructureQuery) && !string.IsNullOrWhiteSpace(Query.StandardRulesPageQuery))
             {
-                await GenerateStandardRulesReport(elementsPerFetch, apiConnection, callback, ct, phaseStopwatch, totalStopwatch);
+                await GenerateStandardRulesReport(elementsPerFetch, apiConnection, callback, phaseStopwatch, totalStopwatch, ct);
                 return;
             }
 
@@ -116,8 +116,8 @@ namespace FWO.Report
         /// <summary>
         /// Generates standard Rules reports by fetching the static rulebase graph once and paging rules flat by management.
         /// </summary>
-        private async Task GenerateStandardRulesReport(int elementsPerFetch, ApiConnection apiConnection, Func<ReportData, Task> callback, CancellationToken ct,
-            Stopwatch phaseStopwatch, Stopwatch totalStopwatch)
+        private async Task GenerateStandardRulesReport(int elementsPerFetch, ApiConnection apiConnection, Func<ReportData, Task> callback,
+            Stopwatch phaseStopwatch, Stopwatch totalStopwatch, CancellationToken ct)
         {
             Query.QueryVariables[QueryVar.Limit] = elementsPerFetch;
             Query.QueryVariables[QueryVar.Offset] = 0;
