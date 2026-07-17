@@ -184,6 +184,13 @@ namespace FWO.Services.Modelling
             }
         }
 
+        /// <summary>
+        /// Uses the NameField rule_owner mapping as a prefilter only for the normal variance rule load.
+        /// AnalyseRemainingRules must inspect rules beyond the current owner's mapped modelled rules,
+        /// and RulesForDeletedConns may need historical/deleted model references that are not guaranteed
+        /// to have an active rule_owner entry. Those expanded modes therefore keep using the existing
+        /// marker-based rule loading path.
+        /// </summary>
         private bool ShouldUseNameFieldRuleOwnerPreFilter(ModellingFilter modellingFilter)
         {
             return userConfig.OwnerSoruceMappingID == (int)OwnerMappingSourceStm.NameField
