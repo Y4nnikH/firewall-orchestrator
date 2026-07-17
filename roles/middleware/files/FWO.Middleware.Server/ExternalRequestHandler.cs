@@ -70,14 +70,43 @@ namespace FWO.Middleware.Server
                 {
                     return false;
                 }
+
                 int lastFinishedTask = 0;
-                foreach (WfReqTask? task in intTicket.Tasks.OrderBy(t => t.TaskNumber))
+                List<WfReqTask> orderedTasks = [.. intTicket.Tasks.OrderBy(t => t.TaskNumber)];
+
+                for (int i = 0; i < orderedTasks.Count; ++i)
                 {
+                    WfReqTask task = orderedTasks[i];
+
+                    if (IsInternalWorkTask(task))
+                    {
+                        List<WfReqTask> batch = GetInternalWorkBatch(intTicket, task);
+                        if (batch.Count == 0)
+                        {
+                            break;
+                        }
+
+                        if (!await InternalWorkBatchIsCompleted(batch))
+                        {
+                            Log.WriteInfo("SendFirstRequest",
+                                $"Ticket {ticketId}: internal work batch starting at task {batch.Min(t => t.TaskNumber)} is not completed yet. Reinit stops here.");
+                            return true;
+                        }
+
+                        lastFinishedTask = batch.Max(t => t.TaskNumber);
+                        i += batch.Count - 1;
+                        continue;
+                    }
+
                     if (task.StateId > wfHandler.StateMatrix(task.TaskType).LowestEndState)
                     {
                         lastFinishedTask = task.TaskNumber;
+                        continue;
                     }
+
+                    break;
                 }
+
                 return await CreateNextRequest(intTicket, lastFinishedTask);
             }
             catch (Exception exception)
