@@ -307,6 +307,7 @@
     private bool ShowLastHitColumn => ReportTypeGroups.IsRuleReport(SelectedReportType);
 
     private Rule? _lastClickedRule = null;
+    private List<ManagementReport>? _lastManagements;
 
     private sealed record VisibleRuleTreeItemsCacheEntry(RuleTreeItem RuleTree, RuleTreeItem[] Items);
 
@@ -318,6 +319,15 @@
     {
         _ruleDisplay = new NatRuleDisplayHtml(userConfig);
         // TODO: are we using NatRuleDisplayHtml for non-NAT rules?
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_lastManagements, Managements))
+        {
+            _lastManagements = Managements;
+            _visibleRuleTreeItemsCache.Clear();
+        }
     }
 
     #endregion
@@ -355,7 +365,11 @@
 
     private RuleTreeItem[] GetRuleTreeItems(ManagementReport managementReport, DeviceReport deviceReport)
     {
-        RuleTreeItem ruleTree = GetRuleTree(managementReport, deviceReport);
+        if (!ruleTreeBuilder.RuleTreeCache.TryGetValue((managementReport.Id, deviceReport.Id), out RuleTreeItem? ruleTree))
+        {
+            // No tree built (yet) for this device - render an empty table instead of failing the whole report.
+            return [];
+        }
         (int managementId, int deviceId) cacheKey = (managementReport.Id, deviceReport.Id);
 
         if (_visibleRuleTreeItemsCache.TryGetValue(cacheKey, out VisibleRuleTreeItemsCacheEntry? cacheEntry)

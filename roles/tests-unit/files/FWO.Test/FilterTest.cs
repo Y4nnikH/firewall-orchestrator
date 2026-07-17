@@ -413,6 +413,23 @@ namespace FWO.Test
             StringAssert.Contains("query standardRulesPage", query.StandardRulesPageQuery);
             StringAssert.Contains("firewall_rule", query.StandardRulesPageQuery);
             StringAssert.Contains("rulebase_id", query.StandardRulesPageQuery);
+            StringAssert.Contains("rule_id: asc", query.StandardRulesPageQuery);
+        }
+
+        [Test]
+        [Parallelizable]
+        public void StandardRulesQueryWithActiveTenantFilterSkipsSplitQueries()
+        {
+            ReportTemplate t = new();
+            t.ReportParams.ReportType = (int)ReportType.Rules;
+            t.ReportParams.TenantFilter.IsActive = true;
+            t.ReportParams.TenantFilter.TenantId = 2;
+
+            DynGraphqlQuery query = Compiler.Compile(t);
+
+            Assert.That(query.StandardRulesStructureQuery, Is.Empty);
+            Assert.That(query.StandardRulesPageQuery, Is.Empty);
+            StringAssert.Contains("get_rules_for_tenant", query.FullQuery);
         }
 
         [Test]

@@ -244,11 +244,7 @@ namespace FWO.Data.Report
                     {
                         return [.. source];
                     }
-
-                    List<T> merged = new(target.Length + source.Length);
-                    merged.AddRange(target);
-                    merged.AddRange(source);
-                    return [.. merged];
+                    return [.. target, .. source];
                 }
                 return target ?? Array.Empty<T>();
             }
@@ -272,10 +268,7 @@ namespace FWO.Data.Report
                 }
                 if (rulebaseReportToMerge.Rules.Length > 0)
                 {
-                    List<Rule> mergedRules = new(rulebaseReport.Rules.Length + rulebaseReportToMerge.Rules.Length);
-                    mergedRules.AddRange(rulebaseReport.Rules);
-                    mergedRules.AddRange(rulebaseReportToMerge.Rules);
-                    rulebaseReport.Rules = [.. mergedRules];
+                    rulebaseReport.Rules = [.. rulebaseReport.Rules, .. rulebaseReportToMerge.Rules];
                     newObjects = true;
                     maxAddedCounts["Rules"] = Math.Max(maxAddedCounts["Rules"], rulebaseReportToMerge.Rules.Length);
                 }

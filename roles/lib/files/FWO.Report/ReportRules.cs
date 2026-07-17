@@ -129,6 +129,10 @@ namespace FWO.Report
                 ct.ThrowIfCancellationRequested();
                 SetMgtQueryVars(management);
                 List<ManagementReport> result = await apiConnection.SendQueryAsync<List<ManagementReport>>(Query.StandardRulesStructureQuery, Query.QueryVariables);
+                if (result.Count == 0)
+                {
+                    continue;
+                }
                 ManagementReport managementReport = result[0];
                 managementReport.Import = management.Import;
                 ClearRules(managementReport);
@@ -201,16 +205,9 @@ namespace FWO.Report
                     continue;
                 }
 
-                if (rulebase.Rules.Length == 0)
-                {
-                    rulebase.Rules = [.. rulebaseRules];
-                    continue;
-                }
-
-                List<Rule> mergedRules = new(rulebase.Rules.Length + rulebaseRules.Count);
-                mergedRules.AddRange(rulebase.Rules);
-                mergedRules.AddRange(rulebaseRules);
-                rulebase.Rules = [.. mergedRules];
+                rulebase.Rules = rulebase.Rules.Length == 0
+                    ? [.. rulebaseRules]
+                    : [.. rulebase.Rules, .. rulebaseRules];
             }
         }
 
