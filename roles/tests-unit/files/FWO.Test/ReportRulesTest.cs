@@ -625,9 +625,10 @@ namespace FWO.Test
             DynGraphqlQuery query = new("")
             {
                 FullQuery = "legacy-full-query",
-                StandardRulesStructureQuery = "standard-rules-structure-query",
+                StandardRulesStructureQuery = "standard-rules-structure-query $import_id_start $import_id_end",
                 StandardRulesPageQuery = "standard-rules-page-query",
-                RelevantManagementIds = [1]
+                RelevantManagementIds = [1],
+                QueryVariables = { ["fullTextFilter0"] = "%accept%" }
             };
             RuleTreeBuilder ruleTreeBuilder = new();
             ReportRules reportRules = new(query, new SimulatedUserConfig(), ReportType.Rules, ruleTreeBuilder);
@@ -642,6 +643,11 @@ namespace FWO.Test
 
             ManagementReport managementReport = reportRules.ReportData.ManagementData.Single();
             Assert.That(apiConnection.StructureQueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.StructureQueryVariables, Has.Count.EqualTo(1));
+            Assert.That(apiConnection.StructureQueryVariables[0].Keys, Is.EquivalentTo(new[] { QueryVar.MgmId, QueryVar.ImportIdStart, QueryVar.ImportIdEnd }));
+            Assert.That(apiConnection.StructureQueryVariables[0][QueryVar.MgmId], Is.EqualTo(1));
+            Assert.That(apiConnection.StructureQueryVariables[0][QueryVar.ImportIdStart], Is.EqualTo(77));
+            Assert.That(apiConnection.StructureQueryVariables[0][QueryVar.ImportIdEnd], Is.EqualTo(77));
             Assert.That(apiConnection.RulePageOffsets, Is.EqualTo(ExpectedStandardRulePageOffsets));
             Assert.That(apiConnection.LegacyFullQueryCount, Is.EqualTo(0));
             Assert.That(callbackCount, Is.EqualTo(2));
@@ -672,6 +678,7 @@ namespace FWO.Test
             public int StructureQueryCount { get; private set; }
             public int LegacyFullQueryCount { get; private set; }
             public List<int> RulePageOffsets { get; } = [];
+            public List<Dictionary<string, object>> StructureQueryVariables { get; } = [];
 
             public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
             {
@@ -694,9 +701,13 @@ namespace FWO.Test
                         }
                     };
                 }
-                else if (query == "standard-rules-structure-query")
+                else if (query == "standard-rules-structure-query $import_id_start $import_id_end")
                 {
                     StructureQueryCount++;
+                    if (variables is Dictionary<string, object> queryVariables)
+                    {
+                        StructureQueryVariables.Add(new Dictionary<string, object>(queryVariables));
+                    }
                     result = new List<ManagementReport>
                     {
                         new()

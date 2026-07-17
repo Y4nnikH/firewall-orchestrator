@@ -128,7 +128,8 @@ namespace FWO.Report
             {
                 ct.ThrowIfCancellationRequested();
                 SetMgtQueryVars(management);
-                List<ManagementReport> result = await apiConnection.SendQueryAsync<List<ManagementReport>>(Query.StandardRulesStructureQuery, Query.QueryVariables);
+                Dictionary<string, object> structureQueryVariables = BuildStandardRulesStructureQueryVariables(Query.StandardRulesStructureQuery, Query.QueryVariables);
+                List<ManagementReport> result = await apiConnection.SendQueryAsync<List<ManagementReport>>(Query.StandardRulesStructureQuery, structureQueryVariables);
                 if (result.Count == 0)
                 {
                     continue;
@@ -171,6 +172,28 @@ namespace FWO.Report
 
             await LogExecutionTime(phaseStopwatch, "Building rule tree", false);
             await LogExecutionTime(totalStopwatch, "Generating Rules Report", false);
+        }
+
+        /// <summary>
+        /// Builds the minimal variable set accepted by the standard Rules structure query.
+        /// </summary>
+        private static Dictionary<string, object> BuildStandardRulesStructureQueryVariables(string structureQuery, Dictionary<string, object> queryVariables)
+        {
+            Dictionary<string, object> structureQueryVariables = new()
+            {
+                [QueryVar.MgmId] = queryVariables[QueryVar.MgmId],
+            };
+
+            if (structureQuery.Contains($"${QueryVar.ImportIdStart}", StringComparison.Ordinal) && queryVariables.TryGetValue(QueryVar.ImportIdStart, out object? importIdStart))
+            {
+                structureQueryVariables[QueryVar.ImportIdStart] = importIdStart;
+            }
+            if (structureQuery.Contains($"${QueryVar.ImportIdEnd}", StringComparison.Ordinal) && queryVariables.TryGetValue(QueryVar.ImportIdEnd, out object? importIdEnd))
+            {
+                structureQueryVariables[QueryVar.ImportIdEnd] = importIdEnd;
+            }
+
+            return structureQueryVariables;
         }
 
         /// <summary>
