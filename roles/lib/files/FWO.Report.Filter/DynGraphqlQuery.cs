@@ -260,13 +260,14 @@ namespace FWO.Report.Filter
         {
             return $@"
                 {GetRulesFragmentDef(filter)}
-                query standardRulesPage ({paramString})
+                query standardRulesPage ({paramString} $rulebaseIds: [Int!])
                 {{
                     firewall_rule(
                         limit: $limit
                         offset: $offset
                         where: {{
                             mgm_id: {{ _in: $mgmId }}
+                            rulebase_id: {{ _in: $rulebaseIds }}
                             access_rule: {{ _eq: true }}
                             {query.RuleWhereStatement}
                         }}

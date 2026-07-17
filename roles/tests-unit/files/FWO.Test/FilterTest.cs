@@ -412,6 +412,8 @@ namespace FWO.Test
             StringAssert.DoesNotContain("rules (", query.StandardRulesStructureQuery);
             StringAssert.Contains("query standardRulesPage", query.StandardRulesPageQuery);
             StringAssert.Contains("firewall_rule", query.StandardRulesPageQuery);
+            StringAssert.Contains("$rulebaseIds: [Int!]", query.StandardRulesPageQuery);
+            StringAssert.Contains("rulebase_id: { _in: $rulebaseIds }", query.StandardRulesPageQuery);
             StringAssert.Contains("rulebase_id", query.StandardRulesPageQuery);
             StringAssert.Contains("rule_id: asc", query.StandardRulesPageQuery);
         }

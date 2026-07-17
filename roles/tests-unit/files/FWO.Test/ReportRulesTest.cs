@@ -645,16 +645,137 @@ namespace FWO.Test
             Assert.That(apiConnection.StructureQueryCount, Is.EqualTo(1));
             Assert.That(apiConnection.StructureQueryVariables, Has.Count.EqualTo(1));
             Assert.That(apiConnection.StructureQueryVariables[0].Keys, Is.EquivalentTo(new[] { QueryVar.MgmId, QueryVar.ImportIdStart, QueryVar.ImportIdEnd }));
-            Assert.That(apiConnection.StructureQueryVariables[0][QueryVar.MgmId], Is.EqualTo(1));
+            Assert.That(apiConnection.StructureQueryVariables[0][QueryVar.MgmId], Is.EqualTo(new[] { 1 }));
             Assert.That(apiConnection.StructureQueryVariables[0][QueryVar.ImportIdStart], Is.EqualTo(77));
             Assert.That(apiConnection.StructureQueryVariables[0][QueryVar.ImportIdEnd], Is.EqualTo(77));
             Assert.That(apiConnection.RulePageOffsets, Is.EqualTo(ExpectedStandardRulePageOffsets));
+            Assert.That(apiConnection.RulePageRulebaseIds, Has.Count.EqualTo(2));
+            Assert.That(apiConnection.RulePageRulebaseIds[0], Is.EqualTo(new[] { 10, 20 }));
+            Assert.That(apiConnection.RulePageRulebaseIds[1], Is.EqualTo(new[] { 10, 20 }));
             Assert.That(apiConnection.LegacyFullQueryCount, Is.EqualTo(0));
             Assert.That(callbackCount, Is.EqualTo(2));
             Assert.That(managementReport.Rulebases.Single(rulebase => rulebase.Id == 10).Rules.Select(rule => rule.Id), Is.EqualTo(new long[] { 100, 101 }));
             Assert.That(managementReport.Rulebases.Single(rulebase => rulebase.Id == 20).Rules.Select(rule => rule.Id), Is.EqualTo(new long[] { 200 }));
             Assert.That(reportRules.ReportData.ElementsCount, Is.EqualTo(3));
             Assert.That(ruleTreeBuilder.RuleTreeCache.ContainsKey((1, 1)), Is.True);
+        }
+
+        [Test]
+        public async Task Test_Generate_StandardRules_SkipsRulePaging_WhenNoSelectedRulebases()
+        {
+            DynGraphqlQuery query = new("")
+            {
+                FullQuery = "legacy-full-query",
+                StandardRulesStructureQuery = "standard-rules-structure-query $import_id_start $import_id_end",
+                StandardRulesPageQuery = "standard-rules-page-query",
+                RelevantManagementIds = [1]
+            };
+            ReportRules reportRules = new(query, new SimulatedUserConfig(), ReportType.Rules, new RuleTreeBuilder());
+            StandardRulesSplitApiConnection apiConnection = new(includeSelectedRulebaseLinks: false);
+            int callbackCount = 0;
+
+            await reportRules.Generate(2, apiConnection, _ =>
+            {
+                callbackCount++;
+                return Task.CompletedTask;
+            }, CancellationToken.None);
+
+            Assert.That(apiConnection.StructureQueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.RulePageOffsets, Is.Empty);
+            Assert.That(callbackCount, Is.EqualTo(0));
+            Assert.That(reportRules.ReportData.ElementsCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void Test_GetRulebaseIdsForSelectedDevices_ReturnsOnlyLinkedKnownRulebases()
+        {
+            ManagementReport managementReport = new()
+            {
+                Rulebases =
+                [
+                    new RulebaseReport { Id = 10 },
+                    new RulebaseReport { Id = 20 },
+                    new RulebaseReport { Id = 30 }
+                ],
+                Devices =
+                [
+                    new DeviceReport
+                    {
+                        Id = 1,
+                        RulebaseLinks =
+                        [
+                            new RulebaseLink { GatewayId = 1, NextRulebaseId = 20, FromRulebaseId = 10 },
+                            new RulebaseLink { GatewayId = 1, NextRulebaseId = 999, FromRulebaseId = 0 },
+                            new RulebaseLink { GatewayId = 1, NextRulebaseId = 20, FromRulebaseId = 10 }
+                        ]
+                    }
+                ]
+            };
+
+            int[] rulebaseIds = ReportRules.GetRulebaseIdsForSelectedDevices(managementReport);
+
+            Assert.That(rulebaseIds, Is.EqualTo(new[] { 10, 20 }));
+        }
+
+        [Test]
+        public void Test_AttachRulesToRulebases_ReturnsAttachedAndSkippedCounts()
+        {
+            ManagementReport managementReport = new()
+            {
+                Rulebases =
+                [
+                    new RulebaseReport { Id = 10 },
+                    new RulebaseReport { Id = 20 }
+                ]
+            };
+            List<Rule> rules =
+            [
+                new() { Id = 100, RulebaseId = 10 },
+                new() { Id = 200, RulebaseId = 20 },
+                new() { Id = 999, RulebaseId = 999 }
+            ];
+
+            ReportRules.RuleAttachCounts counts = ReportRules.AttachRulesToRulebases(managementReport, rules);
+
+            Assert.That(counts.Attached, Is.EqualTo(2));
+            Assert.That(counts.Skipped, Is.EqualTo(1));
+            Assert.That(managementReport.Rulebases.Single(rulebase => rulebase.Id == 10).Rules.Select(rule => rule.Id), Is.EqualTo(new long[] { 100 }));
+            Assert.That(managementReport.Rulebases.Single(rulebase => rulebase.Id == 20).Rules.Select(rule => rule.Id), Is.EqualTo(new long[] { 200 }));
+        }
+
+        [Test]
+        public void Test_AttachRulesToRulebases_AppendsToExistingRules()
+        {
+            ManagementReport managementReport = new()
+            {
+                Rulebases =
+                [
+                    new RulebaseReport
+                    {
+                        Id = 10,
+                        Rules = [new Rule { Id = 50, RulebaseId = 10 }]
+                    }
+                ]
+            };
+
+            ReportRules.RuleAttachCounts counts = ReportRules.AttachRulesToRulebases(managementReport,
+            [
+                new Rule { Id = 100, RulebaseId = 10 },
+                new Rule { Id = 101, RulebaseId = 10 }
+            ]);
+
+            Assert.That(counts.Attached, Is.EqualTo(2));
+            Assert.That(counts.Skipped, Is.EqualTo(0));
+            Assert.That(managementReport.Rulebases[0].Rules.Select(rule => rule.Id), Is.EqualTo(new long[] { 50, 100, 101 }));
+        }
+
+        [Test]
+        public void Test_AttachRulesToRulebases_ReturnsZeroCounts_ForEmptyPage()
+        {
+            ReportRules.RuleAttachCounts counts = ReportRules.AttachRulesToRulebases(new ManagementReport(), []);
+
+            Assert.That(counts.Attached, Is.EqualTo(0));
+            Assert.That(counts.Skipped, Is.EqualTo(0));
         }
 
         private sealed class RecordingObjectFetchApiConnection(ManagementReport page) : SimulatedApiConnection
@@ -673,11 +794,12 @@ namespace FWO.Test
             }
         }
 
-        private sealed class StandardRulesSplitApiConnection : SimulatedApiConnection
+        private sealed class StandardRulesSplitApiConnection(bool includeSelectedRulebaseLinks = true) : SimulatedApiConnection
         {
             public int StructureQueryCount { get; private set; }
             public int LegacyFullQueryCount { get; private set; }
             public List<int> RulePageOffsets { get; } = [];
+            public List<int[]> RulePageRulebaseIds { get; } = [];
             public List<Dictionary<string, object>> StructureQueryVariables { get; } = [];
 
             public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
@@ -708,37 +830,40 @@ namespace FWO.Test
                     {
                         StructureQueryVariables.Add(new Dictionary<string, object>(queryVariables));
                     }
+                    DeviceReport[] devices = includeSelectedRulebaseLinks
+                        ?
+                        [
+                            new DeviceReport
+                            {
+                                Id = 1,
+                                Name = "Gateway",
+                                RulebaseLinks =
+                                [
+                                    new RulebaseLink
+                                    {
+                                        GatewayId = 1,
+                                        IsInitial = true,
+                                        LinkType = 2,
+                                        NextRulebaseId = 10
+                                    },
+                                    new RulebaseLink
+                                    {
+                                        GatewayId = 1,
+                                        LinkType = 2,
+                                        FromRulebaseId = 10,
+                                        NextRulebaseId = 20
+                                    }
+                                ]
+                            }
+                        ]
+                        : [];
                     result = new List<ManagementReport>
                     {
                         new()
                         {
                             Id = 1,
                             Name = "Management",
-                            Devices =
-                            [
-                                new DeviceReport
-                                {
-                                    Id = 1,
-                                    Name = "Gateway",
-                                    RulebaseLinks =
-                                    [
-                                        new RulebaseLink
-                                        {
-                                            GatewayId = 1,
-                                            IsInitial = true,
-                                            LinkType = 2,
-                                            NextRulebaseId = 10
-                                        },
-                                        new RulebaseLink
-                                        {
-                                            GatewayId = 1,
-                                            LinkType = 2,
-                                            FromRulebaseId = 10,
-                                            NextRulebaseId = 20
-                                        }
-                                    ]
-                                }
-                            ],
+                            Devices = devices,
                             Rulebases =
                             [
                                 new RulebaseReport { Id = 10, Name = "Layer 1" },
@@ -751,6 +876,7 @@ namespace FWO.Test
                 {
                     int offset = (int)queryVariables[QueryVar.Offset];
                     RulePageOffsets.Add(offset);
+                    RulePageRulebaseIds.Add((int[])queryVariables[QueryVar.RulebaseIds]);
                     result = offset switch
                     {
                         0 => new List<Rule>

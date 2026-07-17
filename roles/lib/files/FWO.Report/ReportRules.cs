@@ -154,10 +154,21 @@ namespace FWO.Report
                     continue;
                 }
 
+                int[] scopedRulebaseIds = GetRulebaseIdsForSelectedDevices(managementReport);
+                if (scopedRulebaseIds.Length == 0)
+                {
+                    Log.WriteDebug("Generate Rules Report", $"Skipping rule paging: management={management.Id}, scopedRulebases=0");
+                    continue;
+                }
+                Query.QueryVariables[QueryVar.RulebaseIds] = scopedRulebaseIds;
+
                 bool keepFetching = true;
 #if DEBUG
                 int pageCount = 0;
                 int fetchedRuleCount = 0;
+                int attachedRuleCount = 0;
+                int skippedRuleCount = 0;
+                Log.WriteDebug("Generate Rules Report", $"Rule paging scope: management={management.Id}, scopedRulebases={scopedRulebaseIds.Length}");
 #endif
                 while (keepFetching)
                 {
@@ -170,19 +181,21 @@ namespace FWO.Report
                     fetchStopwatch.Stop();
                     Stopwatch attachStopwatch = Stopwatch.StartNew();
 #endif
-                    AttachRulesToRulebases(managementReport, rules);
+                    RuleAttachCounts attachCounts = AttachRulesToRulebases(managementReport, rules);
 #if DEBUG
                     attachStopwatch.Stop();
                     pageCount++;
                     fetchedRuleCount += rules.Count;
-                    Log.WriteDebug("Generate Rules Report", $"Rule page processed: management={management.Id}, page={pageCount}, rules={rules.Count}, offset={Query.QueryVariables[QueryVar.Offset]}, fetchMilliseconds={double.Round(fetchStopwatch.Elapsed.TotalMilliseconds)}, attachMilliseconds={double.Round(attachStopwatch.Elapsed.TotalMilliseconds)}");
+                    attachedRuleCount += attachCounts.Attached;
+                    skippedRuleCount += attachCounts.Skipped;
+                    Log.WriteDebug("Generate Rules Report", $"Rule page processed: management={management.Id}, page={pageCount}, fetchedRules={rules.Count}, attachedRules={attachCounts.Attached}, skippedRules={attachCounts.Skipped}, offset={Query.QueryVariables[QueryVar.Offset]}, fetchMilliseconds={double.Round(fetchStopwatch.Elapsed.TotalMilliseconds)}, attachMilliseconds={double.Round(attachStopwatch.Elapsed.TotalMilliseconds)}");
 #endif
                     keepFetching = rules.Count >= elementsPerFetch;
                     Query.QueryVariables[QueryVar.Offset] = (int)Query.QueryVariables[QueryVar.Offset] + elementsPerFetch;
                     await callback(ReportData);
                 }
 #if DEBUG
-                Log.WriteDebug("Generate Rules Report", $"Rule paging summary: management={management.Id}, pages={pageCount}, rules={fetchedRuleCount}");
+                Log.WriteDebug("Generate Rules Report", $"Rule paging summary: management={management.Id}, pages={pageCount}, fetchedRules={fetchedRuleCount}, attachedRules={attachedRuleCount}, skippedRules={skippedRuleCount}, scopedRulebases={scopedRulebaseIds.Length}");
 #endif
             }
 
@@ -228,19 +241,37 @@ namespace FWO.Report
         }
 
         /// <summary>
+        /// Collects the rulebases reachable from the selected devices' active rulebase links.
+        /// </summary>
+        internal static int[] GetRulebaseIdsForSelectedDevices(ManagementReport managementReport)
+        {
+            HashSet<int> knownRulebaseIds = [.. managementReport.Rulebases.Select(rulebase => rulebase.Id)];
+
+            return [.. managementReport.Devices
+                .SelectMany(device => device.RulebaseLinks ?? [])
+                .SelectMany(link => new[] { link.NextRulebaseId, link.FromRulebaseId ?? 0 })
+                .Where(rulebaseId => rulebaseId > 0 && knownRulebaseIds.Contains(rulebaseId))
+                .Distinct()
+                .OrderBy(rulebaseId => rulebaseId)];
+        }
+
+        internal readonly record struct RuleAttachCounts(int Attached, int Skipped);
+
+        /// <summary>
         /// Appends a flat page of rules to the matching rulebase shells already present in the management report.
         /// </summary>
-        private static void AttachRulesToRulebases(ManagementReport managementReport, List<Rule> rules)
+        internal static RuleAttachCounts AttachRulesToRulebases(ManagementReport managementReport, List<Rule> rules)
         {
             if (rules.Count == 0)
             {
-                return;
+                return new RuleAttachCounts(0, 0);
             }
 
             Dictionary<int, List<Rule>> rulesByRulebaseId = rules
                 .GroupBy(rule => rule.RulebaseId)
                 .ToDictionary(group => group.Key, group => group.ToList());
 
+            int attachedRules = 0;
             foreach (RulebaseReport rulebase in managementReport.Rulebases)
             {
                 if (!rulesByRulebaseId.TryGetValue(rulebase.Id, out List<Rule>? rulebaseRules))
@@ -251,6 +282,7 @@ namespace FWO.Report
                 if (rulebase.Rules.Length == 0)
                 {
                     rulebase.Rules = [.. rulebaseRules];
+                    attachedRules += rulebaseRules.Count;
                     continue;
                 }
 
@@ -259,7 +291,10 @@ namespace FWO.Report
                 Array.Resize(ref existingRules, originalLength + rulebaseRules.Count);
                 rulebaseRules.CopyTo(existingRules, originalLength);
                 rulebase.Rules = existingRules;
+                attachedRules += rulebaseRules.Count;
             }
+
+            return new RuleAttachCounts(attachedRules, rules.Count - attachedRules);
         }
 
         private Task LogExecutionTime(Stopwatch stopwatch, string phaseName, bool reset)
@@ -398,7 +433,7 @@ namespace FWO.Report
 
         protected virtual void SetMgtQueryVars(ManagementReport management)
         {
-            Query.QueryVariables[QueryVar.MgmId] = management.Id;
+            Query.QueryVariables[QueryVar.MgmId] = new[] { management.Id };
             Query.QueryVariables[QueryVar.ImportIdStart] = management.RelevantImportId ?? -1;
             Query.QueryVariables[QueryVar.ImportIdEnd] = management.RelevantImportId ?? -1;
         }
