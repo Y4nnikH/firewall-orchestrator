@@ -4,6 +4,7 @@ using FWO.Data;
 using FWO.Data.Modelling;
 using FWO.Data.Report;
 using FWO.Logging;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -161,7 +162,8 @@ namespace FWO.Services.Modelling
                     import_id_start = relImpId,
                     import_id_end = relImpId
                 };
-                return await apiConnection.SendQueryAsync<List<Rule>>(RuleQueries.getRulesByManagement, RuleVariables);
+                //return await apiConnection.SendQueryAsync<List<Rule>>(RuleQueries.getRulesByManagement, RuleVariables);
+                return await SendRuleQueryWithTempMeasurement(RuleQueries.getRulesByManagement, RuleVariables, "management-all", mgtId);
             }
             else
             {
@@ -180,7 +182,8 @@ namespace FWO.Services.Modelling
                     _ => throw new NotSupportedException("invalid or undefined Marker Location")
                 };
 
-                return await apiConnection.SendQueryAsync<List<Rule>>(query, RuleVariables);
+                //return await apiConnection.SendQueryAsync<List<Rule>>(query, RuleVariables);
+                return await SendRuleQueryWithTempMeasurement(query, RuleVariables, "marker-query", mgtId);
             }
         }
 
@@ -203,11 +206,13 @@ namespace FWO.Services.Modelling
                     mgmId = mgtId,
                     ownerId = owner.Id,
                     ownerMappingSourceId = (short)(int)OwnerMappingSourceStm.NameField,
+                    marker = $"%{userConfig.ModModelledMarker}%",
                     import_id_start = relImpId,
                     import_id_end = relImpId
                 };
 
-                return await apiConnection.SendQueryAsync<List<Rule>>(RuleQueries.getModelledRulesByRuleOwnerNameField, RuleVariables);
+                //return await apiConnection.SendQueryAsync<List<Rule>>(RuleQueries.getModelledRulesByRuleOwnerNameField, RuleVariables);
+                return await SendRuleQueryWithTempMeasurement(RuleQueries.getModelledRulesByRuleOwnerNameField, RuleVariables, "rule-owner-namefield", mgtId);
             }
             catch (Exception exception)
             {
@@ -215,6 +220,18 @@ namespace FWO.Services.Modelling
                     $"NameField rule_owner prefilter failed for owner {owner.Id}, management {mgtId}. Falling back to marker query. {exception.Message}");
                 return null;
             }
+        }
+
+        private async Task<List<Rule>?> SendRuleQueryWithTempMeasurement(string query, object variables, string path, int mgtId)
+        {
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            List<Rule>? rules = await apiConnection.SendQueryAsync<List<Rule>>(query, variables);
+            stopwatch.Stop();
+
+            Log.WriteInfo("TEMP Variance Rule Loading",
+                $"{path}: owner={owner.Id}, management={mgtId}, rules={rules?.Count ?? 0}, ms={stopwatch.ElapsedMilliseconds}");
+
+            return rules;
         }
 
         private async Task GetRuleDevices(int mgtId, ModellingFilter modellingFilter)

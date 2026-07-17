@@ -4,6 +4,7 @@ query getModelledRulesByRuleOwnerNameField (
   $ownerMappingSourceId: smallint!
   $import_id_start: bigint
   $import_id_end: bigint
+  $marker: String
 ) {
   firewall_rule (
     where: {
@@ -18,6 +19,7 @@ query getModelledRulesByRuleOwnerNameField (
         { removed: { _is_null: true } }
         { removed: { _gt: $import_id_start } }
       ]
+      rule_name: { _ilike: $marker }
       rule_owners: {
         owner_id: { _eq: $ownerId }
         owner_mapping_source_id: { _eq: $ownerMappingSourceId }
