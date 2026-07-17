@@ -86,6 +86,9 @@ namespace FWO.Services
             var connectionsToOwnerMap = connectionOwnersToMap.Where(c => c.AppId.HasValue)
                                               .ToDictionary(c => c.Id, c => c.AppId!.Value);
             var newRuleOwners = new List<RuleOwner>();
+            int rulesWithoutMarker = 0;
+            int rulesWithoutMatchingConnection = 0;
+            int invalidRules = 0;
 
             // iterate through rules and create new mappings based on NameField
             foreach (Rule rule in rulesToMap)
@@ -101,12 +104,29 @@ namespace FWO.Services
                         RuleMetadataId = rule.Metadata.Id,
                         OwnerMappingSourceId = (int)OwnerMappingSourceStm.NameField
                     });
+                    continue;
                 }
-                else if (errorMessage != null)
+
+                if (errorMessage?.StartsWith("No match for marker", StringComparison.Ordinal) == true)
                 {
-                    Log.WriteWarning(LogMessageTitle, $"Rule {rule.Id}: {errorMessage}");
+                    rulesWithoutMarker++;
+                }
+                else if (nameFieldValue.HasValue)
+                {
+                    rulesWithoutMatchingConnection++;
+                }
+                else
+                {
+                    invalidRules++;
+                    Log.WriteDebug(LogMessageTitle, $"Rule {rule.Id}: {errorMessage}");
                 }
             }
+
+            Log.WriteInfo(LogMessageTitle,
+                $"NameField rule_owner mapping checked {rulesToMap.Count} rules, created {newRuleOwners.Count} mappings, " +
+                $"skipped {rulesWithoutMarker} rules without marker, {rulesWithoutMatchingConnection} rules without matching connection/owner, " +
+                $"{invalidRules} invalid rules.");
+
             return newRuleOwners;
         }
 
