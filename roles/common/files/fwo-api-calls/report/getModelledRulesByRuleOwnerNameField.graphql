@@ -2,6 +2,7 @@ query getModelledRulesByRuleOwnerNameField (
   $mgmId: Int!
   $ownerId: Int!
   $ownerMappingSourceId: smallint!
+  $active: Boolean
   $import_id_start: bigint
   $import_id_end: bigint
   $marker: String

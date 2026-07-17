@@ -206,6 +206,7 @@ namespace FWO.Services.Modelling
                     mgmId = mgtId,
                     ownerId = owner.Id,
                     ownerMappingSourceId = (short)(int)OwnerMappingSourceStm.NameField,
+                    active = true,
                     marker = $"%{userConfig.ModModelledMarker}%",
                     import_id_start = relImpId,
                     import_id_end = relImpId
@@ -230,6 +231,9 @@ namespace FWO.Services.Modelling
 
             Log.WriteInfo("TEMP Variance Rule Loading",
                 $"{path}: owner={owner.Id}, management={mgtId}, rules={rules?.Count ?? 0}, ms={stopwatch.ElapsedMilliseconds}");
+
+            Log.WriteInfo("TEMP Variance Rule Loading",
+                $"{path}: ruleIds={string.Join(",", rules?.Select(r => r.Id) ?? [])}");
 
             return rules;
         }
