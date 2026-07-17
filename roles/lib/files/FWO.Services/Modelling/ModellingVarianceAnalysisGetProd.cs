@@ -141,7 +141,7 @@ namespace FWO.Services.Modelling
             long? relImpId = await GetRelevantImportId(mgtId);
             await GetRuleDevices(mgtId, modellingFilter);
 
-            if (ShouldUseNameFieldRuleOwnerPreFilter(modellingFilter))
+            if (relImpId != null && ShouldUseNameFieldRuleOwnerPreFilter(modellingFilter))
             {
                 List<Rule>? preFilteredRules = await TryGetNameFieldRuleOwnerPrefilteredRules(mgtId, relImpId);
                 if (preFilteredRules?.Count > 0)
@@ -149,8 +149,11 @@ namespace FWO.Services.Modelling
                     return preFilteredRules;
                 }
 
-                Log.WriteDebug("Variance Rule Loading",
-                    $"NameField rule_owner prefilter returned no rules for owner {owner.Id}, management {mgtId}. Falling back to marker query.");
+                if (preFilteredRules != null)
+                {
+                    Log.WriteDebug("Variance Rule Loading",
+                        $"NameField rule_owner prefilter returned no rules for owner {owner.Id}, management {mgtId}. Falling back to marker query.");
+                }
             }
 
             if (modellingFilter.AnalyseRemainingRules)
