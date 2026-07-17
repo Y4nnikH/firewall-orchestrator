@@ -587,5 +587,50 @@ namespace FWO.Test
             StringAssert.Contains("\"ManagementId\":[1]", localApiConnection.AddExtRequestVars ?? "");
             StringAssert.Contains("\"Name\":\"Tufin\"", localApiConnection.AddedExtTicketSystem ?? "");
         }
+
+        [Test]
+        public async Task SendFirstRequestStopsWhenInternalWorkBatchIsIncomplete()
+        {
+            SimulatedUserConfig localUserConfig = CreateInternalWorkRuleChangeConfig();
+            ExtTicketHandlerTestApiConn.ResetTicketTasks();
+            ExtTicketHandlerTestApiConn localApiConnection = new();
+
+            using ExternalRequestHandler handler = new(localUserConfig, localApiConnection, null);
+
+            for (int taskId = 2; taskId <= 8; ++taskId)
+            {
+                ExtTicketHandlerTestApiConn.MarkReqTaskAsInternalWork(taskId);
+                ExtTicketHandlerTestApiConn.SetReqTaskState(taskId, 99);
+            }
+
+            bool result = await handler.SendFirstRequest(123);
+
+            ClassicAssert.IsTrue(result);
+            ClassicAssert.IsNull(localApiConnection.AddExtRequestVars);
+        }
+
+        [Test]
+        public async Task SendFirstRequestStartsNextExternalRequestAfterCompletedInternalWorkBatch()
+        {
+            SimulatedUserConfig localUserConfig = CreateInternalWorkRuleChangeConfig();
+            ExtTicketHandlerTestApiConn.ResetTicketTasks();
+            ExtTicketHandlerTestApiConn localApiConnection = new();
+
+            using ExternalRequestHandler handler = new(localUserConfig, localApiConnection, null);
+
+            ExtTicketHandlerTestApiConn.SetReqTaskState(1, 600);
+
+            for (int taskId = 2; taskId <= 8; ++taskId)
+            {
+                ExtTicketHandlerTestApiConn.MarkReqTaskAsInternalWork(taskId);
+                ExtTicketHandlerTestApiConn.SetReqTaskState(taskId, 249);
+            }
+
+            bool result = await handler.SendFirstRequest(123);
+
+            ClassicAssert.IsTrue(result);
+            ClassicAssert.IsNotNull(localApiConnection.AddExtRequestVars);
+            StringAssert.Contains("taskNumber = 9", localApiConnection.AddExtRequestVars ?? "");
+        }
     }
 }

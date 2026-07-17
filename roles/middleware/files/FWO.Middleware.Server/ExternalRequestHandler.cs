@@ -74,9 +74,10 @@ namespace FWO.Middleware.Server
                 int lastFinishedTask = 0;
                 List<WfReqTask> orderedTasks = [.. intTicket.Tasks.OrderBy(t => t.TaskNumber)];
 
-                for (int i = 0; i < orderedTasks.Count; ++i)
+                int taskIndex = 0;
+                while (taskIndex < orderedTasks.Count)
                 {
-                    WfReqTask task = orderedTasks[i];
+                    WfReqTask task = orderedTasks[taskIndex];
 
                     if (IsInternalWorkTask(task))
                     {
@@ -94,13 +95,14 @@ namespace FWO.Middleware.Server
                         }
 
                         lastFinishedTask = batch.Max(t => t.TaskNumber);
-                        i += batch.Count - 1;
+                        taskIndex += batch.Count;
                         continue;
                     }
 
                     if (task.StateId > wfHandler.StateMatrix(task.TaskType).LowestEndState)
                     {
                         lastFinishedTask = task.TaskNumber;
+                        taskIndex++;
                         continue;
                     }
 
