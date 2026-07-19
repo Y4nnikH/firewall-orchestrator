@@ -9,6 +9,13 @@ namespace FWO.Test
     [TestFixture]
     internal class ManagementReportMergeTest
     {
+        private static readonly long[] ExpectedMergedObjectIds = [1, 2, 3];
+        private static readonly long[] ExpectedMergedServiceIds = [10, 11];
+        private static readonly long[] ExpectedMergedUserIds = [20, 21];
+        private static readonly long[] ExpectedFirstRulebaseRuleIds = [100, 101];
+        private static readonly long[] ExpectedSecondRulebaseRuleIds = [200, 201, 202];
+        private static readonly long[] ExpectedObjectIdsFromEmptyTarget = [2, 3];
+
         [Test]
         public void Merge_AppendsArraysAndRulesByRulebaseId()
         {
@@ -35,13 +42,30 @@ namespace FWO.Test
             (bool newObjects, Dictionary<string, int> addedCounts) = target.Merge(source);
 
             Assert.That(newObjects, Is.True);
-            Assert.That(target.Objects.Select(obj => obj.Id), Is.EqualTo(new long[] { 1, 2, 3 }));
-            Assert.That(target.Services.Select(service => service.Id), Is.EqualTo(new long[] { 10, 11 }));
-            Assert.That(target.Users.Select(user => user.Id), Is.EqualTo(new long[] { 20, 21 }));
-            Assert.That(target.Rulebases.Single(rulebase => rulebase.Id == 1).Rules.Select(rule => rule.Id), Is.EqualTo(new long[] { 100, 101 }));
-            Assert.That(target.Rulebases.Single(rulebase => rulebase.Id == 2).Rules.Select(rule => rule.Id), Is.EqualTo(new long[] { 200, 201, 202 }));
+            Assert.That(target.Objects.Select(obj => obj.Id), Is.EqualTo(ExpectedMergedObjectIds));
+            Assert.That(target.Services.Select(service => service.Id), Is.EqualTo(ExpectedMergedServiceIds));
+            Assert.That(target.Users.Select(user => user.Id), Is.EqualTo(ExpectedMergedUserIds));
+            Assert.That(target.Rulebases.Single(rulebase => rulebase.Id == 1).Rules.Select(rule => rule.Id), Is.EqualTo(ExpectedFirstRulebaseRuleIds));
+            Assert.That(target.Rulebases.Single(rulebase => rulebase.Id == 2).Rules.Select(rule => rule.Id), Is.EqualTo(ExpectedSecondRulebaseRuleIds));
             Assert.That(addedCounts["NetworkObjects"], Is.EqualTo(2));
             Assert.That(addedCounts["Rules"], Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Merge_CopiesSourceArrays_WhenTargetArraysAreEmpty()
+        {
+            ManagementReport target = ManagementReport([], [], [], []);
+            ManagementReport source = ManagementReport(
+                objectIds: [2, 3],
+                serviceIds: [],
+                userIds: [],
+                rulebases: []);
+
+            (bool newObjects, Dictionary<string, int> addedCounts) = target.Merge(source);
+
+            Assert.That(newObjects, Is.True);
+            Assert.That(target.Objects.Select(obj => obj.Id), Is.EqualTo(ExpectedObjectIdsFromEmptyTarget));
+            Assert.That(addedCounts["NetworkObjects"], Is.EqualTo(2));
         }
 
         [Test]
