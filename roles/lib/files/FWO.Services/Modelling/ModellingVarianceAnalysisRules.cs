@@ -311,15 +311,19 @@ namespace FWO.Services.Modelling
         {
             if (specialUserObjects.Count > 0 && disregardedLocations.Count > 0)
             {
-                List<NetworkLocation> surplusSpecUserLocations = [.. networkLocations.Where(n => n.Object.IsSurplus && specialUserObjects.ContainsKey(n.Object.Name.ToLower()))];
+                // Match by name only: the surplus flag is unreliable for multiple special user objects, as
+                // the comparer treats objects without ip as equal, marking only the first of them as surplus.
+                List<NetworkLocation> specUserLocations = [.. networkLocations.Where(n => specialUserObjects.ContainsKey(n.Object.Name.ToLower()))];
                 List<NetworkLocation> remainingPossibleSpecObj = GetPossibleSpecObjects(disregardedLocations, source);
-                if (surplusSpecUserLocations.Count == remainingPossibleSpecObj.Count)
+                // A placeholder area stands in for any number of special user objects, so accept as soon
+                // as both sides are present instead of demanding equal counts (which fails for >1 object).
+                if (specUserLocations.Count > 0 && remainingPossibleSpecObj.Count > 0)
                 {
                     foreach (var location in remainingPossibleSpecObj)
                     {
                         disregardedLocations.Remove(location);
                     }
-                    foreach (var specUser in surplusSpecUserLocations.Select(s => s.Object))
+                    foreach (var specUser in specUserLocations.Select(s => s.Object))
                     {
                         specUser.IsSurplus = false;
                         specialUserObjects[specUser.Name.ToLower()] = true;
@@ -337,15 +341,19 @@ namespace FWO.Services.Modelling
         {
             if (updatableObjects.Count > 0 && disregardedLocations.Count > 0)
             {
-                List<NetworkLocation> surplusUpdObjLocations = [.. networkLocations.Where(n => n.Object.IsSurplus && updatableObjects.ContainsKey(n.Object.Name.ToLower()))];
+                // Match by name only: the surplus flag is unreliable for multiple updatable objects, as
+                // the comparer treats objects without ip as equal, marking only the first of them as surplus.
+                List<NetworkLocation> updObjLocations = [.. networkLocations.Where(n => updatableObjects.ContainsKey(n.Object.Name.ToLower()))];
                 List<NetworkLocation> remainingPossibleUpdatableObj = GetPossibleUpdatableObjects(disregardedLocations, source);
-                if (surplusUpdObjLocations.Count == remainingPossibleUpdatableObj.Count)
+                // A placeholder area stands in for any number of updatable objects, so accept as soon
+                // as both sides are present instead of demanding equal counts (which fails for >1 object).
+                if (updObjLocations.Count > 0 && remainingPossibleUpdatableObj.Count > 0)
                 {
                     foreach (var location in remainingPossibleUpdatableObj)
                     {
                         disregardedLocations.Remove(location);
                     }
-                    foreach (var updObj in surplusUpdObjLocations.Select(s => s.Object))
+                    foreach (var updObj in updObjLocations.Select(s => s.Object))
                     {
                         updObj.IsSurplus = false;
                         updatableObjects[updObj.Name.ToLower()] = true;

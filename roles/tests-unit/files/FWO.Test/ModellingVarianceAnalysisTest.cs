@@ -792,21 +792,27 @@ namespace FWO.Test
             List<ModellingConnection> Connections = [Connection1, Connection2, Connection3];
             userConfig.ModModelledMarker = "XXX";
             userConfig.ModModelledMarkerLocation = MarkerLocation.Comment;
-            ModellingVarianceAnalysis varianceAnalysis = new(varianceAnalysisApiConnection, extStateHandler, userConfig, Application, DefaultInit.DoNothing);
-            ModellingFilter modellingFilter = new() { AnalyseRemainingRules = true };
-            ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections(Connections, modellingFilter);
+            try
+            {
+                ModellingVarianceAnalysis varianceAnalysis = new(varianceAnalysisApiConnection, extStateHandler, userConfig, Application, DefaultInit.DoNothing);
+                ModellingFilter modellingFilter = new() { AnalyseRemainingRules = true };
+                ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections(Connections, modellingFilter);
 
-            ClassicAssert.AreEqual(2, result.ConnsNotImplemented.Count);
-            ClassicAssert.AreEqual("Conn1", result.ConnsNotImplemented[0].Name);
-            ClassicAssert.AreEqual("Conn2", result.ConnsNotImplemented[1].Name);
-            ClassicAssert.AreEqual(1, result.RuleDifferences.Count);
-            ClassicAssert.AreEqual("Conn3", result.RuleDifferences[0].ModelledConnection.Name);
-            ClassicAssert.AreEqual(1, result.UnModelledRules.Count);
-            ClassicAssert.AreEqual(8, result.UnModelledRules[1].Count);
-            ClassicAssert.AreEqual("FWOC1", result.UnModelledRules[1][0].Name);
-            ClassicAssert.AreEqual("xxxFWOC2yyy", result.UnModelledRules[1][1].Name);
-            userConfig.ModModelledMarker = "FWOC";
-            userConfig.ModModelledMarkerLocation = MarkerLocation.Rulename;
+                ClassicAssert.AreEqual(2, result.ConnsNotImplemented.Count);
+                ClassicAssert.AreEqual("Conn1", result.ConnsNotImplemented[0].Name);
+                ClassicAssert.AreEqual("Conn2", result.ConnsNotImplemented[1].Name);
+                ClassicAssert.AreEqual(1, result.RuleDifferences.Count);
+                ClassicAssert.AreEqual("Conn3", result.RuleDifferences[0].ModelledConnection.Name);
+                ClassicAssert.AreEqual(1, result.UnModelledRules.Count);
+                ClassicAssert.AreEqual(11, result.UnModelledRules[1].Count);
+                ClassicAssert.AreEqual("FWOC1", result.UnModelledRules[1][0].Name);
+                ClassicAssert.AreEqual("xxxFWOC2yyy", result.UnModelledRules[1][1].Name);
+            }
+            finally
+            {
+                userConfig.ModModelledMarker = "FWOC";
+                userConfig.ModModelledMarkerLocation = MarkerLocation.Rulename;
+            }
         }
 
         [Test]
@@ -880,6 +886,87 @@ namespace FWO.Test
 
             ClassicAssert.AreEqual(0, reportResult.ConnsNotImplemented.Count);
             ClassicAssert.AreEqual(0, reportResult.RuleDifferences.Count);
+        }
+
+        [Test]
+        public async Task TestAnalyseRuleStatusSingleUpdatableObject()
+        {
+            // Control case: one updatable object mapped to one placeholder area is recognized.
+            userConfig.ModUpdatableObjAreas = "[{\"area_id\":3,\"use_in_src\":false,\"use_in_dst\":true}]";
+            try
+            {
+                ModellingConnection connOneUpdObj = new()
+                {
+                    Id = 9,
+                    Name = "Conn9",
+                    SourceAppServers = [new() { Content = AS1 }],
+                    DestinationAreas = [new() { Content = new ModellingNetworkArea() { Id = 3, Name = "NA-UpdArea" } }],
+                    Services = [new() { Content = Svc1 }],
+                    ExtraConfigs = [new() { ExtraConfigType = "updatable_obj", ExtraConfigText = "UpdObj1" }]
+                };
+                ModellingVarianceAnalysis varianceAnalysis = new(varianceAnalysisApiConnection, extStateHandler, userConfig, Application, DefaultInit.DoNothing);
+                ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections([connOneUpdObj], new(), false);
+
+                ClassicAssert.AreEqual(0, result.ConnsNotImplemented.Count);
+                ClassicAssert.AreEqual(0, result.RuleDifferences.Count);
+            }
+            finally
+            {
+                userConfig.ModUpdatableObjAreas = "";
+            }
+        }
+
+        [Test]
+        public async Task TestAnalyseRuleStatusMultipleUpdatableObjects()
+        {
+            // Issue #4979: two updatable objects (rule FWOC8: UpdObj1 + UpdObj2) modelled by a single
+            // placeholder area must still be recognized as implementation.
+            userConfig.ModUpdatableObjAreas = "[{\"area_id\":3,\"use_in_src\":false,\"use_in_dst\":true}]";
+            try
+            {
+                ModellingConnection connTwoUpdObj = new()
+                {
+                    Id = 8,
+                    Name = "Conn8",
+                    SourceAppServers = [new() { Content = AS1 }],
+                    DestinationAreas = [new() { Content = new ModellingNetworkArea() { Id = 3, Name = "NA-UpdArea" } }],
+                    Services = [new() { Content = Svc1 }],
+                    ExtraConfigs = [new() { ExtraConfigType = "updatable_obj", ExtraConfigText = "UpdObj1" },
+                                    new() { ExtraConfigType = "updatable_obj", ExtraConfigText = "UpdObj2" }]
+                };
+                ModellingVarianceAnalysis varianceAnalysis = new(varianceAnalysisApiConnection, extStateHandler, userConfig, Application, DefaultInit.DoNothing);
+                ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections([connTwoUpdObj], new(), false);
+
+                ClassicAssert.AreEqual(0, result.ConnsNotImplemented.Count);
+                ClassicAssert.AreEqual(0, result.RuleDifferences.Count);
+            }
+            finally
+            {
+                userConfig.ModUpdatableObjAreas = "";
+            }
+        }
+
+        [Test]
+        public async Task TestAnalyseRuleStatusMultipleSpecialUserObjects()
+        {
+            // Issue #4979: two special user objects (rule FWOC10: SpecObj1 + SpecObj2 in source) modelled
+            // by a single placeholder area must still be recognized as implementation.
+            ModellingConnection connTwoSpecUsers = new()
+            {
+                Id = 10,
+                Name = "Conn10",
+                SourceAppServers = [new() { Content = AS1 }],
+                SourceAreas = [new() { Content = new ModellingNetworkArea() { Id = 1, Name = "NA-SpecUserArea" } }],
+                DestinationAppRoles = [new() { Content = AR3 }],
+                Services = [new() { Content = Svc1 }],
+                ExtraConfigs = [new() { ExtraConfigType = "IDA_user", ExtraConfigText = "SpecObj1" },
+                                new() { ExtraConfigType = "IDA_user", ExtraConfigText = "SpecObj2" }]
+            };
+            ModellingVarianceAnalysis varianceAnalysis = new(varianceAnalysisApiConnection, extStateHandler, userConfig, Application, DefaultInit.DoNothing);
+            ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections([connTwoSpecUsers], new(), false);
+
+            ClassicAssert.AreEqual(0, result.ConnsNotImplemented.Count);
+            ClassicAssert.AreEqual(0, result.RuleDifferences.Count);
         }
 
         [Test]
