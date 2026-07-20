@@ -16,6 +16,10 @@ namespace FWO.Test
     [Parallelizable]
     internal class CheckPointTicketTest
     {
+        private static readonly string[] kExpectedExistingHostEndpoints = ["add-host", "show-host", "publish"];
+        private static readonly string[] kExpectedRetriedHostEndpoints = ["add-host", "show-host", "add-host"];
+        private static readonly string[] kExpectedExistingNetworkEndpoints = ["add-network", "show-network", "publish"];
+
         private readonly ExternalTicketSystem checkPointSystem = new()
         {
             Id = 1,
@@ -351,7 +355,7 @@ namespace FWO.Test
             RestResponse<int> response = await ticket.CreateExternalTicket();
 
             ClassicAssert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-            CollectionAssert.AreEqual(new[] { "add-host", "show-host", "publish" }, checkPointClient.CalledEndpoints);
+            CollectionAssert.AreEqual(kExpectedExistingHostEndpoints, checkPointClient.CalledEndpoints);
         }
 
         [Test]
@@ -368,7 +372,7 @@ namespace FWO.Test
             RestResponse<int> response = await ticket.CreateExternalTicket();
 
             ClassicAssert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-            CollectionAssert.AreEqual(new[] { "add-host", "show-host", "add-host" }, checkPointClient.CalledEndpoints);
+            CollectionAssert.AreEqual(kExpectedRetriedHostEndpoints, checkPointClient.CalledEndpoints);
             StringAssert.Contains("\"ignore-warnings\":true", checkPointClient.RequestBodies[^1] ?? "");
         }
 
@@ -386,7 +390,7 @@ namespace FWO.Test
             RestResponse<int> response = await ticket.CreateExternalTicket();
 
             ClassicAssert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-            CollectionAssert.AreEqual(new[] { "add-network", "show-network", "publish" }, checkPointClient.CalledEndpoints);
+            CollectionAssert.AreEqual(kExpectedExistingNetworkEndpoints, checkPointClient.CalledEndpoints);
         }
 
         [Test]

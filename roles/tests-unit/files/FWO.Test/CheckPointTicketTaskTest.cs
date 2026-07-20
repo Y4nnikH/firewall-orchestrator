@@ -16,6 +16,11 @@ namespace FWO.Test
     [Parallelizable]
     internal class CheckPointTicketTaskTest
     {
+        private static readonly string[] kExpectedAddedMembers = ["A-host", "z-host"];
+        private static readonly string[] kExpectedRemovedMembers = ["delete-host"];
+        private static readonly string[] kExpectedRequiredMemberObjectNames = ["z-host"];
+        private static readonly string[] kExpectedRequiredMemberNames = ["host", "range"];
+
         [Test]
         public void FillTaskText_UsesExternalManagementDataAndTaskPlaceholders()
         {
@@ -101,9 +106,9 @@ namespace FWO.Test
 
             Assert.Multiple(() =>
             {
-                Assert.That(additions, Is.EqualTo(new[] { "A-host", "z-host" }));
-                Assert.That(removals, Is.EqualTo(new[] { "delete-host" }));
-                Assert.That(objects.Select(GetObjectName), Is.EqualTo(new[] { "z-host" }));
+                Assert.That(additions, Is.EqualTo(kExpectedAddedMembers));
+                Assert.That(removals, Is.EqualTo(kExpectedRemovedMembers));
+                Assert.That(objects.Select(GetObjectName), Is.EqualTo(kExpectedRequiredMemberObjectNames));
                 Assert.That(InvokeJson(ticketTask, "RenderEmptyGroupCreateBody")["name"]!.GetValue<string>(), Is.EqualTo("cp-group"));
                 Assert.That(InvokeJson(ticketTask, "RenderGroupMembersAddBody", additions)["members"]!["add"]!.AsArray().Count, Is.EqualTo(2));
                 Assert.That(InvokeJson(ticketTask, "RenderGroupMembersRemoveBody", removals)["members"]!["remove"]![0]!.GetValue<string>(), Is.EqualTo("delete-host"));
@@ -127,7 +132,7 @@ namespace FWO.Test
             Assert.Multiple(() =>
             {
                 Assert.That(objects.Select(GetObjectType), Is.EqualTo(new[] { ObjectType.Host, ObjectType.Network, ObjectType.IPRange }));
-                Assert.That(InvokeStringList(ticketTask, "GetMembersToAdd"), Is.EqualTo(new[] { "host", "range" }));
+                Assert.That(InvokeStringList(ticketTask, "GetMembersToAdd"), Is.EqualTo(kExpectedRequiredMemberNames));
             });
 
             task.Elements = [new WfReqElement { Name = "missing", Field = ElemFieldType.source.ToString(), RequestAction = "create" }];

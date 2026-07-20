@@ -11,12 +11,14 @@ namespace FWO.Test
     [Parallelizable]
     internal class CheckPointTicketHelperTest
     {
+        private static readonly string[] kFindJsonValuePropertyNames = ["value", "missing"];
+
         [Test]
         public void JsonHelpers_FindNestedValuesAndMessages()
         {
             using JsonDocument document = JsonDocument.Parse("{\"outer\":[{\"value\":\"found\",\"message\":\"Expected failure\"}]}");
 
-            string? value = InvokeStatic<string?>("FindJsonValue", document.RootElement, new[] { "value", "missing" });
+            string? value = InvokeStatic<string?>("FindJsonValue", document.RootElement, kFindJsonValuePropertyNames);
             bool messageFound = InvokeStatic<bool>("HasMatchingMessage", document.RootElement, "expected");
             bool messageMissing = InvokeStatic<bool>("HasMatchingMessage", document.RootElement, "different");
 

@@ -12,6 +12,9 @@ namespace FWO.Test
     [Parallelizable]
     internal class CheckPointClientTest
     {
+        private static readonly string[] kSessionHeaderValues = ["session-1"];
+        private static readonly string[] kSessionRequestPaths = ["login", "discard", "logout"];
+
         private sealed class RecordingHandler : HttpMessageHandler
         {
             private readonly Queue<HttpResponseMessage> responses;
@@ -95,7 +98,7 @@ namespace FWO.Test
                 Assert.That(client.CurrentSessionId, Is.EqualTo("session-1"));
                 Assert.That(handler.Requests, Has.Count.EqualTo(2));
                 Assert.That(handler.Requests[0].RequestUri!.AbsolutePath, Is.EqualTo("/web_api/login"));
-                Assert.That(handler.Requests[1].Headers.GetValues("X-chkp-sid"), Is.EqualTo(new[] { "session-1" }));
+                Assert.That(handler.Requests[1].Headers.GetValues("X-chkp-sid"), Is.EqualTo(kSessionHeaderValues));
                 Assert.That(handler.Requests[1].Headers.Accept.Single().MediaType, Is.EqualTo("application/json"));
             });
         }
@@ -128,7 +131,7 @@ namespace FWO.Test
             Assert.Multiple(() =>
             {
                 Assert.That(client.CurrentSessionId, Is.Null);
-                Assert.That(handler.Requests.Select(request => request.RequestUri!.Segments[^1]), Is.EqualTo(new[] { "login", "discard", "logout" }));
+                Assert.That(handler.Requests.Select(request => request.RequestUri!.Segments[^1]), Is.EqualTo(kSessionRequestPaths));
                 Assert.That(handler.Requests.Skip(1).All(request => request.Headers.GetValues("X-chkp-sid").Single() == "session-2"), Is.True);
             });
         }
