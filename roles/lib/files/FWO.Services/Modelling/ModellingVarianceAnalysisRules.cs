@@ -285,6 +285,14 @@ namespace FWO.Services.Modelling
             List<ModellingAppRoleWrapper> appRoles = source ? conn.SourceAppRoles : conn.DestinationAppRoles;
             List<ModellingNetworkAreaWrapper> areas = source ? conn.SourceAreas : conn.DestinationAreas;
             List<ModellingNwGroupWrapper> otherGroups = source ? conn.SourceOtherGroups : conn.DestinationOtherGroups;
+            int specialUserAreaCount = ModellingNetworkAreaWrapper.Resolve(areas)
+                .Select(area => (long)area.Id)
+                .Distinct()
+                .Count(areaId => (source ? AllowedSrcSpecUserAreas : AllowedDestSpecUserAreas).Contains(areaId));
+            int updatableObjectAreaCount = ModellingNetworkAreaWrapper.Resolve(areas)
+                .Select(area => (long)area.Id)
+                .Distinct()
+                .Count(areaId => (source ? AllowedSrcUpdatableObjAreas : AllowedDestUpdatableObjAreas).Contains(areaId));
 
             foreach (var loc in networkLocations)
             {
@@ -302,12 +310,13 @@ namespace FWO.Services.Modelling
             {
                 return false;
             }
-            AdjustWithSpecialUserObjects(networkLocations, specialUserObjects, source, ref disregardedLocations);
-            AdjustWithUpdatableObjects(networkLocations, updatableObjects, source, ref disregardedLocations);
+            AdjustWithSpecialUserObjects(networkLocations, specialUserObjects, source, specialUserAreaCount, ref disregardedLocations);
+            AdjustWithUpdatableObjects(networkLocations, updatableObjects, source, updatableObjectAreaCount, ref disregardedLocations);
             return disregardedLocations.Count == 0 && networkLocations.Where(n => n.Object.IsSurplus).ToList().Count == 0;
         }
 
-        private void AdjustWithSpecialUserObjects(NetworkLocation[] networkLocations, Dictionary<string, bool> specialUserObjects, bool source, ref List<NetworkLocation> disregardedLocations)
+        private void AdjustWithSpecialUserObjects(NetworkLocation[] networkLocations, Dictionary<string, bool> specialUserObjects, bool source,
+            int specialUserAreaCount, ref List<NetworkLocation> disregardedLocations)
         {
             if (specialUserObjects.Count > 0 && disregardedLocations.Count > 0)
             {
@@ -320,7 +329,7 @@ namespace FWO.Services.Modelling
                 List<NetworkLocation> remainingPossibleSpecObj = GetPossibleSpecObjects(disregardedLocations, source);
                 // A placeholder area stands in for any number of special user objects (so N objects cover 1 area),
                 // but a single object must not cover several areas - require at least as many objects as areas.
-                if (remainingPossibleSpecObj.Count > 0 && specUserLocations.Count >= remainingPossibleSpecObj.Count)
+                if (remainingPossibleSpecObj.Count > 0 && specUserLocations.Count >= specialUserAreaCount)
                 {
                     foreach (var location in remainingPossibleSpecObj)
                     {
@@ -340,7 +349,8 @@ namespace FWO.Services.Modelling
             return [.. disregardedLocations.Where(l => l.Object.Type.Name == ObjectType.Group && (source ? AllowedSrcSpecUserAreas.Contains(l.Object.Id) : AllowedDestSpecUserAreas.Contains(l.Object.Id)))];
         }
 
-        private void AdjustWithUpdatableObjects(NetworkLocation[] networkLocations, Dictionary<string, bool> updatableObjects, bool source, ref List<NetworkLocation> disregardedLocations)
+        private void AdjustWithUpdatableObjects(NetworkLocation[] networkLocations, Dictionary<string, bool> updatableObjects, bool source,
+            int updatableObjectAreaCount, ref List<NetworkLocation> disregardedLocations)
         {
             if (updatableObjects.Count > 0 && disregardedLocations.Count > 0)
             {
@@ -353,7 +363,7 @@ namespace FWO.Services.Modelling
                 List<NetworkLocation> remainingPossibleUpdatableObj = GetPossibleUpdatableObjects(disregardedLocations, source);
                 // A placeholder area stands in for any number of updatable objects (so N objects cover 1 area),
                 // but a single object must not cover several areas - require at least as many objects as areas.
-                if (remainingPossibleUpdatableObj.Count > 0 && updObjLocations.Count >= remainingPossibleUpdatableObj.Count)
+                if (remainingPossibleUpdatableObj.Count > 0 && updObjLocations.Count >= updatableObjectAreaCount)
                 {
                     foreach (var location in remainingPossibleUpdatableObj)
                     {
