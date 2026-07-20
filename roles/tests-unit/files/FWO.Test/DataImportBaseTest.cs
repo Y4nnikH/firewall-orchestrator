@@ -54,7 +54,7 @@ namespace FWO.Test
                 Assert.Ignore("Script execution test requires a Unix-like environment.");
             }
 
-            string tempDir = Path.Combine(Path.GetTempPath(), $"fwo-import-test-{Guid.NewGuid():N}");
+            string tempDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"fwo-import-test-{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
 
             try
