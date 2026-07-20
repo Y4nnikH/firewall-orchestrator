@@ -281,23 +281,61 @@ namespace FWO.Services.Modelling
         private bool IsNwImplementation(NetworkLocation[] networkLocations, Dictionary<string, bool> specialUserObjects,
             Dictionary<string, bool> updatableObjects, ModellingConnection conn, bool source, ref List<NetworkLocation> disregardedLocations, bool continueAnalysis)
         {
-            List<ModellingAppServerWrapper> appServers = source ? conn.SourceAppServers : conn.DestinationAppServers;
-            List<ModellingAppRoleWrapper> appRoles = source ? conn.SourceAppRoles : conn.DestinationAppRoles;
-            List<ModellingNetworkAreaWrapper> areas = source ? conn.SourceAreas : conn.DestinationAreas;
-            List<ModellingNwGroupWrapper> otherGroups = source ? conn.SourceOtherGroups : conn.DestinationOtherGroups;
-            int specialUserAreaCount = ModellingNetworkAreaWrapper.Resolve(areas)
-                .Select(area => (long)area.Id)
-                .Distinct()
-                .Count(areaId => (source ? AllowedSrcSpecUserAreas : AllowedDestSpecUserAreas).Contains(areaId));
-            int updatableObjectAreaCount = ModellingNetworkAreaWrapper.Resolve(areas)
-                .Select(area => (long)area.Id)
-                .Distinct()
-                .Count(areaId => (source ? AllowedSrcUpdatableObjAreas : AllowedDestUpdatableObjAreas).Contains(areaId));
+            (List<ModellingAppServerWrapper> appServers, List<ModellingAppRoleWrapper> appRoles,
+                List<ModellingNetworkAreaWrapper> areas, List<ModellingNwGroupWrapper> otherGroups) = GetNwImplementationConfiguration(conn, source);
+            int specialUserAreaCount = GetRelevantAreaCount(areas, source ? AllowedSrcSpecUserAreas : AllowedDestSpecUserAreas);
+            int updatableObjectAreaCount = GetRelevantAreaCount(areas, source ? AllowedSrcUpdatableObjAreas : AllowedDestUpdatableObjAreas);
 
-            foreach (var loc in networkLocations)
+            ResetSurplusFlags(networkLocations);
+            if (!CompareNetworkLocations(networkLocations, appServers, appRoles, areas, otherGroups, disregardedLocations, continueAnalysis))
             {
-                loc.Object.IsSurplus = false;
+                return false;
             }
+            AdjustWithSpecialUserObjects(networkLocations, specialUserObjects, source, specialUserAreaCount, ref disregardedLocations);
+            AdjustWithUpdatableObjects(networkLocations, updatableObjects, source, updatableObjectAreaCount, ref disregardedLocations);
+            return disregardedLocations.Count == 0 && networkLocations.Where(n => n.Object.IsSurplus).ToList().Count == 0;
+        }
+
+        /// <summary>
+        /// Gets the modelled network objects for the requested connection direction.
+        /// </summary>
+        private static (List<ModellingAppServerWrapper> AppServers, List<ModellingAppRoleWrapper> AppRoles,
+            List<ModellingNetworkAreaWrapper> Areas, List<ModellingNwGroupWrapper> OtherGroups) GetNwImplementationConfiguration(ModellingConnection conn, bool source)
+        {
+            return source
+                ? (conn.SourceAppServers, conn.SourceAppRoles, conn.SourceAreas, conn.SourceOtherGroups)
+                : (conn.DestinationAppServers, conn.DestinationAppRoles, conn.DestinationAreas, conn.DestinationOtherGroups);
+        }
+
+        /// <summary>
+        /// Counts the distinct modelled areas that are configured for special handling.
+        /// </summary>
+        private static int GetRelevantAreaCount(List<ModellingNetworkAreaWrapper> areas, List<long> allowedAreaIds)
+        {
+            return ModellingNetworkAreaWrapper.Resolve(areas)
+                .Select(area => (long)area.Id)
+                .Distinct()
+                .Count(allowedAreaIds.Contains);
+        }
+
+        /// <summary>
+        /// Clears surplus markers left by a preceding network-object comparison.
+        /// </summary>
+        private static void ResetSurplusFlags(NetworkLocation[] networkLocations)
+        {
+            foreach (var location in networkLocations)
+            {
+                location.Object.IsSurplus = false;
+            }
+        }
+
+        /// <summary>
+        /// Compares network areas, application servers, and optionally unresolved network groups.
+        /// </summary>
+        private bool CompareNetworkLocations(NetworkLocation[] networkLocations, List<ModellingAppServerWrapper> appServers,
+            List<ModellingAppRoleWrapper> appRoles, List<ModellingNetworkAreaWrapper> areas, List<ModellingNwGroupWrapper> otherGroups,
+            List<NetworkLocation> disregardedLocations, bool continueAnalysis)
+        {
             if (!CompareNwAreas(networkLocations, areas, disregardedLocations, continueAnalysis) && !continueAnalysis)
             {
                 return false;
@@ -306,13 +344,9 @@ namespace FWO.Services.Modelling
             {
                 return false;
             }
-            if (!ruleRecognitionOption.NwResolveGroup && !CompareRemainingNwGroups(networkLocations, appRoles, otherGroups, disregardedLocations, continueAnalysis) && !continueAnalysis)
-            {
-                return false;
-            }
-            AdjustWithSpecialUserObjects(networkLocations, specialUserObjects, source, specialUserAreaCount, ref disregardedLocations);
-            AdjustWithUpdatableObjects(networkLocations, updatableObjects, source, updatableObjectAreaCount, ref disregardedLocations);
-            return disregardedLocations.Count == 0 && networkLocations.Where(n => n.Object.IsSurplus).ToList().Count == 0;
+            return ruleRecognitionOption.NwResolveGroup
+                || CompareRemainingNwGroups(networkLocations, appRoles, otherGroups, disregardedLocations, continueAnalysis)
+                || continueAnalysis;
         }
 
         private void AdjustWithSpecialUserObjects(NetworkLocation[] networkLocations, Dictionary<string, bool> specialUserObjects, bool source,
