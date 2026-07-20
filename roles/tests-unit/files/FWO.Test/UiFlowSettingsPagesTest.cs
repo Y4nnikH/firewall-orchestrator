@@ -399,12 +399,12 @@ namespace FWO.Test
         }
 
         [Test]
-        public async Task FlowNetworkObjectsPage_RecalculateNames_UsesNamingManagementCandidates()
+        public async Task FlowGeneralPage_RecalculateNames_UsesNamingManagementCandidates()
         {
             await using BunitContext context = CreateNetworkObjectsContext(out FlowNetworkObjectsNamingApiConn apiConnection);
 
-            IRenderedComponent<SettingsFlowNetworkObjects> component = RenderPage<SettingsFlowNetworkObjects>(context);
-            FieldInfo? namingManagementField = typeof(SettingsFlowNetworkObjects).GetField("namingCustomObjectManagements", BindingFlags.Instance | BindingFlags.NonPublic);
+            IRenderedComponent<SettingsFlowGeneral> component = RenderPage<SettingsFlowGeneral>(context);
+            FieldInfo? namingManagementField = typeof(SettingsFlowGeneral).GetField("namingCustomObjectManagements", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(namingManagementField, Is.Not.Null);
             component.WaitForAssertion(() =>
             {
@@ -412,7 +412,7 @@ namespace FWO.Test
                 Assert.That(namingManagements, Has.Count.EqualTo(2));
             });
 
-            MethodInfo? saveNamingSource = typeof(SettingsFlowNetworkObjects).GetMethod("SaveNamingSource", BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo? saveNamingSource = typeof(SettingsFlowGeneral).GetMethod("SaveNamingSource", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(saveNamingSource, Is.Not.Null);
             await component.InvokeAsync(async () => await (Task)saveNamingSource!.Invoke(component.Instance, null)!);
 
@@ -424,7 +424,7 @@ namespace FWO.Test
         }
 
         [Test]
-        public async Task FlowNetworkObjectsPage_ShowsSpinnerOnBusySaveButton()
+        public async Task FlowNetworkObjectsPage_ShowsSpinnerOnBusyActionButtons()
         {
             await using BunitContext context = CreateNetworkObjectsContext(out _);
 
@@ -434,9 +434,11 @@ namespace FWO.Test
 
             component.WaitForAssertion(() =>
             {
-                var saveButton = component.FindAll("button.btn.btn-sm.btn-primary")[0];
-                Assert.That(saveButton.InnerHtml, Does.Contain("spinner-border"));
-                Assert.That(saveButton.GetAttribute("disabled"), Is.Not.Null);
+                var busyButtons = component.FindAll("button")
+                    .Where(button => button.InnerHtml.Contains("spinner-border", StringComparison.Ordinal))
+                    .ToList();
+                Assert.That(busyButtons, Is.Not.Empty);
+                Assert.That(busyButtons.All(button => button.GetAttribute("disabled") != null), Is.True);
             });
         }
 

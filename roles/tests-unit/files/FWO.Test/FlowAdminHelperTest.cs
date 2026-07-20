@@ -587,6 +587,23 @@ namespace FWO.Test
         }
 
         [Test]
+        public void FormatNetworkObjectTechnicalDetails_CanSuppressTechnicalIdentifier()
+        {
+            NetworkObject candidate = new()
+            {
+                Id = 42,
+                Name = "candidate",
+                IP = "",
+                IpEnd = "",
+                Uid = "uid-42"
+            };
+
+            string details = FlowAdminHelper.FormatNetworkObjectTechnicalDetails(candidate, false);
+
+            Assert.That(details, Is.EqualTo("candidate"));
+        }
+
+        [Test]
         public void FormatFlowNwObjectTechnicalDetails_UsesIpRangeWhenAvailable()
         {
             FlowNwObject candidate = new()
@@ -655,6 +672,24 @@ namespace FWO.Test
             Assert.That(details, Does.Contain("80-443"));
             Assert.That(details, Does.Contain("TCP"));
             Assert.That(details, Does.Not.Contain("6"));
+        }
+
+        [Test]
+        public void FormatNetworkServiceTechnicalDetails_CanSuppressTechnicalIdentifier()
+        {
+            NetworkService candidate = new()
+            {
+                Id = 54,
+                Name = "https",
+                Uid = "uid-54",
+                DestinationPort = 443,
+                DestinationPortEnd = 443,
+                Protocol = new NetworkProtocol { Id = 6, Name = "TCP" }
+            };
+
+            string details = FlowAdminHelper.FormatNetworkServiceTechnicalDetails(candidate, false);
+
+            Assert.That(details, Is.EqualTo("https (443/TCP)"));
         }
 
         [Test]

@@ -144,10 +144,10 @@ else
     </SummaryContent>
     <ChildContent Context="resolver">
         <Column TableItem="NetworkObject" Title="@(userConfig.GetText("uid"))" Field="@(nwObject => nwObject.Uid)" Sortable="true" Filterable="true" />
-        <Column TableItem="NetworkObject" Title="@(userConfig.GetText("details"))" Field="@(nwObject => nwObject.Name)" Sortable="false" Filterable="false" Context="nwObject">
+        <Column TableItem="NetworkObject" Title="@(userConfig.GetText("name"))" Field="@(nwObject => nwObject.Name)" Sortable="false" Filterable="false" Context="nwObject">
             <Template>
                 <span class="d-inline-block rounded px-2 py-1 @(resolver.IsSelected(nwObject) ? "bg-warning-subtle fw-bold" : "")">
-                    @FlowAdminHelper.FormatNetworkObjectTechnicalDetails(nwObject)
+                    @FlowAdminHelper.FormatNetworkObjectTechnicalDetails(nwObject, false)
                 </span>
             </Template>
         </Column>

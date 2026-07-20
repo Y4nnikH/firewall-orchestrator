@@ -2,94 +2,20 @@
 
 @using FWO.Api.Client.Queries
 @using FWO.Config.Api
-@using FWO.Config.Api.Data
 @using FWO.Data
 @using FWO.Data.Flow
 @using Microsoft.AspNetCore.Components.Authorization
-@using Newtonsoft.Json
-@using System.Text.Json.Serialization
 
 @attribute [Authorize(Roles = $"{Roles.Admin}")]
 
 @inject ApiConnection apiConnection
-@inject GlobalConfig globalConfig
 @inject UserConfig userConfig
 
 <div class="input-group">
     <h3>@(userConfig.GetText("network_objects"))</h3>
     <HelpLink Page="settings/flows/networkobjects"/>
 </div>
-<div class="mb-2">
-    <label class="form-label form-label-sm mb-1">@(userConfig.GetText("flow_naming")):</label>
-    <div>
-        @if (namingManagementRanking.Count > 0)
-        {
-            <table class="table table-sm table-bordered th-bg-secondary mb-0 w-auto">
-                <thead>
-                    <tr>
-                        <th class="text-nowrap">@(userConfig.GetText("sort_order"))</th>
-                        <th>@(userConfig.GetText("management"))</th>
-                        <th class="text-nowrap">@(userConfig.GetText("actions"))</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (int index = 0; index < namingManagementRanking.Count; index++)
-                    {
-                        Management management = namingManagementRanking[index];
-                        <tr @key="management.Id">
-                            <td>@(index + 1)</td>
-                            <td>@management.Name</td>
-                            <td>
-                                <div class="btn-group">
-                                    <button type="button" class="btn btn-sm btn-secondary" disabled="@(index == 0)" @onclick:stopPropagation="true" @onclick="() => MoveNamingManagement(management, -1)" title="@(userConfig.GetText("move_up"))">
-                                        <span class="@Icons.CollapseUp"></span>
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-secondary" disabled="@(index == namingManagementRanking.Count - 1)" @onclick:stopPropagation="true" @onclick="() => MoveNamingManagement(management, 1)" title="@(userConfig.GetText("move_down"))">
-                                        <span class="@Icons.CollapseDown"></span>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        }
-        else
-        {
-            <div class="text-muted small">-</div>
-        }
-        <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-            <div class="btn-group">
-                <button type="button" class="btn btn-sm btn-primary" disabled="@workInProgress" @onclick="SaveNamingSource">
-                    @if (workInProgress)
-                    {
-                        <Loading CssClass="me-1" />
-                    }
-                    @(DisplayService.DisplayButton(userConfig, "save", Icons.Save))
-                </button>
-                <button type="button" class="btn btn-sm btn-warning" disabled="@workInProgress" @onclick="OpenRecalculateConfirm">@(DisplayService.DisplayButton(userConfig, "recalculate_flow_names", Icons.Refresh))</button>
-            </div>
-            <div class="text-muted small">
-                @($"{userConfig.GetText("current")}: {SelectedNamingManagement?.Name ?? "-"}")
-            </div>
-        </div>
-    </div>
-</div>
 
-@* Danger button: completely reset flow db *@
-<div class="mb-2">
-    <label class="form-label form-label-sm mb-1">@(userConfig.GetText("reset_flow_db")):</label>
-    <div class="d-flex flex-wrap align-items-center gap-2">
-        <button type="button" class="btn btn-sm btn-danger" disabled="@workInProgress" @onclick="OpenResetFlowDbConfirm">
-            @(DisplayService.DisplayButton(userConfig, "reset_flow_db", Icons.Refresh))
-        </button>
-        <div class="text-muted small">
-            @(userConfig.GetText("reset_flow_db_hint"))
-        </div>
-    </div>
-</div>
-
-<hr class="my-4" />
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
     <h4 class="mb-0">@(userConfig.GetText("duplicate_objects"))</h4>
 </div>
@@ -247,10 +173,10 @@ else
     </SummaryContent>
     <ChildContent Context="resolver">
         <Column TableItem="NetworkObject" Title="@(userConfig.GetText("uid"))" Field="@(nwObject => nwObject.Uid)" Sortable="true" Filterable="true" />
-        <Column TableItem="NetworkObject" Title="@(userConfig.GetText("details"))" Sortable="false" Filterable="false" Context="nwObject">
+        <Column TableItem="NetworkObject" Title="@(userConfig.GetText("name"))" Sortable="false" Filterable="false" Context="nwObject">
             <Template>
                 <span class="d-inline-block rounded px-2 py-1 @(resolver.IsSelected(nwObject) ? "bg-warning-subtle fw-bold" : "")">
-                    @FlowAdminHelper.FormatNetworkObjectTechnicalDetails(nwObject)
+                    @FlowAdminHelper.FormatNetworkObjectTechnicalDetails(nwObject, false)
                 </span>
             </Template>
         </Column>
@@ -353,12 +279,6 @@ else
     </Footer>
 </PopUp>
 
-<Confirm @bind-Display="RecalculateConfirmMode" PerformAction="RecalculateFlowNames" Title="@(userConfig.GetText("recalculate_flow_names"))"
-         Message="@(userConfig.GetText("recalculate_flow_names_confirm"))" />
-
-<Confirm @bind-Display="ResetFlowDbConfirmMode" PerformAction="ResetFlowDb" Title="@(userConfig.GetText("reset_flow_db"))"
-         Message="@(userConfig.GetText("reset_flow_db_confirm"))" />
-
 <InProgress Display="workInProgress"/>
 
 @code
@@ -368,24 +288,17 @@ else
 
     private List<FlowNwObject> flowNwObjects = [];
     private List<Management> selectableManagements = [];
-    private List<Management> namingManagementRanking = [];
     private List<Management> customObjectManagements = [];
-    private List<Management> namingCustomObjectManagements = [];
     private List<FlowNwObjectDuplicateGroup> duplicateGroups = [];
     private List<CustomObjectManagementSelection> customObjectSelections = [];
-    private ConfigData? configData;
     private FlowNwObjectDuplicateGroup? SelectedDuplicateGroup;
     private FlowNwObject NewCustomFlowNwObject = new();
     private bool workInProgress = false;
     private string objectSearchText = "";
     private bool EditNwObjectMode = false;
-    private bool RecalculateConfirmMode = false;
-    private bool ResetFlowDbConfirmMode = false;
     private bool ResolveDuplicateMode = false;
     private bool CreateCustomObjectMode = false;
     private FlowNwObject EditFlowNwObject = new();
-
-    private Management? SelectedNamingManagement => namingManagementRanking.FirstOrDefault();
 
     protected override async Task OnInitializedAsync()
     {
@@ -405,12 +318,9 @@ else
                 return;
             }
 
-            configData = await globalConfig.GetEditableConfig();
             selectableManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowSelectableManagements);
-            InitializeNamingManagementRanking();
             flowNwObjects = await apiConnection.SendQueryAsync<List<FlowNwObject>>(FlowQueries.getFlowNwObjectCatalog);
             await LoadCustomObjectManagements();
-            await LoadNamingCustomObjectManagements();
             duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowNwObjects, customObjectManagements);
             customObjectSelections = [];
 
@@ -420,177 +330,6 @@ else
         {
             workInProgress = false;
             DisplayMessageInUi(exception, userConfig.GetText("network_objects"), "", true);
-        }
-
-        StateHasChanged();
-    }
-
-    private async Task SaveNamingSource()
-    {
-        try
-        {
-            if (configData == null)
-            {
-                return;
-            }
-
-            workInProgress = true;
-            StateHasChanged();
-
-            await SaveNamingManagementRankingAsync();
-
-            List<FlowNwObject> objectsToBackfill = [.. flowNwObjects.Where(nwObject => string.IsNullOrWhiteSpace(nwObject.Name))];
-            foreach (FlowNwObject nwObject in objectsToBackfill)
-            {
-                string resolvedName = ResolveMissingFlowObjectName(nwObject, GetNamingManagementRankingIds(), "");
-                if (string.IsNullOrWhiteSpace(resolvedName))
-                {
-                    continue;
-                }
-
-                FlowNwObject updatedObject = await apiConnection.SendQueryAsync<FlowNwObject>(FlowMutations.updateFlowNwObject, new
-                {
-                    nwobjId = nwObject.Id,
-                    name = resolvedName,
-                    showInRequestModule = nwObject.ShowInRequestModule
-                });
-                ReplaceFlowObjectInCatalog(updatedObject);
-            }
-
-            DisplayMessageInUi(null, userConfig.GetText("flow_naming"), userConfig.GetText("U5301"), false);
-            workInProgress = false;
-        }
-        catch (Exception exception)
-        {
-            workInProgress = false;
-            DisplayMessageInUi(exception, userConfig.GetText("flow_naming"), "", true);
-        }
-
-        StateHasChanged();
-    }
-
-    private async Task SaveNamingManagementRankingAsync()
-    {
-        if (configData == null)
-        {
-            return;
-        }
-
-        List<int> preferredManagementRanking = GetNamingManagementRankingIds();
-        configData.FlowNamingSourceManagementRanking = FlowNamingHelper.SerializeManagementRanking(preferredManagementRanking);
-        await globalConfig.WriteToDatabase(configData, apiConnection);
-    }
-
-    private void InitializeNamingManagementRanking()
-    {
-        if (configData == null)
-        {
-            namingManagementRanking = [.. selectableManagements];
-            return;
-        }
-
-        List<int> preferredManagementRanking = FlowNamingHelper.ParseManagementRanking(configData.FlowNamingSourceManagementRanking);
-        List<int> normalizedRanking = FlowNamingHelper.NormalizeManagementRanking(
-            preferredManagementRanking,
-            selectableManagements.Select(management => management.Id));
-
-        Dictionary<int, Management> managementById = selectableManagements.ToDictionary(management => management.Id);
-        namingManagementRanking = [.. normalizedRanking
-            .Select(managementId => managementById.GetValueOrDefault(managementId))
-            .Where(management => management != null)
-            .Select(management => management!)];
-    }
-
-    private List<int> GetNamingManagementRankingIds()
-    {
-        return [.. namingManagementRanking.Select(management => management.Id)];
-    }
-
-    private void MoveNamingManagement(Management management, int offset)
-    {
-        int index = namingManagementRanking.FindIndex(item => item.Id == management.Id);
-        int targetIndex = index + offset;
-        if (index < 0 || targetIndex < 0 || targetIndex >= namingManagementRanking.Count)
-        {
-            return;
-        }
-
-        (namingManagementRanking[index], namingManagementRanking[targetIndex]) = (namingManagementRanking[targetIndex], namingManagementRanking[index]);
-    }
-
-    private void OpenRecalculateConfirm()
-    {
-        RecalculateConfirmMode = true;
-    }
-
-    private async Task RecalculateFlowNames()
-    {
-        try
-        {
-            if (configData == null)
-            {
-                return;
-            }
-
-            await SaveNamingManagementRankingAsync();
-            RecalculateConfirmMode = false;
-            workInProgress = true;
-            StateHasChanged();
-
-            List<int> preferredManagementRanking = FlowNamingHelper.ParseManagementRanking(configData.FlowNamingSourceManagementRanking);
-            List<FlowNwObject> objectsToRecalculate = [.. flowNwObjects];
-            foreach (FlowNwObject nwObject in objectsToRecalculate)
-            {
-                string resolvedName = ResolveFlowObjectName(nwObject, preferredManagementRanking, nwObject.Name ?? "");
-                if (string.Equals(resolvedName, nwObject.Name, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                FlowNwObject updatedObject = await apiConnection.SendQueryAsync<FlowNwObject>(FlowMutations.updateFlowNwObject, new
-                {
-                    nwobjId = nwObject.Id,
-                    name = resolvedName,
-                    showInRequestModule = nwObject.ShowInRequestModule
-                });
-                ReplaceFlowObjectInCatalog(updatedObject);
-            }
-
-            workInProgress = false;
-            await Refresh();
-        }
-        catch (Exception exception)
-        {
-            workInProgress = false;
-            DisplayMessageInUi(exception, userConfig.GetText("recalculate_flow_names"), "", true);
-        }
-
-        StateHasChanged();
-    }
-
-    private void OpenResetFlowDbConfirm()
-    {
-        ResetFlowDbConfirmMode = true;
-    }
-
-    private async Task ResetFlowDb()
-    {
-        try
-        {
-            ResetFlowDbConfirmMode = false;
-            workInProgress = true;
-            StateHasChanged();
-
-            await apiConnection.SendQueryAsync<MutationResult>(FlowMutations.resetFlowDB);
-
-            workInProgress = false;
-            await Refresh();
-            DisplayMessageInUi(null, userConfig.GetText("reset_flow_db"), userConfig.GetText("U5330"), false);
-        }
-        catch (Exception exception)
-        {
-            workInProgress = false;
-            DisplayMessageInUi(exception, userConfig.GetText("reset_flow_db"), "", true);
         }
 
         StateHasChanged();
@@ -728,26 +467,6 @@ else
         });
     }
 
-    private async Task LoadNamingCustomObjectManagements()
-    {
-        if (namingCustomObjectManagements.Count > 0)
-        {
-            return;
-        }
-
-        List<int> managementIds = [.. selectableManagements.Select(management => management.Id)];
-        if (managementIds.Count == 0)
-        {
-            namingCustomObjectManagements = [];
-            return;
-        }
-
-        namingCustomObjectManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomObjectNamingCandidates, new
-        {
-            management_id = managementIds
-        });
-    }
-
     private void ReplaceFlowObjectInCatalog(FlowNwObject updatedObject)
     {
         int objectIndex = flowNwObjects.FindIndex(flowObject => flowObject.Id == updatedObject.Id);
@@ -760,7 +479,6 @@ else
     private void UpdateCustomObjectInCatalog(NetworkObject updatedObject)
     {
         UpdateCustomObjectInManagements(customObjectManagements, updatedObject);
-        UpdateCustomObjectInManagements(namingCustomObjectManagements, updatedObject);
     }
 
     private static void UpdateCustomObjectInManagements(List<Management> managements, NetworkObject updatedObject)
@@ -774,71 +492,6 @@ else
                 return;
             }
         }
-    }
-
-    private List<NetworkObject> GetLinkedCustomObjects(long flowNwObjectId)
-    {
-        return [.. namingCustomObjectManagements.SelectMany(management => management.Objects)
-            .Where(nwObject => nwObject.FlowNetworkObjectId == flowNwObjectId)];
-    }
-
-    private string ResolveFlowObjectName(FlowNwObject nwObject, IReadOnlyList<int> preferredManagementRanking, string fallbackName)
-    {
-        List<NetworkObject> linkedObjects = GetLinkedCustomObjects(nwObject.Id);
-        if (linkedObjects.Count == 0)
-        {
-            return fallbackName;
-        }
-
-        string? preferredName = FlowNamingHelper.ResolvePreferredNameByRanking(
-            preferredManagementRanking,
-            managementId => GetBestNameForManagement(linkedObjects, managementId),
-            fallbackName: "");
-        if (!string.IsNullOrWhiteSpace(preferredName))
-        {
-            return preferredName;
-        }
-
-        string? activeName = GetBestName(linkedObjects.Where(nwObject => nwObject.FlowActive));
-        if (!string.IsNullOrWhiteSpace(activeName))
-        {
-            return activeName;
-        }
-
-        string? firstName = GetBestName(linkedObjects);
-        return string.IsNullOrWhiteSpace(firstName) ? fallbackName : firstName;
-    }
-
-    private string ResolveMissingFlowObjectName(FlowNwObject nwObject, IReadOnlyList<int> preferredManagementRanking, string fallbackName)
-    {
-        return string.IsNullOrWhiteSpace(nwObject.Name)
-            ? ResolveFlowObjectName(nwObject, preferredManagementRanking, fallbackName)
-            : nwObject.Name!;
-    }
-
-    private string? GetBestNameForManagement(IEnumerable<NetworkObject> linkedObjects, int managementId)
-    {
-        Management? management = namingCustomObjectManagements.FirstOrDefault(item => item.Id == managementId);
-        if (management == null)
-        {
-            return null;
-        }
-
-        List<NetworkObject> managementObjects = [.. linkedObjects.Where(nwObject => management.Objects.Any(obj => obj.Id == nwObject.Id))];
-        if (managementObjects.Count == 0)
-        {
-            return null;
-        }
-
-        string? activeName = GetBestName(managementObjects.Where(nwObject => nwObject.FlowActive));
-        return !string.IsNullOrWhiteSpace(activeName) ? activeName : GetBestName(managementObjects);
-    }
-
-    private static string? GetBestName(IEnumerable<NetworkObject> linkedObjects)
-    {
-        return linkedObjects
-            .Select(nwObject => nwObject.Name)
-            .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name));
     }
 
     private async Task SaveCustomObject()

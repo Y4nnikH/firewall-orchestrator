@@ -237,10 +237,10 @@ else
     </SummaryContent>
     <ChildContent Context="resolver">
         <Column TableItem="NetworkService" Title="@(userConfig.GetText("uid"))" Field="@(service => service.Uid)" Sortable="true" Filterable="true" />
-        <Column TableItem="NetworkService" Title="@(userConfig.GetText("details"))" Field="@(service => service.Name)" Sortable="false" Filterable="false" Context="service">
+        <Column TableItem="NetworkService" Title="@(userConfig.GetText("name"))" Field="@(service => service.Name)" Sortable="false" Filterable="false" Context="service">
             <Template>
                 <span class="d-inline-block rounded px-2 py-1 @(resolver.IsSelected(service) ? "bg-warning-subtle fw-bold" : "")">
-                    @FlowAdminHelper.FormatNetworkServiceTechnicalDetails(service)
+                    @FlowAdminHelper.FormatNetworkServiceTechnicalDetails(service, false)
                 </span>
             </Template>
         </Column>

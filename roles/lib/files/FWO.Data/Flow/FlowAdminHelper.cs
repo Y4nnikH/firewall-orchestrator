@@ -271,11 +271,16 @@ namespace FWO.Data.Flow
         /// <summary>
         /// Formats the technical details of a network object for duplicate resolution views.
         /// </summary>
-        public static string FormatNetworkObjectTechnicalDetails(NetworkObject candidate)
+        public static string FormatNetworkObjectTechnicalDetails(NetworkObject candidate, bool includeTechnicalId = true)
         {
             string details = HasNoTechnicalAddress(candidate)
                 ? (candidate.Name ?? "")
                 : DisplayBase.DisplayIpWithName(candidate);
+            if (!includeTechnicalId)
+            {
+                return string.IsNullOrWhiteSpace(details) ? "-" : details;
+            }
+
             string technicalId = string.IsNullOrWhiteSpace(candidate.Uid)
                 ? $"#{candidate.Id}"
                 : candidate.Uid;
@@ -360,7 +365,7 @@ namespace FWO.Data.Flow
         /// </summary>
         public static string FormatDuplicateObjectSummary(IEnumerable<NetworkObject>? objects, int maxItems, string emptyLabel, string moreTemplate)
         {
-            return FormatDuplicateObjectSummary(objects, maxItems, emptyLabel, moreTemplate, FormatNetworkObjectTechnicalDetails);
+            return FormatDuplicateObjectSummary(objects, maxItems, emptyLabel, moreTemplate, candidate => FormatNetworkObjectTechnicalDetails(candidate));
         }
 
         /// <summary>
@@ -368,7 +373,7 @@ namespace FWO.Data.Flow
         /// </summary>
         public static string FormatDuplicateObjectSummary(IEnumerable<NetworkService>? objects, int maxItems, string emptyLabel, string moreTemplate)
         {
-            return FormatDuplicateObjectSummary(objects, maxItems, emptyLabel, moreTemplate, FormatNetworkServiceTechnicalDetails);
+            return FormatDuplicateObjectSummary(objects, maxItems, emptyLabel, moreTemplate, candidate => FormatNetworkServiceTechnicalDetails(candidate));
         }
 
         /// <summary>
@@ -441,9 +446,14 @@ namespace FWO.Data.Flow
         /// <summary>
         /// Formats the technical details of a network service for duplicate resolution views.
         /// </summary>
-        public static string FormatNetworkServiceTechnicalDetails(NetworkService candidate)
+        public static string FormatNetworkServiceTechnicalDetails(NetworkService candidate, bool includeTechnicalId = true)
         {
             string details = DisplayBase.DisplayService(candidate, false).ToString();
+            if (!includeTechnicalId)
+            {
+                return string.IsNullOrWhiteSpace(details) ? "-" : details;
+            }
+
             string technicalId = string.IsNullOrWhiteSpace(candidate.Uid)
                 ? $"#{candidate.Id}"
                 : candidate.Uid;
