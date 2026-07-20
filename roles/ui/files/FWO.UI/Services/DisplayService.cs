@@ -7,6 +7,9 @@ namespace FWO.Ui.Services
 {
     public static class DisplayService
     {
+        private const int AutomaticStateId = -1;
+        private const int ConditionalStateId = -2;
+
         public static MarkupString DisplayButton(UserConfig userConfig, string text, string icon, string iconText = "", string objIcon = "")
         {
             string tooltip = userConfig.ModIconify ? $"data-toggle=\"tooltip\" title=\"{@userConfig.PureLine(text)}\"" : "";
@@ -28,12 +31,12 @@ namespace FWO.Ui.Services
 
         public static string DisplayState(UserConfig userConfig, WfState state)
         {
-            if (state.Id == -1)
+            if (state.Id == AutomaticStateId)
             {
                 return userConfig.GetText("automatic");
             }
 
-            if (state.Id == -2)
+            if (state.Id == ConditionalStateId)
             {
                 return userConfig.GetText("Conditional");
             }

@@ -134,7 +134,6 @@
 
     private async Task OnActionTypeChanged(string? actionType)
     {
-        ActAction.ActionType = actionType ?? "";
         await ActionTypeChanged.InvokeAsync(actionType);
     }
 

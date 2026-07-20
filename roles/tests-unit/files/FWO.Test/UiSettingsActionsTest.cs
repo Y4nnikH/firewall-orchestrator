@@ -601,17 +601,20 @@ namespace FWO.Test
         }
 
         [Test]
-        public async Task EditActionGeneral_OnActionTypeChanged_UpdatesActionAndInvokesCallback()
+        public async Task EditActionGeneral_OnActionTypeChanged_InvokesCallbackWithoutMutatingAction()
         {
             EditActionGeneral component = new();
             int callbackCount = 0;
-            WfStateAction action = new();
+            WfStateAction action = new()
+            {
+                ActionType = StateActionTypes.SetAlert.ToString()
+            };
             SetMember(component, "ActAction", action);
             SetMember(component, "ActionTypeChanged", EventCallback.Factory.Create<string?>(new object(), _ => callbackCount++));
 
             await InvokeAsync(component, "OnActionTypeChanged", StateActionTypes.SendEmail.ToString());
 
-            Assert.That(action.ActionType, Is.EqualTo(StateActionTypes.SendEmail.ToString()));
+            Assert.That(action.ActionType, Is.EqualTo(StateActionTypes.SetAlert.ToString()));
             Assert.That(callbackCount, Is.EqualTo(1));
         }
 
@@ -629,7 +632,7 @@ namespace FWO.Test
 
             await InvokeAsync(component, "OnActionTypeChanged", (string?)null);
 
-            Assert.That(action.ActionType, Is.EqualTo(""));
+            Assert.That(action.ActionType, Is.EqualTo(StateActionTypes.SetAlert.ToString()));
             Assert.That(callbackCount, Is.EqualTo(1));
         }
 
@@ -1498,6 +1501,28 @@ namespace FWO.Test
             Assert.That(action.ActionType, Is.EqualTo(StateActionTypes.SetAlert.ToString()));
             Assert.That(action.ExternalParams, Is.EqualTo("alert message"));
             Assert.That(GetMember<string>(component, "message"), Is.EqualTo("alert message"));
+        }
+
+        [Test]
+        public async Task EditActionPopup_ActionTypeChanged_FromGeneralCallback_ClearsExternalParams()
+        {
+            EditActionPopup component = new();
+            EditActionGeneral general = new();
+            WfStateAction action = new()
+            {
+                ActionType = StateActionTypes.SetAlert.ToString(),
+                ExternalParams = "alert message"
+            };
+            SetMember(component, "actAction", action);
+            SetMember(component, "message", "alert message");
+            SetMember(general, "ActAction", action);
+            SetMember(general, "ActionTypeChanged", EventCallback.Factory.Create<string?>(new object(), async actionType => await InvokeAsync(component, "ActionTypeChanged", actionType)));
+
+            await InvokeAsync(general, "OnActionTypeChanged", StateActionTypes.TrafficPathAnalysis.ToString());
+
+            Assert.That(action.ActionType, Is.EqualTo(StateActionTypes.TrafficPathAnalysis.ToString()));
+            Assert.That(action.ExternalParams, Is.EqualTo(""));
+            Assert.That(GetMember<string>(component, "message"), Is.EqualTo(""));
         }
 
         [Test]

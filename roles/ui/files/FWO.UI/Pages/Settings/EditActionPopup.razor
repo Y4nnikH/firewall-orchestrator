@@ -156,12 +156,14 @@
 
     private void ActionTypeChanged(string? actionType)
     {
-        if (actAction.ActionType == actionType)
+        string newActionType = actionType ?? "";
+        string previousActionType = actAction.ActionType;
+        if (previousActionType == newActionType)
         {
             return;
         }
 
-        actAction.ActionType = actionType ?? "";
+        actAction.ActionType = newActionType;
         actAction.ExternalParams = "";
         ResetActionSpecificEditState();
     }
