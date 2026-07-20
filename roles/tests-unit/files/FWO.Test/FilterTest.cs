@@ -408,6 +408,7 @@ namespace FWO.Test
             DynGraphqlQuery query = Compiler.Compile(t);
 
             StringAssert.Contains("query standardRulesStructure", query.StandardRulesStructureQuery);
+            Assert.That(query.FullQuery, Is.Empty);
             StringAssert.Contains("rulebase_links", query.StandardRulesStructureQuery);
             StringAssert.DoesNotContain("rules (", query.StandardRulesStructureQuery);
             StringAssert.Contains("query standardRulesPage", query.StandardRulesPageQuery);

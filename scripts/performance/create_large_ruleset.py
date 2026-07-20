@@ -67,10 +67,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--api-url", required=True, help="FWO GraphQL API URL, for example https://host/api/v1/graphql")
     parser.add_argument("--middleware-url", help="FWO middleware base URL for login, for example https://host/")
-    parser.add_argument("--user", default="admin", help="Middleware login user when --jwt is not supplied")
+    parser.add_argument("--user", default="admin", help="Middleware login user when --jwt-file is not supplied")
     parser.add_argument("--password-file", help="File containing the middleware login password")
-    parser.add_argument("--jwt", help="Existing JWT for GraphQL API access")
-    parser.add_argument("--admin-secret", help="Hasura admin secret. Prefer a disposable perf system when using this.")
+    parser.add_argument("--jwt-file", help="File containing an existing JWT for GraphQL API access")
+    parser.add_argument("--admin-secret-file", help="File containing the Hasura admin secret")
     parser.add_argument("--role", default="admin", help="Hasura role to use with JWT authentication")
     parser.add_argument("--insecure", action="store_true", help="Disable TLS certificate verification")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS, help="HTTP timeout in seconds")
@@ -93,6 +93,12 @@ def read_password(password_file: str | None) -> str:
     return getpass("FWO password: ")
 
 
+def read_secret(secret_file: str | None) -> str | None:
+    if secret_file:
+        return Path(secret_file).read_text(encoding="utf-8").strip()
+    return None
+
+
 def login(middleware_url: str, user: str, password: str, timeout: int, verify: bool) -> str:
     url = middleware_url.rstrip("/") + "/api/AuthenticationToken/GetTokenPair"
     response = requests.post(
@@ -108,14 +114,15 @@ def login(middleware_url: str, user: str, password: str, timeout: int, verify: b
 
 def build_headers(args: argparse.Namespace) -> dict[str, str]:
     headers = dict(JSON_HEADERS)
-    if args.admin_secret:
-        headers["x-hasura-admin-secret"] = args.admin_secret
+    admin_secret = read_secret(args.admin_secret_file)
+    if admin_secret:
+        headers["x-hasura-admin-secret"] = admin_secret
         return headers
 
-    jwt = args.jwt
+    jwt = read_secret(args.jwt_file)
     if jwt is None:
         if not args.middleware_url:
-            raise ValueError("Provide --jwt, --admin-secret, or --middleware-url for login.")
+            raise ValueError("Provide --jwt-file, --admin-secret-file, or --middleware-url for login.")
         jwt = login(args.middleware_url, args.user, read_password(args.password_file), args.timeout, not args.insecure)
 
     headers["Authorization"] = f"Bearer {jwt}"

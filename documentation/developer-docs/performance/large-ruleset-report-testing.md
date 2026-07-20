@@ -29,8 +29,8 @@ For a local disposable system with a Hasura admin secret:
 ```bash
 python3 scripts/performance/create_large_ruleset.py \
   --api-url https://localhost:9443/api/v1/graphql \
-  --admin-secret "$HASURA_GRAPHQL_ADMIN_SECRET" \
-  --insecure
+  --admin-secret-file /path/to/hasura-admin-secret \
+  --insecure \
   --rules 100000
 ```
 

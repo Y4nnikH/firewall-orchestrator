@@ -136,7 +136,6 @@ namespace FWO.Report
                 }
                 ManagementReport managementReport = result[0];
                 managementReport.Import = management.Import;
-                ClearRules(managementReport);
                 ReportData.ManagementData.Add(managementReport);
             }
 
@@ -227,17 +226,6 @@ namespace FWO.Report
             }
 
             return structureQueryVariables;
-        }
-
-        /// <summary>
-        /// Removes placeholder rule arrays from the structure query before flat rule pages are attached.
-        /// </summary>
-        private static void ClearRules(ManagementReport managementReport)
-        {
-            foreach (RulebaseReport rulebase in managementReport.Rulebases)
-            {
-                rulebase.Rules = [];
-            }
         }
 
         /// <summary>

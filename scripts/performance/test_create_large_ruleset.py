@@ -80,14 +80,16 @@ def test_chunks_splits_rows_by_batch_size() -> None:
     assert module.chunks(rows, 2) == [[{"id": 0}, {"id": 1}], [{"id": 2}, {"id": 3}], [{"id": 4}]]
 
 
-def test_build_headers_prefers_admin_secret() -> None:
+def test_build_headers_prefers_admin_secret(tmp_path: Path) -> None:
     module = load_module()
+    admin_secret_file = tmp_path / "admin-secret"
+    admin_secret_file.write_text("secret\n", encoding="utf-8")
     args = type(
         "Args",
         (),
         {
-            "admin_secret": "secret",
-            "jwt": "jwt",
+            "admin_secret_file": str(admin_secret_file),
+            "jwt_file": None,
             "middleware_url": None,
             "user": "admin",
             "password_file": None,
@@ -155,6 +157,8 @@ def test_parse_args_sets_defaults(monkeypatch: MonkeyPatch) -> None:
     assert args.prefix == module.DEFAULT_PREFIX
     assert args.batch_size == module.DEFAULT_BATCH_SIZE
     assert args.device_type_id == module.DEFAULT_DEVICE_TYPE_ID
+    assert args.jwt_file is None
+    assert args.admin_secret_file is None
     assert args.insecure is False
 
 
@@ -164,6 +168,15 @@ def test_read_password_reads_password_file(tmp_path: Path) -> None:
     password_file.write_text("secret\n", encoding="utf-8")
 
     assert module.read_password(str(password_file)) == "secret"
+
+
+def test_read_secret_reads_secret_file(tmp_path: Path) -> None:
+    module = load_module()
+    secret_file = tmp_path / "secret"
+    secret_file.write_text("secret\n", encoding="utf-8")
+
+    assert module.read_secret(str(secret_file)) == "secret"
+    assert module.read_secret(None) is None
 
 
 def test_login_posts_credentials(monkeypatch: MonkeyPatch) -> None:
@@ -190,11 +203,13 @@ def test_login_posts_credentials(monkeypatch: MonkeyPatch) -> None:
     assert captured["verify"] is False
 
 
-def test_build_headers_uses_existing_jwt() -> None:
+def test_build_headers_uses_existing_jwt(tmp_path: Path) -> None:
     module = load_module()
+    jwt_file = tmp_path / "jwt"
+    jwt_file.write_text("jwt\n", encoding="utf-8")
     args = SimpleNamespace(
-        admin_secret=None,
-        jwt="jwt",
+        admin_secret_file=None,
+        jwt_file=str(jwt_file),
         middleware_url=None,
         user="admin",
         password_file=None,
@@ -213,8 +228,8 @@ def test_build_headers_uses_existing_jwt() -> None:
 def test_build_headers_requires_auth_source() -> None:
     module = load_module()
     args = SimpleNamespace(
-        admin_secret=None,
-        jwt=None,
+        admin_secret_file=None,
+        jwt_file=None,
         middleware_url=None,
         user="admin",
         password_file=None,
@@ -223,7 +238,7 @@ def test_build_headers_requires_auth_source() -> None:
         role="admin",
     )
 
-    with pytest.raises(ValueError, match="Provide --jwt"):
+    with pytest.raises(ValueError, match="Provide --jwt-file"):
         module.build_headers(args)
 
 
@@ -447,9 +462,13 @@ def test_main_rejects_too_few_objects(monkeypatch: MonkeyPatch) -> None:
         module.main()
 
 
-def test_main_runs_creation_pipeline_and_prints_summary(monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]) -> None:
+def test_main_runs_creation_pipeline_and_prints_summary(
+    monkeypatch: MonkeyPatch, capsys: CaptureFixture[str], tmp_path: Path
+) -> None:
     module = load_module()
     calls: list[str] = []
+    jwt_file = tmp_path / "jwt"
+    jwt_file.write_text("jwt\n", encoding="utf-8")
     args = SimpleNamespace(
         rules=SUMMARY_RULE_COUNT,
         services=SUMMARY_SERVICE_COUNT,
@@ -457,8 +476,8 @@ def test_main_runs_creation_pipeline_and_prints_summary(monkeypatch: MonkeyPatch
         objects=SUMMARY_OBJECT_COUNT,
         insecure=True,
         api_url="https://api",
-        admin_secret=None,
-        jwt="jwt",
+        admin_secret_file=None,
+        jwt_file=str(jwt_file),
         middleware_url=None,
         user="admin",
         password_file=None,
