@@ -989,14 +989,28 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task TestNameFieldRuleOwnerPreFilterSkippedForPendingRuleOwnerMapping()
+        {
+            SimulatedUserConfig config = CreateNameFieldPreFilterUserConfig();
+            RuleOwnerPreFilterRoutingApiConn apiConnection = new() { HasPendingRuleOwnerMappingImport = true };
+            ModellingVarianceAnalysis analysis = new(apiConnection, extStateHandler, config, Application, DefaultInit.DoNothing);
+
+            await analysis.AnalyseRulesVsModelledConnections([], new(), false);
+
+            Assert.That(apiConnection.Queries, Does.Contain(ImportQueries.getPendingRuleOwnerImports));
+            Assert.That(apiConnection.Queries, Does.Not.Contain(RuleQueries.getModelledRulesByRuleOwnerNameField));
+            Assert.That(apiConnection.Queries, Does.Contain(RuleQueries.getModelledRulesByManagementName));
+        }
+
+        [Test]
         public async Task TestNameFieldRuleOwnerPreFilterSkippedForExpandedRuleModes()
         {
             SimulatedUserConfig config = CreateNameFieldPreFilterUserConfig();
 
             foreach (ModellingFilter modellingFilter in new ModellingFilter[]
             {
-        new() { AnalyseRemainingRules = true },
-        new() { RulesForDeletedConns = true }
+                new() { AnalyseRemainingRules = true },
+                new() { RulesForDeletedConns = true }
             })
             {
                 RuleOwnerPreFilterRoutingApiConn apiConnection = new();
@@ -1024,6 +1038,7 @@ namespace FWO.Test
         {
             public List<string> Queries { get; } = [];
             public bool ReturnRuleOwnerRules { get; init; } = true;
+            public bool HasPendingRuleOwnerMappingImport { get; init; } = false;
 
             public override async Task<QueryResponseType> SendQueryAsync<QueryResponseType>(
                 string query,
@@ -1056,6 +1071,9 @@ namespace FWO.Test
                 }
                 if (responseType == typeof(List<ImportControl>))
                 {
+                    List<ImportControl> imports = HasPendingRuleOwnerMappingImport
+                        ? [new() { ControlId = 1 }]
+                        : [];
                     return (QueryResponseType)(object)new List<ImportControl>();
                 }
 
