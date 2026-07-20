@@ -24,6 +24,11 @@ namespace FWO.Test
         private static readonly string[] kResolvedDns = ["cn=alice,dc=test", "cn=bob,dc=test", "cn=external,dc=test"];
         private static readonly string[] kOverrideRecipients = ["override@example.test"];
         private static readonly string[] kScopedRecipients = ["scoped@example.test"];
+        private static readonly List<string> kOtherAddressRecipients = ["a@test", "b@test"];
+        private static readonly List<string> kJsonOtherAddressList = ["json-a@test", "json-b@test"];
+        private static readonly List<string> kLegacyRecipients = ["legacy@test"];
+        private static readonly List<string> kEmptyRecipients = [];
+        private static readonly List<string> kDupExtraRecipients = ["dup@test", "extra@test"];
         private static readonly int[] kNotificationIds = [7, 9];
         private static readonly string[] kResolverDns = ["cn=existing,dc=test", "cn=fresh,dc=test"];
         private static readonly string[] kOwnerGroupDns = ["cn=network-team,dc=test", "cn=external,dc=test"];
@@ -67,7 +72,7 @@ namespace FWO.Test
                 null,
                 null,
                 null,
-                ["a@test", "b@test"]);
+                kOtherAddressRecipients);
 
             Assert.That(recipients, Is.EqualTo(kDummyRecipients));
         }
@@ -81,7 +86,7 @@ namespace FWO.Test
                 null,
                 null,
                 null,
-                ["a@test", "b@test"]);
+                kOtherAddressRecipients);
 
             Assert.That(recipients, Is.EquivalentTo(kOtherRecipients));
         }
@@ -94,10 +99,10 @@ namespace FWO.Test
             {
                 None = false,
                 OtherAddresses = true,
-                OtherAddressList = ["json-a@test", "json-b@test"]
+                OtherAddressList = kJsonOtherAddressList
             };
 
-            List<string> recipients = await helper.GetRecipients(selection, null, ["legacy@test"]);
+            List<string> recipients = await helper.GetRecipients(selection, null, kLegacyRecipients);
 
             Assert.That(recipients, Is.EqualTo(kDummyRecipients));
         }
@@ -110,10 +115,10 @@ namespace FWO.Test
             {
                 None = false,
                 OtherAddresses = true,
-                OtherAddressList = ["json-a@test", "json-b@test"]
+                OtherAddressList = kJsonOtherAddressList
             };
 
-            List<string> recipients = await helper.GetRecipients(selection.ToConfigValue(), null, []);
+            List<string> recipients = await helper.GetRecipients(selection.ToConfigValue(), null, kEmptyRecipients);
 
             Assert.That(recipients, Is.EqualTo(kDummyRecipients));
         }
@@ -204,12 +209,12 @@ namespace FWO.Test
             EmailRecipientSelection selection = new()
             {
                 OtherAddresses = true,
-                OtherAddressList = ["other@test", "", "dup@test"],
+                OtherAddressList = new List<string> { "other@test", "", "dup@test" },
                 EnsureAtLeastOneNotification = true,
                 OwnerResponsibleTypeIds = [99]
             };
 
-            List<string> recipients = await helper.GetRecipients(selection, owner, ["dup@test", "extra@test"]);
+            List<string> recipients = await helper.GetRecipients(selection, owner, kDupExtraRecipients);
 
             Assert.That(recipients, Is.EquivalentTo(kOtherPlusExtraRecipients));
 

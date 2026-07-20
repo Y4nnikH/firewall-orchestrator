@@ -26,6 +26,8 @@ namespace FWO.Test
                 .OrderBy(method => method.MetadataToken)
                 .ToList();
 
+            Assert.That(methods, Is.Not.Empty);
+
             foreach (MethodInfo method in methods)
             {
                 object?[] args = BuildArguments(method.GetParameters());
@@ -44,6 +46,7 @@ namespace FWO.Test
         {
             using MiddlewareClient client = new("http://127.0.0.1:1/");
 
+            Assert.That(client, Is.Not.Null);
             client.SetAuthenticationToken("jwt-token");
             client.Dispose();
             client.Dispose();
