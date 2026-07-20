@@ -112,7 +112,7 @@ else
             <Template>
                 @(string.IsNullOrWhiteSpace(nwObject.IpStart) && string.IsNullOrWhiteSpace(nwObject.IpEnd)
                     ? "-"
-                    : DisplayBase.DisplayIp(nwObject.IpStart ?? "", nwObject.IpEnd ?? ""))
+                    : FlowAdminHelper.FormatFlowNwObjectTechnicalDetails(nwObject))
             </Template>
         </Column>
         <Pager ShowPageNumber="true" ShowTotalCount="true" />

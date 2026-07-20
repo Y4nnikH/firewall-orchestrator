@@ -476,6 +476,19 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task FlowNetworkObjectsPage_ShowsIpRangeInCatalog()
+        {
+            await using BunitContext context = CreateNetworkObjectsContext(out _);
+
+            IRenderedComponent<SettingsFlowNetworkObjects> component = RenderPage<SettingsFlowNetworkObjects>(context);
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(component.Markup, Does.Contain("192.0.2.10-192.0.2.20"));
+            });
+        }
+
+        [Test]
         public async Task FlowNetworkObjectsPage_ResolveDuplicateMapping_PreservesTypeForCustomObjectSearch()
         {
             await using BunitContext context = CreateNetworkDuplicateResolverContext(out FlowNetworkObjectsDuplicateResolverApiConn apiConnection);
@@ -722,8 +735,8 @@ namespace FWO.Test
         {
             Id = 100,
             Name = "",
-            IpStart = null,
-            IpEnd = null,
+            IpStart = "192.0.2.10/32",
+            IpEnd = "192.0.2.20/32",
             Hash = "hash-100",
             State = FlowState.Requested,
             ShowInRequestModule = false,
