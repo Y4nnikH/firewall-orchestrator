@@ -307,6 +307,19 @@ namespace FWO.Data.Flow
         }
 
         /// <summary>
+        /// Formats a compact member preview for flow network groups.
+        /// </summary>
+        public static string FormatFlowNwGroupMemberDetails(FlowNwGroup candidate, int maxItems, string emptyLabel, string moreTemplate)
+        {
+            return FormatDuplicateObjectSummary(
+                candidate.NwGroupMembers.Select(member => member.NwObject),
+                maxItems,
+                emptyLabel,
+                moreTemplate,
+                FormatFlowNwObjectTechnicalDetails);
+        }
+
+        /// <summary>
         /// Formats the technical details of a flow service object for overview and duplicate resolution views.
         /// </summary>
         public static string FormatFlowSvcObjectTechnicalDetails(FlowSvcObject candidate, IEnumerable<IpProtocol>? protocols = null)
@@ -334,6 +347,19 @@ namespace FWO.Data.Flow
         public static string FormatFlowSvcGroupTechnicalDetails(FlowSvcGroup candidate, string membersLabel)
         {
             return $"{candidate.SvcGroupMembers.Count} {membersLabel}";
+        }
+
+        /// <summary>
+        /// Formats a compact member preview for flow service groups.
+        /// </summary>
+        public static string FormatFlowSvcGroupMemberDetails(FlowSvcGroup candidate, int maxItems, string emptyLabel, string moreTemplate, IEnumerable<IpProtocol>? protocols = null)
+        {
+            return FormatDuplicateObjectSummary(
+                candidate.SvcGroupMembers.Select(member => member.SvcObject),
+                maxItems,
+                emptyLabel,
+                moreTemplate,
+                service => FormatFlowSvcObjectTechnicalDetails(service, protocols));
         }
 
         /// <summary>

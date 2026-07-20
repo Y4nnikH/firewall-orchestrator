@@ -194,6 +194,42 @@ namespace FWO.Test
         }
 
         [Test]
+        public void FormatFlowNwGroupMemberDetails_ListsNetworkMembers()
+        {
+            FlowNwGroup candidate = new()
+            {
+                Id = 11,
+                Name = "group-1",
+                NwGroupMembers =
+                [
+                    new FlowNwGroupMember
+                    {
+                        NwObject = new FlowNwObject
+                        {
+                            Id = 101,
+                            IpStart = "192.0.2.10",
+                            IpEnd = "192.0.2.10"
+                        }
+                    },
+                    new FlowNwGroupMember
+                    {
+                        NwObject = new FlowNwObject
+                        {
+                            Id = 102,
+                            IpStart = "198.51.100.0",
+                            IpEnd = "198.51.100.255"
+                        }
+                    }
+                ]
+            };
+
+            string details = FlowAdminHelper.FormatFlowNwGroupMemberDetails(candidate, 5, "None", "... and @@COUNT@@ more");
+
+            Assert.That(details, Does.Contain("192.0.2.10"));
+            Assert.That(details, Does.Contain("198.51.100.0/24"));
+        }
+
+        [Test]
         public void BuildDuplicateGroups_FindsInactiveFlowSvcObjectConflicts()
         {
             List<FlowSvcObject> flowObjects =
@@ -256,6 +292,49 @@ namespace FWO.Test
             string details = FlowAdminHelper.FormatFlowSvcGroupTechnicalDetails(candidate, "Members");
 
             Assert.That(details, Is.EqualTo("2 Members"));
+        }
+
+        [Test]
+        public void FormatFlowSvcGroupMemberDetails_ListsServiceMembers()
+        {
+            FlowSvcGroup candidate = new()
+            {
+                Id = 31,
+                Name = "svc-group-1",
+                SvcGroupMembers =
+                [
+                    new FlowSvcGroupMember
+                    {
+                        SvcObject = new FlowSvcObject
+                        {
+                            Id = 301,
+                            PortStart = 80,
+                            PortEnd = 80,
+                            ProtoId = 6
+                        }
+                    },
+                    new FlowSvcGroupMember
+                    {
+                        SvcObject = new FlowSvcObject
+                        {
+                            Id = 302,
+                            PortStart = 25565,
+                            PortEnd = 25568,
+                            ProtoId = 6
+                        }
+                    }
+                ]
+            };
+
+            string details = FlowAdminHelper.FormatFlowSvcGroupMemberDetails(
+                candidate,
+                5,
+                "None",
+                "... and @@COUNT@@ more",
+                [new IpProtocol { Id = 6, Name = "TCP" }]);
+
+            Assert.That(details, Does.Contain("80/TCP"));
+            Assert.That(details, Does.Contain("25565-25568/TCP"));
         }
 
         [Test]

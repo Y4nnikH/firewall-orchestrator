@@ -138,7 +138,7 @@ else
         @if (SelectedDuplicateGroup != null)
         {
             <div><span class="fw-bold">@(userConfig.GetText("flow_object")):</span> @SelectedDuplicateGroup.FlowNwGroupName (#@SelectedDuplicateGroup.FlowNwGroupId)</div>
-            <div class="text-muted small">@BuildFlowNwGroupTechnicalDetails(SelectedDuplicateGroup.FlowNwGroupId)</div>
+            <div class="text-muted small">@BuildFlowNwGroupMemberDetails(SelectedDuplicateGroup.FlowNwGroupId)</div>
             <div><span class="fw-bold">@(userConfig.GetText("management")):</span> @SelectedDuplicateGroup.ManagementName</div>
         }
     </SummaryContent>
@@ -330,6 +330,15 @@ else
     {
         FlowNwGroup? flowNwGroup = flowNwGroups.FirstOrDefault(item => item.Id == flowNwGroupId);
         string details = flowNwGroup == null ? "" : FlowAdminHelper.FormatFlowNwGroupTechnicalDetails(flowNwGroup, userConfig.GetText("members"));
+        return string.IsNullOrWhiteSpace(details) ? "-" : details;
+    }
+
+    private string BuildFlowNwGroupMemberDetails(long flowNwGroupId)
+    {
+        FlowNwGroup? flowNwGroup = flowNwGroups.FirstOrDefault(item => item.Id == flowNwGroupId);
+        string details = flowNwGroup == null
+            ? ""
+            : FlowAdminHelper.FormatFlowNwGroupMemberDetails(flowNwGroup, 10, userConfig.GetText("none"), userConfig.GetText("duplicate_objects_more"));
         return string.IsNullOrWhiteSpace(details) ? "-" : details;
     }
 

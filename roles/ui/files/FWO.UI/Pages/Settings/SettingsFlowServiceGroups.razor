@@ -138,7 +138,7 @@ else
         @if (SelectedDuplicateGroup != null)
         {
             <div><span class="fw-bold">@(userConfig.GetText("flow_object")):</span> @SelectedDuplicateGroup.FlowSvcGroupName (#@SelectedDuplicateGroup.FlowSvcGroupId)</div>
-            <div class="text-muted small">@BuildFlowSvcGroupTechnicalDetails(SelectedDuplicateGroup.FlowSvcGroupId)</div>
+            <div class="text-muted small">@BuildFlowSvcGroupMemberDetails(SelectedDuplicateGroup.FlowSvcGroupId)</div>
             <div><span class="fw-bold">@(userConfig.GetText("management")):</span> @SelectedDuplicateGroup.ManagementName</div>
         }
     </SummaryContent>
@@ -164,6 +164,7 @@ else
     private List<Management> selectableManagements = [];
     private List<Management> customServiceManagements = [];
     private List<FlowSvcGroupDuplicateGroup> duplicateGroups = [];
+    private List<IpProtocol> ipProtos = [];
     private FlowSvcGroupDuplicateGroup? SelectedDuplicateGroup;
     private bool workInProgress = false;
     private bool EditMode = false;
@@ -183,6 +184,7 @@ else
             workInProgress = true;
             StateHasChanged();
 
+            ipProtos = await apiConnection.SendQueryAsync<List<IpProtocol>>(StmQueries.getIpProtocols) ?? [];
             flowSvcGroups = await apiConnection.SendQueryAsync<List<FlowSvcGroup>>(FlowQueries.getFlowServiceGroups) ?? [];
             selectableManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowSelectableManagements) ?? [];
 
@@ -330,6 +332,15 @@ else
     {
         FlowSvcGroup? flowSvcGroup = flowSvcGroups.FirstOrDefault(item => item.Id == flowSvcGroupId);
         string details = flowSvcGroup == null ? "" : FlowAdminHelper.FormatFlowSvcGroupTechnicalDetails(flowSvcGroup, userConfig.GetText("members"));
+        return string.IsNullOrWhiteSpace(details) ? "-" : details;
+    }
+
+    private string BuildFlowSvcGroupMemberDetails(long flowSvcGroupId)
+    {
+        FlowSvcGroup? flowSvcGroup = flowSvcGroups.FirstOrDefault(item => item.Id == flowSvcGroupId);
+        string details = flowSvcGroup == null
+            ? ""
+            : FlowAdminHelper.FormatFlowSvcGroupMemberDetails(flowSvcGroup, 10, userConfig.GetText("none"), userConfig.GetText("duplicate_objects_more"), ipProtos);
         return string.IsNullOrWhiteSpace(details) ? "-" : details;
     }
 

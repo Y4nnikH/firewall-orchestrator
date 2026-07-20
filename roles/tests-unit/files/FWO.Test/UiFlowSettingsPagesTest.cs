@@ -317,6 +317,39 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task FlowNetworkGroupsPage_DuplicateResolverShowsMemberDetails()
+        {
+            await using BunitContext context = CreateContext();
+
+            IRenderedComponent<SettingsFlowNetworkGroups> component = RenderPage<SettingsFlowNetworkGroups>(context);
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-warning"), Is.Not.Empty));
+
+            component.FindAll("button.btn.btn-sm.btn-warning")[0].Click();
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(component.Markup, Does.Contain("10.0.0.1"));
+                Assert.That(component.Markup, Does.Contain("10.0.0.2"));
+            });
+        }
+
+        [Test]
+        public async Task FlowServiceGroupsPage_DuplicateResolverShowsMemberDetails()
+        {
+            await using BunitContext context = CreateContext();
+
+            IRenderedComponent<SettingsFlowServiceGroups> component = RenderPage<SettingsFlowServiceGroups>(context);
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-warning"), Is.Not.Empty));
+
+            component.FindAll("button.btn.btn-sm.btn-warning")[0].Click();
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(component.Markup, Does.Contain("80/TCP"));
+            });
+        }
+
+        [Test]
         public async Task FlowTimeObjectsPage_RendersWithoutErrors()
         {
             await using BunitContext context = CreateContext();
@@ -821,7 +854,19 @@ namespace FWO.Test
             Name = "Flow Service Group",
             State = FlowState.Requested,
             ShowInRequestModule = true,
-            SvcGroupMembers = [new FlowSvcGroupMember()]
+            SvcGroupMembers =
+            [
+                new FlowSvcGroupMember
+                {
+                    SvcObject = new FlowSvcObject
+                    {
+                        Id = 100,
+                        PortStart = 80,
+                        PortEnd = 80,
+                        ProtoId = 6
+                    }
+                }
+            ]
         };
 
         private static readonly FlowNwGroup kFlowNwGroup = new()
@@ -830,7 +875,27 @@ namespace FWO.Test
             Name = "Flow Network Group",
             State = FlowState.Requested,
             ShowInRequestModule = true,
-            NwGroupMembers = [new FlowNwGroupMember(), new FlowNwGroupMember()]
+            NwGroupMembers =
+            [
+                new FlowNwGroupMember
+                {
+                    NwObject = new FlowNwObject
+                    {
+                        Id = 301,
+                        IpStart = "10.0.0.1",
+                        IpEnd = "10.0.0.1"
+                    }
+                },
+                new FlowNwGroupMember
+                {
+                    NwObject = new FlowNwObject
+                    {
+                        Id = 302,
+                        IpStart = "10.0.0.2",
+                        IpEnd = "10.0.0.2"
+                    }
+                }
+            ]
         };
 
         private static readonly FlowTimeObject kFlowTimeObject = new()
