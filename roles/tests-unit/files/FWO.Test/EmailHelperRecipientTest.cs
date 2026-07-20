@@ -29,6 +29,8 @@ namespace FWO.Test
         private static readonly List<string> kLegacyRecipients = ["legacy@test"];
         private static readonly List<string> kEmptyRecipients = [];
         private static readonly List<string> kDupExtraRecipients = ["dup@test", "extra@test"];
+        private static readonly List<string> kSupportAndMainRecipients = ["support@example.test", "main@example.test"];
+        private static readonly List<int> kActiveOwnerResponsibleIds = [7, 11];
         private static readonly int[] kNotificationIds = [7, 9];
         private static readonly string[] kResolverDns = ["cn=existing,dc=test", "cn=fresh,dc=test"];
         private static readonly string[] kOwnerGroupDns = ["cn=network-team,dc=test", "cn=external,dc=test"];
@@ -624,7 +626,7 @@ namespace FWO.Test
 
             List<string> recipients = await InvokePrivateAsync<List<string>>(helper, "GetOwnerGroupOrMainResponsibleRecipients", new object?[] { owner });
 
-            Assert.That(recipients, Is.EqualTo(new[] { "support@example.test", "main@example.test" }));
+            Assert.That(recipients, Is.EqualTo(kSupportAndMainRecipients));
         }
 
         [Test]
@@ -640,7 +642,7 @@ namespace FWO.Test
 
             List<int> activeIds = InvokePrivate<List<int>>(helper, "GetActiveOwnerResponsibleTypeIds", Array.Empty<object?>());
 
-            Assert.That(activeIds, Is.EqualTo(new[] { 7, 11 }));
+            Assert.That(activeIds, Is.EqualTo(kActiveOwnerResponsibleIds));
         }
 
         [Test]
