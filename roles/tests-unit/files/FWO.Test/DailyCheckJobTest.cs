@@ -140,6 +140,22 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task Execute_LogsAlertWhenModuleProcessingThrows()
+        {
+            ThrowingDailyCheckApiConnection apiConnection = new();
+            SimulatedGlobalConfig globalConfig = new()
+            {
+                DailyCheckModules = "[1]"
+            };
+            DailyCheckJob dailyCheckJob = new(apiConnection, globalConfig);
+
+            await dailyCheckJob.Execute(null!);
+
+            Assert.That(apiConnection.LogCount, Is.EqualTo(1));
+            Assert.That(apiConnection.AlertCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public async Task Execute_RunsEnabledChecks_WhenDemoDataAndImportsAreEnabled()
         {
             DailyCheckApiConnection apiConnection = new()
@@ -431,6 +447,48 @@ namespace FWO.Test
             {
                 QueryCount++;
                 throw new InvalidOperationException("No query should be executed in this test.");
+            }
+        }
+
+        private sealed class ThrowingDailyCheckApiConnection : SimulatedApiConnection
+        {
+            public int QueryCount { get; private set; }
+            public int LogCount { get; private set; }
+            public int AlertCount { get; private set; }
+
+            public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, FWO.Api.Client.QueryChunkingOptions? chunkingOptions = null)
+            {
+                QueryCount++;
+
+                if (query == DeviceQueries.getManagementsDetails && typeof(QueryResponseType) == typeof(List<Management>))
+                {
+                    throw new InvalidOperationException("boom");
+                }
+
+                if (query == MonitorQueries.getOpenAlerts && typeof(QueryResponseType) == typeof(List<Alert>))
+                {
+                    return Task.FromResult((QueryResponseType)(object)new List<Alert>());
+                }
+
+                if (query == MonitorQueries.addLogEntry && typeof(QueryResponseType) == typeof(ReturnIdWrapper))
+                {
+                    LogCount++;
+                    return Task.FromResult((QueryResponseType)(object)new ReturnIdWrapper
+                    {
+                        ReturnIds = [new ReturnId { NewId = 1 }]
+                    });
+                }
+
+                if (query == MonitorQueries.addAlert && typeof(QueryResponseType) == typeof(ReturnIdWrapper))
+                {
+                    AlertCount++;
+                    return Task.FromResult((QueryResponseType)(object)new ReturnIdWrapper
+                    {
+                        ReturnIds = [new ReturnId { NewIdLong = 1 }]
+                    });
+                }
+
+                throw new InvalidOperationException($"Unexpected query: {query}");
             }
         }
 

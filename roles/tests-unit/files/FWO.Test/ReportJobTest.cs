@@ -29,6 +29,7 @@ namespace FWO.Test
             internal int GetDevicesByManagementCalls { get; private set; }
             internal int QueryCount { get; private set; }
             internal List<ReportSchedule> ReportSchedules { get; set; } = [];
+            internal List<Ldap> LdapConnections { get; set; } = [];
             internal bool ThrowOnReportSchedules { get; set; }
             internal bool ThrowOnGetReportSchedulesAsOperationCanceled { get; set; }
             internal List<FwoNotification> Notifications { get; set; } = [];
@@ -64,6 +65,10 @@ namespace FWO.Test
                 if (typeof(QueryResponseType) == typeof(List<FwoNotification>) && query == NotificationQueries.getNotifications)
                 {
                     return Task.FromResult((QueryResponseType)(object)Notifications);
+                }
+                if (typeof(QueryResponseType) == typeof(List<Ldap>) && query == AuthQueries.getLdapConnections)
+                {
+                    return Task.FromResult((QueryResponseType)(object)LdapConnections);
                 }
                 if (typeof(QueryResponseType) == typeof(List<ManagementSelect>) && query == DeviceQueries.getDevicesByManagement)
                 {
@@ -354,6 +359,41 @@ namespace FWO.Test
             await reportJob.Execute(null!);
 
             Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public async Task GenerateReport_SwallowsInitUserEnvironmentFailure()
+        {
+            ReportJobApiConnection apiConnection = new()
+            {
+                LdapConnections = []
+            };
+            ReportJob reportJob = CreateReportJob(apiConnection);
+            ReportSchedule reportSchedule = new()
+            {
+                Id = 17,
+                Name = "scheduled-report",
+                ScheduleOwningUser = new UiUser
+                {
+                    DbId = 42,
+                    Name = "report-user"
+                },
+                StartTime = new DateTime(2026, 4, 21, 10, 0, 0),
+                Template = new ReportTemplate
+                {
+                    Id = 7,
+                    ReportParams = new ReportParams
+                    {
+                        ReportType = (int)ReportType.TicketReport
+                    }
+                }
+            };
+            MethodInfo generateReport = GetPrivateInstanceMethod("GenerateReport");
+
+            await (Task)generateReport.Invoke(reportJob, [reportSchedule, new DateTime(2026, 4, 21, 10, 0, 0), CancellationToken.None])!;
+
+            Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.LastQuery, Is.EqualTo(AuthQueries.getLdapConnections));
         }
 
         [Test]

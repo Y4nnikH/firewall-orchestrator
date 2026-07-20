@@ -551,6 +551,111 @@ namespace FWO.Test
             Assert.That(recipients, Is.Empty);
         }
 
+        [Test]
+        public void GetEmailAddressReturnsDummyWhenConfigured()
+        {
+            EmailHelper helper = CreateEmailHelper();
+
+            string emailAddress = InvokePrivate<string>(helper, "GetEmailAddress", new object?[] { "cn=missing,dc=test" });
+
+            Assert.That(emailAddress, Is.EqualTo(kDummyRecipients[0]));
+        }
+
+        [Test]
+        public async Task CollectEmailAddressesFromScopedUserReturnsDummyAndEmailFallbacks()
+        {
+            EmailHelper dummyHelper = CreateEmailHelper();
+            EmailHelper helper = CreateEmailHelper(useDummyEmailAddress: false);
+            SetPrivateField(helper, "uiUsers", new List<UiUser>
+            {
+                new() { Dn = "cn=scoped,dc=test", Email = "scoped@example.test" }
+            });
+
+            List<string> dummyRecipients = await InvokePrivateAsync<List<string>>(dummyHelper, "CollectEmailAddressesFromScopedUser", new object?[] { "cn=scoped,dc=test", "scoped@example.test" });
+            List<string> explicitRecipients = await InvokePrivateAsync<List<string>>(helper, "CollectEmailAddressesFromScopedUser", new object?[] { "cn=scoped,dc=test", "scoped@example.test" });
+            List<string> fallbackRecipients = await InvokePrivateAsync<List<string>>(helper, "CollectEmailAddressesFromScopedUser", new object?[] { "cn=scoped,dc=test", null });
+
+            Assert.That(dummyRecipients, Is.EqualTo(kDummyRecipients));
+            Assert.That(explicitRecipients, Is.EqualTo(kScopedRecipients));
+            Assert.That(fallbackRecipients, Is.EqualTo(kScopedRecipients));
+        }
+
+        [Test]
+        public async Task CollectEmailAddressesFromUserReturnsEmptyForMissingDn()
+        {
+            EmailHelper helper = CreateEmailHelper(useDummyEmailAddress: false);
+
+            List<string> nullUserRecipients = await InvokePrivateAsync<List<string>>(helper, "CollectEmailAddressesFromUser", new object?[] { null });
+            List<string> emptyDnRecipients = await InvokePrivateAsync<List<string>>(helper, "CollectEmailAddressesFromUser", new object?[] { new UiUser { Dn = "" } });
+
+            Assert.That(nullUserRecipients, Is.Empty);
+            Assert.That(emptyDnRecipients, Is.Empty);
+        }
+
+        [Test]
+        public async Task CollectEmailAddressesFromDnsReturnsEmptyForBlankInput()
+        {
+            EmailHelper helper = CreateEmailHelper(useDummyEmailAddress: false);
+
+            List<string> nullRecipients = await InvokePrivateAsync<List<string>>(helper, "CollectEmailAddressesFromDns", new object?[] { null });
+            List<string> whitespaceRecipients = await InvokePrivateAsync<List<string>>(helper, "CollectEmailAddressesFromDns", new object?[] { new List<string> { " ", "\t" } });
+
+            Assert.That(nullRecipients, Is.Empty);
+            Assert.That(whitespaceRecipients, Is.Empty);
+        }
+
+        [Test]
+        public async Task GetOwnerGroupOrMainResponsibleRecipientsReturnsGroupAndMainAddresses()
+        {
+            EmailHelper helper = CreateEmailHelper(useDummyEmailAddress: false);
+            SetPrivateField(helper, "uiUsers", new List<UiUser>
+            {
+                new() { Dn = "cn=support,dc=test", Email = "support@example.test" },
+                new() { Dn = "cn=main,dc=test", Email = "main@example.test" }
+            });
+            FwoOwner owner = new();
+            owner.AddOwnerResponsible(GlobalConst.kOwnerResponsibleTypeSupporting, "cn=support,dc=test");
+            owner.AddOwnerResponsible(GlobalConst.kOwnerResponsibleTypeMain, "cn=main,dc=test");
+
+            List<string> recipients = await InvokePrivateAsync<List<string>>(helper, "GetOwnerGroupOrMainResponsibleRecipients", new object?[] { owner });
+
+            Assert.That(recipients, Is.EqualTo(new[] { "support@example.test", "main@example.test" }));
+        }
+
+        [Test]
+        public void GetActiveOwnerResponsibleTypeIdsReturnsOnlyActiveIds()
+        {
+            EmailHelper helper = CreateEmailHelper(useDummyEmailAddress: false);
+            SetPrivateField(helper, "ownerResponsibleTypes", new List<OwnerResponsibleType>
+            {
+                new() { Id = 3, Active = false },
+                new() { Id = 7, Active = true },
+                new() { Id = 11, Active = true }
+            });
+
+            List<int> activeIds = InvokePrivate<List<int>>(helper, "GetActiveOwnerResponsibleTypeIds", Array.Empty<object?>());
+
+            Assert.That(activeIds, Is.EqualTo(new[] { 7, 11 }));
+        }
+
+        [Test]
+        public void ApplyDummyRecipientOverrideReplacesRecipientsAndClearsCopies()
+        {
+            EmailHelper helper = CreateEmailHelper();
+            object?[] args =
+            {
+                new List<string> { "real@example.test" },
+                new List<string> { "cc@example.test" },
+                new List<string> { "bcc@example.test" }
+            };
+
+            InvokePrivateVoid(helper, "ApplyDummyRecipientOverride", args);
+
+            Assert.That((List<string>)args[0]!, Is.EqualTo(kDummyRecipients));
+            Assert.That((List<string>)args[1]!, Is.Empty);
+            Assert.That((List<string>)args[2]!, Is.Empty);
+        }
+
         private static void SetPrivateField<T>(EmailHelper helper, string fieldName, T value)
         {
             FieldInfo field = typeof(EmailHelper).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
@@ -570,6 +675,13 @@ namespace FWO.Test
             MethodInfo method = typeof(EmailHelper).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
                 ?? throw new InvalidOperationException($"Method '{methodName}' not found.");
             return (T)method.Invoke(helper, args)!;
+        }
+
+        private static void InvokePrivateVoid(EmailHelper helper, string methodName, object?[] args)
+        {
+            MethodInfo method = typeof(EmailHelper).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException($"Method '{methodName}' not found.");
+            method.Invoke(helper, args);
         }
 
         private static async Task<T> InvokePrivateAsync<T>(EmailHelper helper, string methodName, object?[] args)
