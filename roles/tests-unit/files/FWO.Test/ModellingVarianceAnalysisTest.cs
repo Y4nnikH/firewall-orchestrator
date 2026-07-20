@@ -1074,7 +1074,7 @@ namespace FWO.Test
                     List<ImportControl> imports = HasPendingRuleOwnerMappingImport
                         ? [new() { ControlId = 1 }]
                         : [];
-                    return (QueryResponseType)(object)new List<ImportControl>();
+                    return (QueryResponseType)(object)imports;
                 }
 
                 if (responseType == typeof(List<NetworkObject>))
