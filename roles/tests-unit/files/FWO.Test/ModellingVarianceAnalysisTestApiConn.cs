@@ -123,6 +123,14 @@ namespace FWO.Test
             Tos = [new(new(), Nwgroup3)],
             Services = [new() { Content = Svc1 }]
         };
+        static readonly Rule Rule13 = new()
+        {
+            Name = "FWOC11",
+            MgmtId = 1,
+            Froms = [new(new(), SpecObj1), new(new(), NwObj1)],
+            Tos = [new(new(), Nwgroup3)],
+            Services = [new() { Content = Svc1 }]
+        };
         static readonly DeviceReport DevRep1 = new()
         {
             Id = 1,
@@ -189,7 +197,7 @@ namespace FWO.Test
             }
             else if (responseType == typeof(List<Rule>))
             {
-                GraphQLResponse<dynamic> response = new() { Data = new List<Rule>() { new(Rule1), new(Rule2), new(Rule3), new(Rule4), new(Rule5), new(Rule6), new(Rule7), new(Rule8), new(Rule9), new(Rule10), new(Rule11), new(Rule12) } };
+                GraphQLResponse<dynamic> response = new() { Data = new List<Rule>() { new(Rule1), new(Rule2), new(Rule3), new(Rule4), new(Rule5), new(Rule6), new(Rule7), new(Rule8), new(Rule9), new(Rule10), new(Rule11), new(Rule12), new(Rule13) } };
                 return response.Data;
             }
             else if (responseType == typeof(List<ModellingConnection>))
@@ -201,7 +209,7 @@ namespace FWO.Test
             {
                 if (variables != null)
                 {
-                    List<int> connIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                    List<int> connIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
                     var connId = variables.GetType().GetProperties().First(o => o.Name == "id").GetValue(variables, null);
                     if (connId != null && connIds.Contains((int)connId))
                     {
