@@ -976,6 +976,19 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task TestNameFieldRuleOwnerPreFilterSkippedForRequestFlow()
+        {
+            SimulatedUserConfig config = CreateNameFieldPreFilterUserConfig();
+            RuleOwnerPreFilterRoutingApiConn apiConnection = new();
+            ModellingVarianceAnalysis analysis = new(apiConnection, extStateHandler, config, Application, DefaultInit.DoNothing);
+
+            await analysis.AnalyseModelledConnectionsForRequest([]);
+
+            Assert.That(apiConnection.Queries, Does.Not.Contain(RuleQueries.getModelledRulesByRuleOwnerNameField));
+            Assert.That(apiConnection.Queries, Does.Contain(RuleQueries.getModelledRulesByManagementName));
+        }
+
+        [Test]
         public async Task TestNameFieldRuleOwnerPreFilterSkippedForExpandedRuleModes()
         {
             SimulatedUserConfig config = CreateNameFieldPreFilterUserConfig();
@@ -1041,7 +1054,15 @@ namespace FWO.Test
                 {
                     return (QueryResponseType)(object)new List<ModellingConnection>();
                 }
+                if (responseType == typeof(List<ImportControl>))
+                {
+                    return (QueryResponseType)(object)new List<ImportControl>();
+                }
 
+                if (responseType == typeof(List<NetworkObject>))
+                {
+                    return (QueryResponseType)(object)new List<NetworkObject>();
+                }
                 if (responseType == typeof(List<DeviceReport>))
                 {
                     return (QueryResponseType)(object)new List<DeviceReport>();
