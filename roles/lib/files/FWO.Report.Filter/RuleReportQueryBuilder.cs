@@ -1,4 +1,5 @@
 using FWO.Api.Client.Queries;
+using FWO.Basics;
 using FWO.Data;
 using FWO.Data.Report;
 
