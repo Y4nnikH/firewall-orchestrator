@@ -311,13 +311,16 @@ namespace FWO.Services.Modelling
         {
             if (specialUserObjects.Count > 0 && disregardedLocations.Count > 0)
             {
-                // Match by name only: the surplus flag is unreliable for multiple special user objects, as
-                // the comparer treats objects without ip as equal, marking only the first of them as surplus.
-                List<NetworkLocation> specUserLocations = [.. networkLocations.Where(n => specialUserObjects.ContainsKey(n.Object.Name.ToLower()))];
+                // Match by name, but only for objects that did not match normally: a special user object
+                // stands in for a placeholder area only if it is surplus. Objects without ip can never match
+                // normally, so they always count - this also avoids the comparer deduping them (and thus
+                // marking only the first of several as surplus) undercounting the real objects.
+                List<NetworkLocation> specUserLocations = [.. networkLocations.Where(n => specialUserObjects.ContainsKey(n.Object.Name.ToLower())
+                    && (n.Object.IsSurplus || string.IsNullOrEmpty(n.Object.IP)))];
                 List<NetworkLocation> remainingPossibleSpecObj = GetPossibleSpecObjects(disregardedLocations, source);
-                // A placeholder area stands in for any number of special user objects, so accept as soon
-                // as both sides are present instead of demanding equal counts (which fails for >1 object).
-                if (specUserLocations.Count > 0 && remainingPossibleSpecObj.Count > 0)
+                // A placeholder area stands in for any number of special user objects (so N objects cover 1 area),
+                // but a single object must not cover several areas - require at least as many objects as areas.
+                if (remainingPossibleSpecObj.Count > 0 && specUserLocations.Count >= remainingPossibleSpecObj.Count)
                 {
                     foreach (var location in remainingPossibleSpecObj)
                     {
@@ -341,13 +344,16 @@ namespace FWO.Services.Modelling
         {
             if (updatableObjects.Count > 0 && disregardedLocations.Count > 0)
             {
-                // Match by name only: the surplus flag is unreliable for multiple updatable objects, as
-                // the comparer treats objects without ip as equal, marking only the first of them as surplus.
-                List<NetworkLocation> updObjLocations = [.. networkLocations.Where(n => updatableObjects.ContainsKey(n.Object.Name.ToLower()))];
+                // Match by name, but only for objects that did not match normally: an updatable object
+                // stands in for a placeholder area only if it is surplus. Objects without ip can never match
+                // normally, so they always count - this also avoids the comparer deduping them (and thus
+                // marking only the first of several as surplus) undercounting the real objects.
+                List<NetworkLocation> updObjLocations = [.. networkLocations.Where(n => updatableObjects.ContainsKey(n.Object.Name.ToLower())
+                    && (n.Object.IsSurplus || string.IsNullOrEmpty(n.Object.IP)))];
                 List<NetworkLocation> remainingPossibleUpdatableObj = GetPossibleUpdatableObjects(disregardedLocations, source);
-                // A placeholder area stands in for any number of updatable objects, so accept as soon
-                // as both sides are present instead of demanding equal counts (which fails for >1 object).
-                if (updObjLocations.Count > 0 && remainingPossibleUpdatableObj.Count > 0)
+                // A placeholder area stands in for any number of updatable objects (so N objects cover 1 area),
+                // but a single object must not cover several areas - require at least as many objects as areas.
+                if (remainingPossibleUpdatableObj.Count > 0 && updObjLocations.Count >= remainingPossibleUpdatableObj.Count)
                 {
                     foreach (var location in remainingPossibleUpdatableObj)
                     {
