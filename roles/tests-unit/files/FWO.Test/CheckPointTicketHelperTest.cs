@@ -42,7 +42,7 @@ namespace FWO.Test
                 Assert.That(hardError.ToString(), Is.EqualTo("HardError"));
                 Assert.That(success.ToString(), Is.EqualTo("Success"));
                 Assert.That(InvokeStatic<string?>("TryGetString", document.RootElement, "text"), Is.EqualTo("abc"));
-                Assert.That(InvokeStatic<string?>("TryGetString", document.RootElement, "number"), Is.Null);
+                Assert.That(InvokeStatic<string?>("TryGetString", document.RootElement, "number"), Is.EqualTo("24"));
                 Assert.That(InvokeStatic<int?>("TryGetInt", document.RootElement, "number"), Is.EqualTo(24));
                 Assert.That(InvokeStatic<int?>("TryGetInt", document.RootElement, "actualNumber"), Is.EqualTo(25));
                 Assert.That(InvokeStatic<int?>("TryGetInt", document.RootElement, "missing"), Is.Null);

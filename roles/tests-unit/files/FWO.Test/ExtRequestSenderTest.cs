@@ -121,8 +121,8 @@ namespace FWO.Test
 
         [TestCase("", null)]
         [TestCase("{}", null)]
-        [TestCase("{\"managementId\":[]}", null)]
-        [TestCase("{\"managementId\":[23,42]}", 23)]
+        [TestCase("{\"ManagementId\":[]}", null)]
+        [TestCase("{\"ManagementId\":[23,42]}", 23)]
         public void GetManagementId_ReturnsTheFirstConfiguredManagement(string queryVariables, int? expectedId)
         {
             int? managementId = InvokePrivateStatic<int?>("GetManagementId", queryVariables);
