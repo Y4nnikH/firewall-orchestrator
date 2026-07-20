@@ -1003,6 +1003,20 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task TestNameFieldRuleOwnerPreFilterFallsBackWhenPrefilterQueryFails()
+        {
+            SimulatedUserConfig config = CreateNameFieldPreFilterUserConfig();
+            RuleOwnerPreFilterRoutingApiConn apiConnection = new() { ThrowOnRuleOwnerPreFilter = true };
+            ModellingVarianceAnalysis analysis = new(apiConnection, extStateHandler, config, Application, DefaultInit.DoNothing);
+
+            await analysis.AnalyseRulesVsModelledConnections([], new(), false);
+
+            Assert.That(apiConnection.Queries, Does.Contain(ImportQueries.getPendingRuleOwnerImports));
+            Assert.That(apiConnection.Queries, Does.Contain(RuleQueries.getModelledRulesByRuleOwnerNameField));
+            Assert.That(apiConnection.Queries, Does.Contain(RuleQueries.getModelledRulesByManagementName));
+        }
+
+        [Test]
         public async Task TestNameFieldRuleOwnerPreFilterSkippedForExpandedRuleModes()
         {
             SimulatedUserConfig config = CreateNameFieldPreFilterUserConfig();
@@ -1039,6 +1053,7 @@ namespace FWO.Test
             public List<string> Queries { get; } = [];
             public bool ReturnRuleOwnerRules { get; init; } = true;
             public bool HasPendingRuleOwnerMappingImport { get; init; } = false;
+            public bool ThrowOnRuleOwnerPreFilter { get; init; } = false;
 
             public override async Task<QueryResponseType> SendQueryAsync<QueryResponseType>(
                 string query,
@@ -1088,6 +1103,11 @@ namespace FWO.Test
 
                 if (responseType == typeof(List<Rule>))
                 {
+                    if (query == RuleQueries.getModelledRulesByRuleOwnerNameField && ThrowOnRuleOwnerPreFilter)
+                    {
+                        throw new InvalidOperationException("Simulated rule_owner prefilter failure.");
+                    }
+
                     List<Rule> rules = query == RuleQueries.getModelledRulesByRuleOwnerNameField && !ReturnRuleOwnerRules
                         ? []
                         : [new() { Id = 1, Name = "FWOC1", MgmtId = 1 }];

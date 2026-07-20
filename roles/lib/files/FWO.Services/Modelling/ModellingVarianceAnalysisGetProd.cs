@@ -143,7 +143,7 @@ namespace FWO.Services.Modelling
             long? relImpId = await GetRelevantImportId(mgtId);
             await GetRuleDevices(mgtId, modellingFilter);
 
-            if (relImpId != null && useNameFieldRuleOwnerPreFilter && ShouldUseNameFieldRuleOwnerPreFilter(modellingFilter) && await IsRuleOwnerMappingCurrent(relImpId.Value))
+            if (relImpId != null && useNameFieldRuleOwnerPreFilter && ShouldUseNameFieldRuleOwnerPreFilter(modellingFilter) && await IsRuleOwnerMappingCurrent(mgtId, relImpId.Value))
             {
                 List<Rule>? preFilteredRules = await TryGetNameFieldRuleOwnerPrefilteredRules(mgtId, relImpId);
                 if (preFilteredRules?.Count > 0)
@@ -206,17 +206,22 @@ namespace FWO.Services.Modelling
                 && !modellingFilter.RulesForDeletedConns;
         }
 
-        private async Task<bool> IsRuleOwnerMappingCurrent(long relImpId)
+        /// <summary>
+        /// Checks import_control backlog for firewall-import driven rule_owner mapping lag.
+        /// Owner/model changes are expected to update rule_owner mapping promptly; without an
+        /// import_control marker there is no cheap freshness signal here.
+        /// </summary>
+        private async Task<bool> IsRuleOwnerMappingCurrent(int mgtId, long relImpId)
         {
             try
             {
                 PendingRuleOwnerMappingImports ??= await apiConnection.SendQueryAsync<List<ImportControl>>(ImportQueries.getPendingRuleOwnerImports) ?? [];
 
-                bool hasRelevantPendingImport = PendingRuleOwnerMappingImports.Any(import => import.ControlId <= relImpId);
+                bool hasRelevantPendingImport = PendingRuleOwnerMappingImports.Any(import => import.ControlId <= relImpId && (!import.MgmId.HasValue || import.MgmId.Value == mgtId));
                 if (hasRelevantPendingImport)
                 {
                     Log.WriteDebug("Variance Rule Loading",
-                        $"Skipping NameField rule_owner prefilter because pending rule_owner mapping imports exist up to import {relImpId}.");
+                        $"Skipping NameField rule_owner prefilter because pending rule_owner mapping imports exist for management {mgtId} up to import {relImpId}.");
                 }
 
                 return !hasRelevantPendingImport;
@@ -224,7 +229,8 @@ namespace FWO.Services.Modelling
             catch (Exception exception)
             {
                 Log.WriteWarning("Variance Rule Loading",
-                    $"Could not verify rule_owner mapping freshness for import {relImpId}. Falling back to marker query. {exception.Message}");
+                        $"Could not verify rule_owner mapping freshness for management {mgtId}, import {relImpId}. Falling back to marker query. {exception.Message}");
+
                 return false;
             }
         }
