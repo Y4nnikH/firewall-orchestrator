@@ -29,7 +29,9 @@ public sealed class GetApplicationZonesOptions
 }
 
 /// <summary>
-/// Represents nullable filters for every top-level application-zone response field. String filters support
+/// Represents nullable filters for every top-level application-zone response field. Application fields select
+/// applications before zones are loaded. Zone fields apply only to concrete zones, so they exclude placeholders for
+/// applications without a zone. Deleted zones and member addresses are excluded by default. String filters support
 /// <c>*</c> for any character sequence and <c>?</c> for one character; values without wildcards match exactly,
 /// case-insensitively.
 /// </summary>
@@ -76,7 +78,8 @@ public sealed class ApplicationZoneFilter
     public string? IdString { get; set; }
 
     /// <summary>
-    /// Gets or sets the optional deleted-state filter.
+    /// Gets or sets the optional deleted-state filter for concrete zones. Deleted zones are excluded from this
+    /// endpoint, so <c>true</c> returns no results and <c>false</c> excludes applications without a zone.
     /// </summary>
     [JsonPropertyName("isDeleted")]
     public bool? IsDeleted { get; set; }

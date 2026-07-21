@@ -44,7 +44,8 @@ public sealed class ApplicationZoneResponse
     public string? IdString { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether the application-zone is deleted, or <c>null</c> when the application has no application-zone.
+    /// Gets or sets a value indicating whether the application-zone is deleted. Returned zones are always active,
+    /// so this is <c>false</c>, or <c>null</c> when the application has no application-zone.
     /// </summary>
     [JsonPropertyName("isDeleted")]
     public bool? IsDeleted { get; set; }
@@ -92,7 +93,8 @@ public sealed class ApplicationZoneAddressResponse
     public string ImportSource { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets a value indicating whether the address is deleted.
+    /// Gets or sets a value indicating whether the address is deleted. Returned addresses are always active, so this
+    /// is <c>false</c>.
     /// </summary>
     [JsonPropertyName("isDeleted")]
     public bool IsDeleted { get; set; }

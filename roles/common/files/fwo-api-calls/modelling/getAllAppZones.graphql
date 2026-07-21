@@ -1,11 +1,11 @@
-query getAllAppZones {
-  modelling_nwgroup (where: { group_type: { _eq: 21 } } order_by: { name: asc }) {
+query getAllAppZones($applicationIds: [Int!]!) {
+  modelling_nwgroup (where: { group_type: { _eq: 21 }, app_id: { _in: $applicationIds }, is_deleted: { _eq: false } } order_by: { name: asc }) {
     id
     app_id
     name
     id_string
     is_deleted
-    nwobjects: nwobject_nwgroups {
+    nwobjects: nwobject_nwgroups(where: { owner_network: { is_deleted: { _eq: false } } }) {
       owner_network {
         ...appServerDetails
       }

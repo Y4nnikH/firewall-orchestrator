@@ -12,6 +12,7 @@ using FWO.Middleware.Server.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using NUnit.Framework;
 
 namespace FWO.Test;
@@ -19,8 +20,8 @@ namespace FWO.Test;
 [TestFixture]
 internal class ApplicationZonesControllerTest
 {
-    private static readonly string[] kControllerRoutes = ["api/modelling"];
-    private static readonly string[] kModellerRole = [Roles.Modeller];
+    private static readonly List<string> kControllerRoutes = new() { "api/modelling" };
+    private static readonly List<string> kModellerRole = new() { Roles.Modeller };
 
     [Test]
     public void GetUsesApplicationZonesRoute()
@@ -33,6 +34,29 @@ internal class ApplicationZonesControllerTest
         {
             Assert.That(controllerRoutes.Select(route => route.Template), Is.EquivalentTo(kControllerRoutes));
             Assert.That(httpPost?.Template, Is.EqualTo("getApplicationZones"));
+        });
+    }
+
+    [Test]
+    public void GetAllowsEmptyRequestBody()
+    {
+        MethodInfo getMethod = typeof(ApplicationZonesController).GetMethod(nameof(ApplicationZonesController.Get))!;
+        ParameterInfo requestParameter = getMethod.GetParameters().Single();
+        FromBodyAttribute? fromBody = requestParameter.GetCustomAttribute<FromBodyAttribute>();
+
+        Assert.That(fromBody?.EmptyBodyBehavior, Is.EqualTo(EmptyBodyBehavior.Allow));
+    }
+
+    [Test]
+    public void ApplicationZoneQueryLimitsResultsToActiveRequestedData()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(ModellingQueries.getAllAppZones, Does.Contain("$applicationIds: [Int!]!"));
+            Assert.That(ModellingQueries.getAllAppZones, Does.Contain("app_id: { _in: $applicationIds }"));
+            Assert.That(ModellingQueries.getAllAppZones, Does.Contain("is_deleted: { _eq: false }"));
+            Assert.That(ModellingQueries.getAllAppZones,
+                Does.Contain("owner_network: { is_deleted: { _eq: false } }"));
         });
     }
 
@@ -51,11 +75,11 @@ internal class ApplicationZonesControllerTest
         ApplicationZonesApiConnection apiConnection = new()
         {
             Owners = CreateOwners((7, "Application Seven", "APP-7"), (8, "Application Eight", "APP-8")),
-            AllApplicationZones =
-            [
+            AllApplicationZones = new List<ModellingAppZone>
+            {
                 CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", "10.7.0.9"),
                 CreateApplicationZone(8, 80, "AZ-8", "az-8", "10.8.0.1", string.Empty)
-            ]
+            }
         };
         ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
         GetApplicationZonesRequest request = new();
@@ -72,6 +96,8 @@ internal class ApplicationZonesControllerTest
                 ModellingQueries.getAllAppZones
             }));
             Assert.That(apiConnection.SetBestRoleCount, Is.Zero);
+            Assert.That(JsonSerializer.Serialize(apiConnection.LastApplicationZoneVariables),
+                Is.EqualTo("""{"applicationIds":[7,8]}"""));
             Assert.That(response, Has.Count.EqualTo(2));
             Assert.That(response[0].ApplicationId, Is.EqualTo(7));
             Assert.That(response[0].ApplicationName, Is.EqualTo("Application Seven"));
@@ -89,11 +115,11 @@ internal class ApplicationZonesControllerTest
         ApplicationZonesApiConnection apiConnection = new()
         {
             Owners = CreateOwners((7, "Application Seven", "APP-7"), (9, "Application Nine", "APP-9")),
-            AllApplicationZones =
-            [
+            AllApplicationZones = new List<ModellingAppZone>
+            {
                 CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty),
                 CreateApplicationZone(9, 90, "AZ-9", "az-9", "10.9.0.1", string.Empty)
-            ]
+            }
         };
         ClaimsPrincipal modeller = PrincipalWithRolesAndClaims(
             kModellerRole, new Claim("x-hasura-editable-owners", "{7,8}"));
@@ -110,11 +136,11 @@ internal class ApplicationZonesControllerTest
         ApplicationZonesApiConnection apiConnection = new()
         {
             Owners = CreateOwners((7, "Application Seven", "APP-7"), (9, "Application Nine", "APP-9")),
-            AllApplicationZones =
-            [
+            AllApplicationZones = new List<ModellingAppZone>
+            {
                 CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty),
                 CreateApplicationZone(9, 90, "AZ-9", "az-9", "10.9.0.1", string.Empty)
-            ]
+            }
         };
         ClaimsPrincipal adminAndModeller = PrincipalWithRolesAndClaims(
             new List<string> { Roles.Admin, Roles.Modeller }, new Claim("x-hasura-editable-owners", "{7}"));
@@ -131,11 +157,11 @@ internal class ApplicationZonesControllerTest
         ApplicationZonesApiConnection apiConnection = new()
         {
             Owners = CreateOwners((7, "Application Seven", "APP-7")),
-            AllApplicationZones =
-            [
+            AllApplicationZones = new List<ModellingAppZone>
+            {
                 CreateApplicationZone(7, 70, "AZ-Match", "az-match", "10.7.0.1", string.Empty),
                 CreateApplicationZone(7, 71, "AZ-Other", "az-other", "10.7.0.2", string.Empty)
-            ]
+            }
         };
         ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Auditor));
         GetApplicationZonesRequest request = new()
@@ -225,11 +251,11 @@ internal class ApplicationZonesControllerTest
                 (7, "Application Seven", "APP-7"),
                 (8, "Application Eight", "APP-8"),
                 (9, "Application Nine", "APP-9")),
-            AllApplicationZones =
-            [
+            AllApplicationZones = new List<ModellingAppZone>
+            {
                 CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty),
                 CreateApplicationZone(8, 80, "AZ-8", "az-8", "10.8.0.1", string.Empty)
-            ]
+            }
         };
         ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
 
@@ -255,7 +281,10 @@ internal class ApplicationZonesControllerTest
         ApplicationZonesApiConnection apiConnection = new()
         {
             Owners = CreateOwners((7, "Application Seven", "APP-7")),
-            AllApplicationZones = [CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty)]
+            AllApplicationZones = new List<ModellingAppZone>
+            {
+                CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty)
+            }
         };
         ClaimsPrincipal modeller = PrincipalWithRolesAndClaims(
             kModellerRole, new Claim("x-hasura-editable-owners", "{7}"));
@@ -303,6 +332,48 @@ internal class ApplicationZonesControllerTest
             Assert.That(response[0].IsDeleted, Is.Null);
             Assert.That(response[0].Addresses, Is.Empty);
         });
+    }
+
+    [Test]
+    public async Task GetExcludesDefaultSuperOwnerFromApplicationPlaceholders()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = new List<FwoOwner>
+            {
+                new() { Id = 0, Name = "super-owner", ExtAppId = "NONE", IsDefault = true },
+                new() { Id = 2, Name = "Application Two", ExtAppId = "APP-2" }
+            }
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(new GetApplicationZonesRequest());
+
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)((OkObjectResult)result.Result!).Value!;
+        Assert.That(response.Select(applicationZone => applicationZone.ApplicationId), Is.EqualTo(new List<int> { 2 }));
+    }
+
+    [Test]
+    public async Task GetZoneFilterExcludesApplicationPlaceholders()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((2, "Application Two", "APP-2"), (3, "Application Three", "APP-3")),
+            AllApplicationZones = new List<ModellingAppZone>
+            {
+                CreateApplicationZone(2, 20, "AZ-2", "az-2", "10.2.0.1", string.Empty)
+            }
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new() { Filter = new() { IsDeleted = false } }
+        };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)((OkObjectResult)result.Result!).Value!;
+        Assert.That(response.Select(applicationZone => applicationZone.ApplicationId), Is.EqualTo(new List<int> { 2 }));
     }
 
     [Test]
@@ -374,7 +445,10 @@ internal class ApplicationZonesControllerTest
         ApplicationZonesApiConnection apiConnection = new()
         {
             Owners = CreateOwners((7, "Application Seven", "APP-7")),
-            AllApplicationZones = [CreateApplicationZone(7, 70, "AZ-Match", "az-match", "10.7.0.1", string.Empty)]
+            AllApplicationZones = new List<ModellingAppZone>
+            {
+                CreateApplicationZone(7, 70, "AZ-Match", "az-match", "10.7.0.1", string.Empty)
+            }
         };
         ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Auditor));
         GetApplicationZonesRequest request = new()
@@ -398,6 +472,21 @@ internal class ApplicationZonesControllerTest
         Assert.That(response.Select(applicationZone => applicationZone.Id), Is.EqualTo(new List<long> { 70 }));
     }
 
+    [Test]
+    public void MatchesTextFilterTreatsTimedOutPatternsAsNoMatch()
+    {
+        string filter = string.Concat(Enumerable.Repeat("*a", 127)) + "*b";
+        string value = new string('a', 4096);
+        MethodInfo matchesTextFilter = typeof(ApplicationZonesController).GetMethod(
+            "MatchesTextFilter", BindingFlags.NonPublic | BindingFlags.Static)!;
+        object?[] filterArguments = new object?[2];
+        filterArguments[0] = value;
+        filterArguments[1] = filter;
+
+        bool isMatch = (bool)matchesTextFilter.Invoke(null, filterArguments)!;
+        Assert.That(isMatch, Is.False);
+    }
+
     private static ModellingAppZone CreateApplicationZone(
         int applicationId, long id, string name, string idString, string ip, string ipEnd)
     {
@@ -407,8 +496,8 @@ internal class ApplicationZonesControllerTest
             Id = id,
             Name = name,
             IdString = idString,
-            AppServers =
-            [
+            AppServers = new List<ModellingAppServerWrapper>
+            {
                 new ModellingAppServerWrapper
                 {
                     Content = new ModellingAppServer
@@ -422,7 +511,7 @@ internal class ApplicationZonesControllerTest
                         CustomType = 4
                     }
                 }
-            ]
+            }
         };
     }
 
@@ -468,9 +557,10 @@ internal class ApplicationZonesControllerTest
 
     private sealed class ApplicationZonesApiConnection : SimulatedApiConnection
     {
-        public List<ModellingAppZone> AllApplicationZones { get; set; } = [];
-        public List<FwoOwner> Owners { get; set; } = [];
-        public List<string> Queries { get; } = [];
+        public List<ModellingAppZone> AllApplicationZones { get; set; } = new();
+        public List<FwoOwner> Owners { get; set; } = new();
+        public List<string> Queries { get; } = new();
+        public object? LastApplicationZoneVariables { get; private set; }
         public int SetBestRoleCount { get; private set; }
 
         public override void SetBestRole(ClaimsPrincipal user, List<string> targetRoleList)
@@ -487,14 +577,35 @@ internal class ApplicationZonesControllerTest
             Queries.Add(query);
             if (query == OwnerQueries.getOwnersFiltered)
             {
-                return Task.FromResult((QueryResponseType)(object)Owners);
+                return Task.FromResult((QueryResponseType)(object)GetMatchingOwners(variables));
             }
             if (query == ModellingQueries.getAllAppZones)
             {
+                LastApplicationZoneVariables = variables;
                 return Task.FromResult((QueryResponseType)(object)AllApplicationZones);
             }
 
             return Task.FromResult((QueryResponseType)(object)new List<ModellingAppZone>());
+        }
+
+        private List<FwoOwner> GetMatchingOwners(object? variables)
+        {
+            List<int>? applicationIds = GetApplicationIds(variables);
+            return Owners.Where(owner => !owner.IsDefault &&
+                (applicationIds is null || applicationIds.Contains(owner.Id))).ToList();
+        }
+
+        private static List<int>? GetApplicationIds(object? variables)
+        {
+            if (variables?.GetType().GetProperty("where")?.GetValue(variables) is not Dictionary<string, object> where ||
+                !where.TryGetValue("id", out object? idExpression) ||
+                idExpression is not Dictionary<string, object> idFilter ||
+                !idFilter.TryGetValue("_in", out object? rawApplicationIds))
+            {
+                return null;
+            }
+
+            return rawApplicationIds as List<int>;
         }
     }
 }

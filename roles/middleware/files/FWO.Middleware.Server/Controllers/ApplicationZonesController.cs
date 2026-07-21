@@ -9,6 +9,7 @@ using FWO.Middleware.Server.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.Text.RegularExpressions;
 
 namespace FWO.Middleware.Server.Controllers;
@@ -32,6 +33,8 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     /// receives application zones only for applications in the <c>x-hasura-editable-owners</c> JWT claim.
     /// The <c>options</c> root key defaults to <c>{}</c> when omitted.
     /// Every field in <c>options.filter</c> is nullable; an omitted or null field does not restrict the response.
+    /// Deleted application zones and member addresses are excluded by default. Zone-specific filters exclude the
+    /// placeholder returned for applications that have no application zone.
     /// </remarks>
     [HttpPost("getApplicationZones")]
     [Consumes("application/json")]
@@ -41,7 +44,8 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     [Authorize(Roles = $"{Roles.Admin}, {Roles.Auditor}, {Roles.Modeller}")]
-    public async Task<ActionResult<List<ApplicationZoneResponse>>> Get([FromBody] GetApplicationZonesRequest? request)
+    public async Task<ActionResult<List<ApplicationZoneResponse>>> Get(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] GetApplicationZonesRequest? request)
     {
         GetApplicationZonesRequest effectiveRequest = request ?? new GetApplicationZonesRequest();
         Dictionary<string, string[]> validationErrors = ValidateRequest(effectiveRequest);
@@ -59,7 +63,7 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
             List<FwoOwner> filteredApplications = await GetFilteredApplicationsAsync(
                 accessibleApplicationIds, effectiveRequest.Options!.Filter);
             List<ApplicationZoneResponse> applicationZones = await GetApplicationZonesAsync(filteredApplications);
-            return Ok(ApplyFilter(applicationZones, effectiveRequest.Options!.Filter));
+            return Ok(ApplyZoneFilter(applicationZones, effectiveRequest.Options!.Filter));
         }
         catch (Exception exception)
         {
@@ -166,14 +170,15 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
             return [];
         }
 
-        HashSet<int> applicationIds = applications.Select(application => application.Id).ToHashSet();
+        List<int> applicationIds = applications.Select(application => application.Id).ToList();
+        HashSet<int> applicationIdSet = applicationIds.ToHashSet();
         List<ModellingAppZone> zones = await apiConnection.SendQueryAsync<List<ModellingAppZone>>(
-            ModellingQueries.getAllAppZones) ?? [];
+            ModellingQueries.getAllAppZones, new { applicationIds }) ?? [];
         List<ApplicationZoneResponse> applicationZones = zones
-            .Where(zone => zone.AppId is not null && applicationIds.Contains(zone.AppId.Value))
+            .Where(zone => zone.AppId is not null && applicationIdSet.Contains(zone.AppId.Value))
             .Select(ToResponse)
             .ToList();
-        return AddApplicationZoneDetails(applications.Select(application => application.Id).ToList(), applicationZones, applications);
+        return AddApplicationZoneDetails(applicationIds, applicationZones, applications);
     }
 
     private async Task<List<FwoOwner>> GetFilteredApplicationsAsync(
@@ -188,15 +193,16 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
 
     private async Task<List<FwoOwner>> GetExistingApplicationsAsync(List<int>? applicationIds)
     {
-        Dictionary<string, object> where = applicationIds is null
-            ? []
-            : new Dictionary<string, object>
-            {
-                ["id"] = new Dictionary<string, object> { ["_in"] = applicationIds }
-            };
-        List<FwoOwner> owners = await apiConnection.SendQueryAsync<List<FwoOwner>>(
+        Dictionary<string, object> where = new()
+        {
+            ["is_default"] = new Dictionary<string, object> { ["_eq"] = false }
+        };
+        if (applicationIds is not null)
+        {
+            where["id"] = new Dictionary<string, object> { ["_in"] = applicationIds };
+        }
+        return await apiConnection.SendQueryAsync<List<FwoOwner>>(
             OwnerQueries.getOwnersFiltered, new { where }) ?? [];
-        return applicationIds is null ? owners : owners.Where(owner => applicationIds.Contains(owner.Id)).ToList();
     }
 
     private static List<ApplicationZoneResponse> AddApplicationZoneDetails(
@@ -239,7 +245,7 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         return responses;
     }
 
-    private static List<ApplicationZoneResponse> ApplyFilter(
+    private static List<ApplicationZoneResponse> ApplyZoneFilter(
         List<ApplicationZoneResponse> applicationZones, ApplicationZoneFilter? filter)
     {
         if (filter is null)
@@ -248,9 +254,6 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         }
 
         return applicationZones.Where(applicationZone =>
-            (filter.ApplicationId is null || applicationZone.ApplicationId == filter.ApplicationId) &&
-            MatchesTextFilter(applicationZone.ApplicationName, filter.ApplicationName) &&
-            MatchesTextFilter(applicationZone.AppIdExternal, filter.AppIdExternal) &&
             (filter.Id is null || applicationZone.Id == filter.Id) &&
             MatchesTextFilter(applicationZone.Name, filter.Name) &&
             MatchesTextFilter(applicationZone.IdString, filter.IdString) &&
@@ -271,8 +274,15 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         string pattern = "^" + Regex.Escape(filter)
             .Replace("\\*", ".*")
             .Replace("\\?", ".") + "$";
-        return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-            TimeSpan.FromMilliseconds(kFilterPatternTimeoutMilliseconds));
+        try
+        {
+            return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+                TimeSpan.FromMilliseconds(kFilterPatternTimeoutMilliseconds));
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return false;
+        }
     }
 
     private static void AddError(Dictionary<string, string[]> errors, string fieldName, string error)
