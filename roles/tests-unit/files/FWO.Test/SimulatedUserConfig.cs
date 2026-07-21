@@ -109,6 +109,7 @@ namespace FWO.Test
             {"H5017","The catalog brings flow objects, duplicate mappings, and custom network objects together in one place."},
             {"H5018","Use the page to set naming sources, resolve conflicts, and create individual mappings manually when needed."},
             {"H5020","Flow name recalculation applies the selected management ranking to network objects, network groups, service objects, service groups, and time objects."},
+            {"H5025","For duplicate mappings, the catalog and resolver dialog also show the technical details of the flow object. In the catalog view, long lists are shortened and finished with a note about additional objects."},
             {"network_services","Network Services"},
             {"protocol","Protocol"},
             {"port","Port"},
