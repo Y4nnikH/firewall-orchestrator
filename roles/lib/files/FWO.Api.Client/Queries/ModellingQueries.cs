@@ -121,6 +121,7 @@ namespace FWO.Api.Client.Queries
         public static readonly string addHistoryEntry;
 
         public static readonly string newAppZone;
+        public static readonly string getAllAppZones;
         public static readonly string getAppZonesByAppId;
 
         public static readonly string getOwnersForRuleOwnerNameField;
@@ -248,6 +249,7 @@ namespace FWO.Api.Client.Queries
                 addHistoryEntry = GetQueryText("modelling/addHistoryEntry.graphql");
 
                 newAppZone = GetQueryText("modelling/addNwAppZone.graphql");
+                getAllAppZones = appServerDetailsFragment + GetQueryText("modelling/getAllAppZones.graphql");
                 getAppZonesByAppId = appServerDetailsFragment + GetQueryText("modelling/getAppZonesByAppId.graphql");
 
                 getOwnersForRuleOwnerNameField = GetQueryText("modelling/getOwnersForRuleOwnerNameField.graphql");

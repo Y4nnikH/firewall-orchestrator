@@ -22,12 +22,13 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     internal const int kMaxFilterTextLength = 256;
 
     /// <summary>
-    /// Returns complete application-zone objects, including all addresses, for the requested applications.
+    /// Returns complete application-zone objects, including all addresses, for the requested or visible applications.
     /// </summary>
     /// <remarks>
     /// Requires the <c>admin</c>, <c>auditor</c>, or <c>modeller</c> role. A caller with only the modeller role
     /// receives application zones only for applications in the <c>x-hasura-editable-owners</c> JWT claim.
-    /// The <c>applicationIds</c> root key is required. The <c>options</c> root key defaults to <c>{}</c> when omitted.
+    /// The <c>applicationIds</c> root key defaults to all applications visible to the caller when omitted, null, or empty.
+    /// The <c>options</c> root key defaults to <c>{}</c> when omitted.
     /// Every field in <c>options.filter</c> is nullable; an omitted or null field does not restrict the response.
     /// </remarks>
     [HttpPost("getApplicationZones")]
@@ -40,7 +41,8 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     [Authorize(Roles = $"{Roles.Admin}, {Roles.Auditor}, {Roles.Modeller}")]
     public async Task<ActionResult<List<ApplicationZoneResponse>>> Get([FromBody] GetApplicationZonesRequest? request)
     {
-        Dictionary<string, string[]> validationErrors = ValidateRequest(request);
+        GetApplicationZonesRequest effectiveRequest = request ?? new GetApplicationZonesRequest();
+        Dictionary<string, string[]> validationErrors = ValidateRequest(effectiveRequest);
         if (validationErrors.Count > 0)
         {
             return BadRequest(new ValidationProblemDetails(validationErrors)
@@ -51,8 +53,7 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
 
         try
         {
-            GetApplicationZonesRequest effectiveRequest = request!;
-            List<int> applicationIds = GetAccessibleApplicationIds(effectiveRequest.ApplicationIds!);
+            List<int>? applicationIds = GetAccessibleApplicationIds(effectiveRequest.ApplicationIds);
             List<ApplicationZoneResponse> applicationZones = await GetApplicationZonesAsync(applicationIds);
             return Ok(ApplyFilter(applicationZones, effectiveRequest.Options!.Filter));
         }
@@ -66,15 +67,9 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     /// <summary>
     /// Validates the request and returns all detected field errors.
     /// </summary>
-    internal static Dictionary<string, string[]> ValidateRequest(GetApplicationZonesRequest? request)
+    internal static Dictionary<string, string[]> ValidateRequest(GetApplicationZonesRequest request)
     {
         Dictionary<string, string[]> errors = [];
-        if (request is null)
-        {
-            AddError(errors, "request", "A request body is required.");
-            return errors;
-        }
-
         ValidateApplicationIds(request.ApplicationIds, errors);
         if (request.Options is null)
         {
@@ -114,9 +109,8 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
 
     private static void ValidateApplicationIds(List<int>? applicationIds, Dictionary<string, string[]> errors)
     {
-        if (applicationIds is not { Count: > 0 })
+        if (applicationIds is null)
         {
-            AddError(errors, "applicationIds", "applicationIds is required and must contain at least one positive integer.");
             return;
         }
 
@@ -166,21 +160,31 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         }
     }
 
-    private List<int> GetAccessibleApplicationIds(List<int> applicationIds)
+    private List<int>? GetAccessibleApplicationIds(List<int>? applicationIds)
     {
-        if (!ShouldRestrictToEditableApplications(User))
+        if (ShouldRestrictToEditableApplications(User))
         {
-            return applicationIds.Distinct().ToList();
+            HashSet<int> editableApplicationIds = JwtClaimParser.ExtractIntClaimValues(
+                User.Claims, "x-hasura-editable-owners").ToHashSet();
+            return applicationIds is { Count: > 0 }
+                ? applicationIds.Where(editableApplicationIds.Contains).Distinct().ToList()
+                : editableApplicationIds.ToList();
         }
 
-        HashSet<int> editableApplicationIds = JwtClaimParser.ExtractIntClaimValues(
-            User.Claims, "x-hasura-editable-owners").ToHashSet();
-        return applicationIds.Where(editableApplicationIds.Contains).Distinct().ToList();
+        return applicationIds is { Count: > 0 } ? applicationIds.Distinct().ToList() : null;
     }
 
-    private async Task<List<ApplicationZoneResponse>> GetApplicationZonesAsync(List<int> applicationIds)
+    private async Task<List<ApplicationZoneResponse>> GetApplicationZonesAsync(List<int>? applicationIds)
     {
         List<ApplicationZoneResponse> applicationZones = [];
+        if (applicationIds is null)
+        {
+            List<ModellingAppZone> zones = await apiConnection.SendQueryAsync<List<ModellingAppZone>>(
+                ModellingQueries.getAllAppZones) ?? [];
+            applicationZones.AddRange(zones.Select(ToResponse));
+            return applicationZones;
+        }
+
         foreach (int applicationId in applicationIds)
         {
             List<ModellingAppZone> zones = await apiConnection.SendQueryAsync<List<ModellingAppZone>>(

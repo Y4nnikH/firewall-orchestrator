@@ -148,8 +148,12 @@ internal class ApplicationZonesControllerTest
     {
         GetApplicationZonesRequest request = new();
 
-        Assert.That(request.Options, Is.Not.Null);
-        Assert.That(request.Options!.Filter, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(request.ApplicationIds, Is.Null);
+            Assert.That(request.Options, Is.Not.Null);
+            Assert.That(request.Options!.Filter, Is.Null);
+        });
     }
 
     [Test]
@@ -194,18 +198,51 @@ internal class ApplicationZonesControllerTest
     }
 
     [Test]
-    public async Task GetReturnsValidationProblemForInvalidRequest()
+    public async Task GetReturnsAllApplicationZonesForEmptyRequestBody()
     {
-        ApplicationZonesController controller = CreateController(new ApplicationZonesApiConnection(), PrincipalWithRoles(Roles.Admin));
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            AllApplicationZones =
+            [
+                CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty),
+                CreateApplicationZone(8, 80, "AZ-8", "az-8", "10.8.0.1", string.Empty)
+            ]
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(null);
+
+        OkObjectResult okResult = (OkObjectResult)result.Result!;
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)okResult.Value!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(apiConnection.Queries, Is.EqualTo(new List<string> { ModellingQueries.getAllAppZones }));
+            Assert.That(response.Select(applicationZone => applicationZone.Id), Is.EqualTo(new List<long> { 70, 80 }));
+        });
+    }
+
+    [Test]
+    public async Task GetReturnsOnlyEditableApplicationZonesForEmptyObjectRequest()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            ZonesByApplicationId = new Dictionary<int, List<ModellingAppZone>>
+            {
+                [7] = [CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty)]
+            }
+        };
+        ClaimsPrincipal modeller = PrincipalWithRolesAndClaims(
+            kModellerRole, new Claim("x-hasura-editable-owners", "{7}"));
+        ApplicationZonesController controller = CreateController(apiConnection, modeller);
 
         ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(new GetApplicationZonesRequest());
 
-        ObjectResult errorResult = (ObjectResult)result.Result!;
-        ValidationProblemDetails validationProblem = (ValidationProblemDetails)errorResult.Value!;
+        OkObjectResult okResult = (OkObjectResult)result.Result!;
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)okResult.Value!;
         Assert.Multiple(() =>
         {
-            Assert.That(errorResult.StatusCode, Is.EqualTo(StatusCodes.Status400BadRequest));
-            Assert.That(validationProblem.Errors.Keys, Does.Contain("applicationIds"));
+            Assert.That(apiConnection.ApplicationIds, Is.EqualTo(new List<int> { 7 }));
+            Assert.That(response.Select(applicationZone => applicationZone.Id), Is.EqualTo(new List<long> { 70 }));
         });
     }
 
@@ -270,6 +307,7 @@ internal class ApplicationZonesControllerTest
     private sealed class ApplicationZonesApiConnection : SimulatedApiConnection
     {
         public Dictionary<int, List<ModellingAppZone>> ZonesByApplicationId { get; set; } = [];
+        public List<ModellingAppZone> AllApplicationZones { get; set; } = [];
         public List<string> Queries { get; } = [];
         public List<int> ApplicationIds { get; } = [];
         public int SetBestRoleCount { get; private set; }
@@ -286,6 +324,11 @@ internal class ApplicationZonesControllerTest
             QueryChunkingOptions? chunkingOptions = null)
         {
             Queries.Add(query);
+            if (query == ModellingQueries.getAllAppZones)
+            {
+                return Task.FromResult((QueryResponseType)(object)AllApplicationZones);
+            }
+
             PropertyInfo applicationIdProperty = variables!.GetType().GetProperty("appId")!;
             int applicationId = (int)applicationIdProperty.GetValue(variables)!;
             ApplicationIds.Add(applicationId);

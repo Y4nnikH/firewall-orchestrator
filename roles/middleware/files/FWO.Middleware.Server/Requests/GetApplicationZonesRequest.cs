@@ -9,7 +9,8 @@ namespace FWO.Middleware.Server.Requests;
 public sealed class GetApplicationZonesRequest
 {
     /// <summary>
-    /// Gets or sets the required list of positive application ids to query.
+    /// Gets or sets the optional list of positive application ids to query. When omitted, null, or empty,
+    /// application zones for every application visible to the caller are returned.
     /// </summary>
     [JsonPropertyName("applicationIds")]
     public List<int>? ApplicationIds { get; set; }
