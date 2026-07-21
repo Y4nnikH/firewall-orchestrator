@@ -108,6 +108,7 @@ namespace FWO.Test
             {"H5016","This page shows the flow network object catalog and the matching tools for cleanup and maintenance."},
             {"H5017","The catalog brings flow objects, duplicate mappings, and custom network objects together in one place."},
             {"H5018","Use the page to set naming sources, resolve conflicts, and create individual mappings manually when needed."},
+            {"H5020","Flow name recalculation applies the selected management ranking to network objects, network groups, service objects, service groups, and time objects."},
             {"network_services","Network Services"},
             {"protocol","Protocol"},
             {"port","Port"},

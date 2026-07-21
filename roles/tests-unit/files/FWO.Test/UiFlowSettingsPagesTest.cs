@@ -437,7 +437,7 @@ namespace FWO.Test
             await using BunitContext context = CreateNetworkObjectsContext(out FlowNetworkObjectsNamingApiConn apiConnection);
 
             IRenderedComponent<SettingsFlowGeneral> component = RenderPage<SettingsFlowGeneral>(context);
-            FieldInfo? namingManagementField = typeof(SettingsFlowGeneral).GetField("namingCustomObjectManagements", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo? namingManagementField = typeof(SettingsFlowGeneral).GetField("namingNetworkObjectManagements", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(namingManagementField, Is.Not.Null);
             component.WaitForAssertion(() =>
             {
@@ -800,6 +800,22 @@ namespace FWO.Test
             {
                 return Task.FromResult((QueryResponseType)(object)new List<FlowNwObject> { flowNwObject });
             }
+            if (query == FlowQueries.getFlowAddressGroups)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<FlowNwGroup>());
+            }
+            if (query == FlowQueries.getFlowServiceObjects)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<FlowSvcObject>());
+            }
+            if (query == FlowQueries.getFlowServiceGroups)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<FlowSvcGroup>());
+            }
+            if (query == FlowQueries.getFlowTimeObjects)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<FlowTimeObject>());
+            }
             if (query == FlowQueries.getFlowCustomObjectCandidates)
             {
                 return Task.FromResult((QueryResponseType)(object)new List<Management> { localManagement });
@@ -812,20 +828,32 @@ namespace FWO.Test
                     globalManagement
                 });
             }
-            if (query == FlowMutations.updateFlowNwObject && typeof(QueryResponseType) == typeof(FlowNwObject))
+            if (query == FlowQueries.getFlowCustomServiceCandidates)
             {
-                string name = GetAnonymousProperty<string>(variables, "name");
-                UpdatedFlowObjectNames.Add(name);
-                return Task.FromResult((QueryResponseType)(object)new FlowNwObject
+                return Task.FromResult((QueryResponseType)(object)new List<Management>());
+            }
+            if (query == FlowQueries.getFlowCustomTimeObjectCandidates)
+            {
+                return Task.FromResult((QueryResponseType)(object)new List<Management>());
+            }
+            if (query == FlowMutations.updateFlowNwObjects && typeof(QueryResponseType) == typeof(List<MutationResult>))
+            {
+                List<object> updates = GetAnonymousProperty<List<object>>(variables, "updates");
+                foreach (object update in updates)
                 {
-                    Id = flowNwObject.Id,
-                    Name = name,
-                    IpStart = null,
-                    IpEnd = null,
-                    Hash = flowNwObject.Hash,
-                    State = flowNwObject.State,
-                    ShowInRequestModule = flowNwObject.ShowInRequestModule,
-                    Objects = []
+                    object setObject = update.GetType().GetProperty("_set", BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)?.GetValue(update)
+                        ?? throw new InvalidOperationException("Missing _set payload.");
+                    string name = (string)(setObject.GetType().GetProperty("name", BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)?.GetValue(setObject)
+                        ?? throw new InvalidOperationException("Missing name payload."));
+                    UpdatedFlowObjectNames.Add(name);
+                }
+
+                return Task.FromResult((QueryResponseType)(object)new List<MutationResult>
+                {
+                    new()
+                    {
+                        AffectedRows = updates.Count
+                    }
                 });
             }
             if (query == ConfigQueries.upsertConfigItems)

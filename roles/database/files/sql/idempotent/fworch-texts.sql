@@ -2208,6 +2208,8 @@ INSERT INTO txt VALUES ('H5017',				'German', 	'Im Katalog werden Flow-Objekte, 
 INSERT INTO txt VALUES ('H5017',				'English', 	'The catalog brings flow objects, duplicate mappings, and custom network objects together in one place.');
 INSERT INTO txt VALUES ('H5018',				'German', 	'Verwenden Sie die Seite, um Namensquellen zu setzen, Konflikte zu lösen und bei Bedarf einzelne Zuordnungen manuell anzulegen.');
 INSERT INTO txt VALUES ('H5018',				'English', 	'Use the page to set naming sources, resolve conflicts, and create individual mappings manually when needed.');
+INSERT INTO txt VALUES ('H5020',				'German', 	'Die Neuberechnung der Flow-Namen ber&uuml;cksichtigt Netzwerkobjekte, Netzwerkgruppen, Serviceobjekte, Servicegruppen und Zeitobjekte anhand der gew&auml;hlten Management-Reihenfolge.');
+INSERT INTO txt VALUES ('H5020',				'English', 	'Flow name recalculation applies the selected management ranking to network objects, network groups, service objects, service groups, and time objects.');
 INSERT INTO txt VALUES ('H5019',				'German', 	'Die Seite enth&auml;lt au&szlig;erdem einen gef&auml;hrlichen Reset f&uuml;r die komplette Flow-Datenbank, der nur vor einer vollst&auml;ndigen Neu-Synchronisation verwendet werden sollte.');
 INSERT INTO txt VALUES ('H5019',				'English', 	'The page also includes a dangerous reset for the complete flow database, which should only be used before a full re-synchronization.');
 INSERT INTO txt VALUES ('H5020',				'German', 	'Bei doppelten Zuordnungen werden im Katalog und im Auswahldialog die technischen Details des Flow-Objekts angezeigt. In der Katalogansicht wird die Liste bei vielen Eintr&auml;gen gek&uuml;rzt und mit einem Hinweis auf weitere Objekte erg&auml;nzt.');
