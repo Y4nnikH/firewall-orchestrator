@@ -14,28 +14,40 @@ public sealed class ApplicationZoneResponse
     public int ApplicationId { get; set; }
 
     /// <summary>
-    /// Gets or sets the application-zone database id.
+    /// Gets or sets the owning application name.
+    /// </summary>
+    [JsonPropertyName("applicationName")]
+    public string ApplicationName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the optional external identifier of the owning application.
+    /// </summary>
+    [JsonPropertyName("appIdExternal")]
+    public string? AppIdExternal { get; set; }
+
+    /// <summary>
+    /// Gets or sets the application-zone database id, or <c>null</c> when the application has no application-zone.
     /// </summary>
     [JsonPropertyName("id")]
-    public long Id { get; set; }
+    public long? Id { get; set; }
 
     /// <summary>
-    /// Gets or sets the application-zone name.
+    /// Gets or sets the application-zone name, or <c>null</c> when the application has no application-zone.
     /// </summary>
     [JsonPropertyName("name")]
-    public string Name { get; set; } = string.Empty;
+    public string? Name { get; set; }
 
     /// <summary>
-    /// Gets or sets the application-zone identifier.
+    /// Gets or sets the application-zone identifier, or <c>null</c> when the application has no application-zone.
     /// </summary>
     [JsonPropertyName("idString")]
-    public string IdString { get; set; } = string.Empty;
+    public string? IdString { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether the application-zone is deleted.
+    /// Gets or sets a value indicating whether the application-zone is deleted, or <c>null</c> when the application has no application-zone.
     /// </summary>
     [JsonPropertyName("isDeleted")]
-    public bool IsDeleted { get; set; }
+    public bool? IsDeleted { get; set; }
 
     /// <summary>
     /// Gets or sets every address that belongs to the application-zone.

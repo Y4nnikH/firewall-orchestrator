@@ -1,6 +1,7 @@
 using FWO.Api.Client;
 using FWO.Api.Client.Queries;
 using FWO.Basics;
+using FWO.Data;
 using FWO.Data.Modelling;
 using FWO.Logging;
 using FWO.Middleware.Server.Requests;
@@ -131,6 +132,8 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         }
 
         ValidatePositiveValue(filter.ApplicationId, "options.filter.applicationId", errors);
+        ValidateFilterText(filter.ApplicationName, "options.filter.applicationName", errors);
+        ValidateFilterText(filter.AppIdExternal, "options.filter.appIdExternal", errors);
         ValidatePositiveValue(filter.Id, "options.filter.id", errors);
         ValidateFilterText(filter.Name, "options.filter.name", errors);
         ValidateFilterText(filter.IdString, "options.filter.idString", errors);
@@ -176,6 +179,19 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
 
     private async Task<List<ApplicationZoneResponse>> GetApplicationZonesAsync(List<int>? applicationIds)
     {
+        List<ApplicationZoneResponse> applicationZones = await GetApplicationZoneResponsesAsync(applicationIds);
+        List<int> responseApplicationIds = applicationIds ?? applicationZones
+            .Select(applicationZone => applicationZone.ApplicationId)
+            .Distinct()
+            .ToList();
+        List<FwoOwner> applications = responseApplicationIds.Count == 0
+            ? []
+            : await GetExistingApplicationsAsync(responseApplicationIds);
+        return AddApplicationZoneDetails(responseApplicationIds, applicationZones, applications);
+    }
+
+    private async Task<List<ApplicationZoneResponse>> GetApplicationZoneResponsesAsync(List<int>? applicationIds)
+    {
         List<ApplicationZoneResponse> applicationZones = [];
         if (applicationIds is null)
         {
@@ -194,6 +210,57 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         return applicationZones;
     }
 
+    private async Task<List<FwoOwner>> GetExistingApplicationsAsync(List<int> applicationIds)
+    {
+        Dictionary<string, object> where = new()
+        {
+            ["id"] = new Dictionary<string, object> { ["_in"] = applicationIds }
+        };
+        List<FwoOwner> owners = await apiConnection.SendQueryAsync<List<FwoOwner>>(
+            OwnerQueries.getOwnersFiltered, new { where }) ?? [];
+        return owners;
+    }
+
+    private static List<ApplicationZoneResponse> AddApplicationZoneDetails(
+        List<int> applicationIds,
+        List<ApplicationZoneResponse> applicationZones,
+        List<FwoOwner> applications)
+    {
+        Dictionary<int, FwoOwner> applicationsById = applications.ToDictionary(application => application.Id);
+        Dictionary<int, List<ApplicationZoneResponse>> zonesByApplicationId = applicationZones
+            .GroupBy(applicationZone => applicationZone.ApplicationId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        List<ApplicationZoneResponse> responses = [];
+
+        foreach (int applicationId in applicationIds.Distinct())
+        {
+            if (!applicationsById.TryGetValue(applicationId, out FwoOwner? application))
+            {
+                continue;
+            }
+
+            if (zonesByApplicationId.TryGetValue(applicationId, out List<ApplicationZoneResponse>? zones))
+            {
+                foreach (ApplicationZoneResponse zone in zones)
+                {
+                    zone.ApplicationName = application.Name;
+                    zone.AppIdExternal = application.ExtAppId;
+                }
+                responses.AddRange(zones);
+            }
+            else
+            {
+                responses.Add(new ApplicationZoneResponse
+                {
+                    ApplicationId = applicationId,
+                    ApplicationName = application.Name,
+                    AppIdExternal = application.ExtAppId
+                });
+            }
+        }
+        return responses;
+    }
+
     private static List<ApplicationZoneResponse> ApplyFilter(
         List<ApplicationZoneResponse> applicationZones, ApplicationZoneFilter? filter)
     {
@@ -204,6 +271,8 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
 
         return applicationZones.Where(applicationZone =>
             (filter.ApplicationId is null || applicationZone.ApplicationId == filter.ApplicationId) &&
+            (filter.ApplicationName is null || string.Equals(applicationZone.ApplicationName, filter.ApplicationName, StringComparison.OrdinalIgnoreCase)) &&
+            (filter.AppIdExternal is null || string.Equals(applicationZone.AppIdExternal, filter.AppIdExternal, StringComparison.OrdinalIgnoreCase)) &&
             (filter.Id is null || applicationZone.Id == filter.Id) &&
             (filter.Name is null || string.Equals(applicationZone.Name, filter.Name, StringComparison.OrdinalIgnoreCase)) &&
             (filter.IdString is null || string.Equals(applicationZone.IdString, filter.IdString, StringComparison.OrdinalIgnoreCase)) &&

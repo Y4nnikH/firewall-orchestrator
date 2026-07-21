@@ -48,6 +48,18 @@ public sealed class ApplicationZoneFilter
     public int? ApplicationId { get; set; }
 
     /// <summary>
+    /// Gets or sets the optional exact, case-insensitive application name filter.
+    /// </summary>
+    [JsonPropertyName("applicationName")]
+    public string? ApplicationName { get; set; }
+
+    /// <summary>
+    /// Gets or sets the optional exact, case-insensitive external application-id filter.
+    /// </summary>
+    [JsonPropertyName("appIdExternal")]
+    public string? AppIdExternal { get; set; }
+
+    /// <summary>
     /// Gets or sets the optional application-zone database id filter.
     /// </summary>
     [JsonPropertyName("id")]
