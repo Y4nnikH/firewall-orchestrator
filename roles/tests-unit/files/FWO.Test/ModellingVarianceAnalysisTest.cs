@@ -904,8 +904,9 @@ namespace FWO.Test
                     Services = [new() { Content = Svc1 }],
                     ExtraConfigs = [new() { ExtraConfigType = "updatable_obj", ExtraConfigText = "UpdObj1" }]
                 };
+                List<ModellingConnection> connections = [connOneUpdObj];
                 ModellingVarianceAnalysis varianceAnalysis = new(varianceAnalysisApiConnection, extStateHandler, userConfig, Application, DefaultInit.DoNothing);
-                ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections([connOneUpdObj], new(), false);
+                ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections(connections, new(), false);
 
                 ClassicAssert.AreEqual(0, result.ConnsNotImplemented.Count);
                 ClassicAssert.AreEqual(0, result.RuleDifferences.Count);
@@ -934,8 +935,9 @@ namespace FWO.Test
                     ExtraConfigs = [new() { ExtraConfigType = "updatable_obj", ExtraConfigText = "UpdObj1" },
                                     new() { ExtraConfigType = "updatable_obj", ExtraConfigText = "UpdObj2" }]
                 };
+                List<ModellingConnection> connections = [connTwoUpdObj];
                 ModellingVarianceAnalysis varianceAnalysis = new(varianceAnalysisApiConnection, extStateHandler, userConfig, Application, DefaultInit.DoNothing);
-                ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections([connTwoUpdObj], new(), false);
+                ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections(connections, new(), false);
 
                 ClassicAssert.AreEqual(0, result.ConnsNotImplemented.Count);
                 ClassicAssert.AreEqual(0, result.RuleDifferences.Count);
@@ -962,8 +964,9 @@ namespace FWO.Test
                     Services = [new() { Content = Svc1 }],
                     ExtraConfigs = [new() { ExtraConfigType = "updatable_obj", ExtraConfigText = "UpdObj1" }]
                 };
+                List<ModellingConnection> connections = [connWithMultipleAreas];
                 ModellingVarianceAnalysis varianceAnalysis = new(varianceAnalysisApiConnection, extStateHandler, userConfig, Application, DefaultInit.DoNothing);
-                ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections([connWithMultipleAreas], new(), false);
+                ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections(connections, new(), false);
 
                 ClassicAssert.AreEqual(0, result.ConnsNotImplemented.Count);
                 ClassicAssert.AreEqual(1, result.RuleDifferences.Count);
@@ -990,8 +993,9 @@ namespace FWO.Test
                 ExtraConfigs = [new() { ExtraConfigType = "IDA_user", ExtraConfigText = "SpecObj1" },
                                 new() { ExtraConfigType = "IDA_user", ExtraConfigText = "SpecObj2" }]
             };
+            List<ModellingConnection> connections = [connTwoSpecUsers];
             ModellingVarianceAnalysis varianceAnalysis = new(varianceAnalysisApiConnection, extStateHandler, userConfig, Application, DefaultInit.DoNothing);
-            ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections([connTwoSpecUsers], new(), false);
+            ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections(connections, new(), false);
 
             ClassicAssert.AreEqual(0, result.ConnsNotImplemented.Count);
             ClassicAssert.AreEqual(0, result.RuleDifferences.Count);
@@ -1011,8 +1015,9 @@ namespace FWO.Test
                 Services = [new() { Content = Svc1 }],
                 ExtraConfigs = [new() { ExtraConfigType = "IDA_user", ExtraConfigText = "SpecObj1" }]
             };
+            List<ModellingConnection> connections = [connWithMultipleAreas];
             ModellingVarianceAnalysis varianceAnalysis = new(varianceAnalysisApiConnection, extStateHandler, userConfig, Application, DefaultInit.DoNothing);
-            ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections([connWithMultipleAreas], new(), false);
+            ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections(connections, new(), false);
 
             ClassicAssert.AreEqual(0, result.ConnsNotImplemented.Count);
             ClassicAssert.AreEqual(1, result.RuleDifferences.Count);
@@ -1039,8 +1044,9 @@ namespace FWO.Test
                     Services = [new() { Content = Svc1 }],
                     ExtraConfigs = [new() { ExtraConfigType = extraConfigType, ExtraConfigText = "AppServerUnchanged" }]
                 };
+                List<ModellingConnection> connections = [connWithNormallyMatchedObject];
                 ModellingVarianceAnalysis varianceAnalysis = new(varianceAnalysisApiConnection, extStateHandler, userConfig, Application, DefaultInit.DoNothing);
-                ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections([connWithNormallyMatchedObject], new(), false);
+                ModellingVarianceResult result = await varianceAnalysis.AnalyseRulesVsModelledConnections(connections, new(), false);
 
                 ClassicAssert.AreEqual(0, result.ConnsNotImplemented.Count);
                 ClassicAssert.AreEqual(1, result.RuleDifferences.Count);

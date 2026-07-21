@@ -354,12 +354,7 @@ namespace FWO.Services.Modelling
         {
             if (specialUserObjects.Count > 0 && disregardedLocations.Count > 0)
             {
-                // Match by name, but only for objects that did not match normally: a special user object
-                // stands in for a placeholder area only if it is surplus. Objects without ip can never match
-                // normally, so they always count - this also avoids the comparer deduping them (and thus
-                // marking only the first of several as surplus) undercounting the real objects.
-                List<NetworkLocation> specUserLocations = [.. networkLocations.Where(n => specialUserObjects.ContainsKey(n.Object.Name.ToLower())
-                    && (n.Object.IsSurplus || string.IsNullOrEmpty(n.Object.IP)))];
+                List<NetworkLocation> specUserLocations = GetPlaceholderSubstitutes(networkLocations, specialUserObjects);
                 List<NetworkLocation> remainingPossibleSpecObj = GetPossibleSpecObjects(disregardedLocations, source);
                 // A placeholder area stands in for any number of special user objects (so N objects cover 1 area),
                 // but a single object must not cover several areas - require at least as many objects as areas.
@@ -383,17 +378,26 @@ namespace FWO.Services.Modelling
             return [.. disregardedLocations.Where(l => l.Object.Type.Name == ObjectType.Group && (source ? AllowedSrcSpecUserAreas.Contains(l.Object.Id) : AllowedDestSpecUserAreas.Contains(l.Object.Id)))];
         }
 
+        /// <summary>
+        /// Selects the modelled objects (matched by name) that may stand in for a placeholder area.
+        /// An object qualifies when it is surplus, or - only while IPs are compared - when it has no IP:
+        /// such an object can never match normally, so it always counts. Relying on the empty IP also
+        /// avoids the IP comparer deduping several IP-less objects (marking only the first as surplus)
+        /// and thereby undercounting them. When IPs are not compared the empty-IP signal is meaningless,
+        /// so the surplus flag alone decides.
+        /// </summary>
+        private List<NetworkLocation> GetPlaceholderSubstitutes(NetworkLocation[] networkLocations, Dictionary<string, bool> objectsByName)
+        {
+            return [.. networkLocations.Where(n => objectsByName.ContainsKey(n.Object.Name.ToLower())
+                && (n.Object.IsSurplus || (ruleRecognitionOption.NwRegardIp && string.IsNullOrEmpty(n.Object.IP))))];
+        }
+
         private void AdjustWithUpdatableObjects(NetworkLocation[] networkLocations, Dictionary<string, bool> updatableObjects, bool source,
             int updatableObjectAreaCount, ref List<NetworkLocation> disregardedLocations)
         {
             if (updatableObjects.Count > 0 && disregardedLocations.Count > 0)
             {
-                // Match by name, but only for objects that did not match normally: an updatable object
-                // stands in for a placeholder area only if it is surplus. Objects without ip can never match
-                // normally, so they always count - this also avoids the comparer deduping them (and thus
-                // marking only the first of several as surplus) undercounting the real objects.
-                List<NetworkLocation> updObjLocations = [.. networkLocations.Where(n => updatableObjects.ContainsKey(n.Object.Name.ToLower())
-                    && (n.Object.IsSurplus || string.IsNullOrEmpty(n.Object.IP)))];
+                List<NetworkLocation> updObjLocations = GetPlaceholderSubstitutes(networkLocations, updatableObjects);
                 List<NetworkLocation> remainingPossibleUpdatableObj = GetPossibleUpdatableObjects(disregardedLocations, source);
                 // A placeholder area stands in for any number of updatable objects (so N objects cover 1 area),
                 // but a single object must not cover several areas - require at least as many objects as areas.
