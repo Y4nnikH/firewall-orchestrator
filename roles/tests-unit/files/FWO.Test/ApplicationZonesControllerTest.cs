@@ -292,6 +292,70 @@ internal class ApplicationZonesControllerTest
         });
     }
 
+    [Test]
+    public async Task GetUsesApplicationNameFilterToSelectApplicationWithoutApplicationZone()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((1, "ownerF_demo", "123"))
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new()
+            {
+                Filter = new() { ApplicationName = "ownerF_demo" }
+            }
+        };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        OkObjectResult okResult = (OkObjectResult)result.Result!;
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)okResult.Value!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(apiConnection.ApplicationIds, Is.EqualTo(new List<int> { 1 }));
+            Assert.That(response, Has.Count.EqualTo(1));
+            Assert.That(response[0].ApplicationId, Is.EqualTo(1));
+            Assert.That(response[0].ApplicationName, Is.EqualTo("ownerF_demo"));
+            Assert.That(response[0].AppIdExternal, Is.EqualTo("123"));
+            Assert.That(response[0].Id, Is.Null);
+            Assert.That(response[0].Addresses, Is.Empty);
+        });
+    }
+
+    [Test]
+    public async Task GetUsesApplicationIdAndExternalIdFiltersToSelectApplicationWithoutApplicationZone()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((1, "ownerF_demo", "123"))
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new()
+            {
+                Filter = new()
+                {
+                    ApplicationId = 1,
+                    AppIdExternal = "123"
+                }
+            }
+        };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        OkObjectResult okResult = (OkObjectResult)result.Result!;
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)okResult.Value!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(response, Has.Count.EqualTo(1));
+            Assert.That(response[0].ApplicationId, Is.EqualTo(1));
+            Assert.That(response[0].Id, Is.Null);
+        });
+    }
+
     private static ModellingAppZone CreateApplicationZone(
         int applicationId, long id, string name, string idString, string ip, string ipEnd)
     {

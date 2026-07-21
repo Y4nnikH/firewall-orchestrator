@@ -42,19 +42,22 @@ public sealed class GetApplicationZonesOptions
 public sealed class ApplicationZoneFilter
 {
     /// <summary>
-    /// Gets or sets the optional application id filter.
+    /// Gets or sets the optional application id filter. When <see cref="GetApplicationZonesRequest.ApplicationIds"/>
+    /// is omitted, this selects the matching visible application, including one without an application-zone.
     /// </summary>
     [JsonPropertyName("applicationId")]
     public int? ApplicationId { get; set; }
 
     /// <summary>
-    /// Gets or sets the optional exact, case-insensitive application name filter.
+    /// Gets or sets the optional exact, case-insensitive application name filter. When <see cref="GetApplicationZonesRequest.ApplicationIds"/>
+    /// is omitted, this selects matching visible applications, including applications without an application-zone.
     /// </summary>
     [JsonPropertyName("applicationName")]
     public string? ApplicationName { get; set; }
 
     /// <summary>
-    /// Gets or sets the optional exact, case-insensitive external application-id filter.
+    /// Gets or sets the optional exact, case-insensitive external application-id filter. When <see cref="GetApplicationZonesRequest.ApplicationIds"/>
+    /// is omitted, this selects matching visible applications, including applications without an application-zone.
     /// </summary>
     [JsonPropertyName("appIdExternal")]
     public string? AppIdExternal { get; set; }

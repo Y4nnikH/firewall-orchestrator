@@ -55,7 +55,14 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         try
         {
             List<int>? applicationIds = GetAccessibleApplicationIds(effectiveRequest.ApplicationIds);
-            List<ApplicationZoneResponse> applicationZones = await GetApplicationZonesAsync(applicationIds);
+            List<FwoOwner>? filteredApplications = await GetFilteredApplicationsAsync(
+                applicationIds, effectiveRequest.Options!.Filter);
+            if (filteredApplications is not null)
+            {
+                applicationIds = filteredApplications.Select(application => application.Id).ToList();
+            }
+            List<ApplicationZoneResponse> applicationZones = await GetApplicationZonesAsync(
+                applicationIds, filteredApplications);
             return Ok(ApplyFilter(applicationZones, effectiveRequest.Options!.Filter));
         }
         catch (Exception exception)
@@ -177,16 +184,17 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         return applicationIds is { Count: > 0 } ? applicationIds.Distinct().ToList() : null;
     }
 
-    private async Task<List<ApplicationZoneResponse>> GetApplicationZonesAsync(List<int>? applicationIds)
+    private async Task<List<ApplicationZoneResponse>> GetApplicationZonesAsync(
+        List<int>? applicationIds, List<FwoOwner>? filteredApplications)
     {
         List<ApplicationZoneResponse> applicationZones = await GetApplicationZoneResponsesAsync(applicationIds);
         List<int> responseApplicationIds = applicationIds ?? applicationZones
             .Select(applicationZone => applicationZone.ApplicationId)
             .Distinct()
             .ToList();
-        List<FwoOwner> applications = responseApplicationIds.Count == 0
+        List<FwoOwner> applications = filteredApplications ?? (responseApplicationIds.Count == 0
             ? []
-            : await GetExistingApplicationsAsync(responseApplicationIds);
+            : await GetExistingApplicationsAsync(responseApplicationIds));
         return AddApplicationZoneDetails(responseApplicationIds, applicationZones, applications);
     }
 
@@ -210,12 +218,34 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         return applicationZones;
     }
 
-    private async Task<List<FwoOwner>> GetExistingApplicationsAsync(List<int> applicationIds)
+    private async Task<List<FwoOwner>?> GetFilteredApplicationsAsync(
+        List<int>? applicationIds, ApplicationZoneFilter? filter)
     {
-        Dictionary<string, object> where = new()
+        if (!HasApplicationSelectionFilter(filter))
         {
-            ["id"] = new Dictionary<string, object> { ["_in"] = applicationIds }
-        };
+            return null;
+        }
+
+        List<FwoOwner> applications = await GetExistingApplicationsAsync(applicationIds);
+        return applications.Where(application =>
+            (filter!.ApplicationId is null || application.Id == filter.ApplicationId) &&
+            (filter.ApplicationName is null || string.Equals(application.Name, filter.ApplicationName, StringComparison.OrdinalIgnoreCase)) &&
+            (filter.AppIdExternal is null || string.Equals(application.ExtAppId, filter.AppIdExternal, StringComparison.OrdinalIgnoreCase))).ToList();
+    }
+
+    private static bool HasApplicationSelectionFilter(ApplicationZoneFilter? filter)
+    {
+        return filter?.ApplicationId is not null || filter?.ApplicationName is not null || filter?.AppIdExternal is not null;
+    }
+
+    private async Task<List<FwoOwner>> GetExistingApplicationsAsync(List<int>? applicationIds)
+    {
+        Dictionary<string, object> where = applicationIds is null
+            ? []
+            : new Dictionary<string, object>
+            {
+                ["id"] = new Dictionary<string, object> { ["_in"] = applicationIds }
+            };
         List<FwoOwner> owners = await apiConnection.SendQueryAsync<List<FwoOwner>>(
             OwnerQueries.getOwnersFiltered, new { where }) ?? [];
         return owners;
