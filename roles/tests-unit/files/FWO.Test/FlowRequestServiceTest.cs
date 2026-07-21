@@ -777,7 +777,32 @@ internal class FlowRequestServiceTest
         public List<IpProtocol> Protocols { get; set; } = [];
         public List<RuleAction> RuleActions { get; set; } = [new RuleAction { Id = 1, Name = "accept", Allowed = true }];
         public List<WfExtState> ExtStates { get; set; } = [];
-        public List<WorkflowConfiguration> WorkflowConfigurations { get; set; } = [];
+        public List<WorkflowConfiguration> WorkflowConfigurations { get; set; } =
+        [
+            new WorkflowConfiguration
+            {
+                Id = 1,
+                Name = "default",
+                Phases =
+                [
+                    new WorkflowConfigurationPhase
+                    {
+                        TaskType = WfTaskType.master.ToString(),
+                        Phase = WorkflowPhases.request.ToString(),
+                        PhaseMatrix = new StateMatrixPhase
+                        {
+                            Id = 11,
+                            Name = "request",
+                            Phase = WorkflowPhases.request.ToString(),
+                            Active = true,
+                            LowestInputState = 0,
+                            LowestStartState = 0,
+                            LowestEndState = 0
+                        }
+                    }
+                ]
+            }
+        ];
         public string[]? ExtStateErrors { get; set; }
         public WfTicketWriter? LastTicketWriter { get; private set; }
         public object? NewTicketVariables { get; private set; }
