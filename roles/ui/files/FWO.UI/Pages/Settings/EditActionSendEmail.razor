@@ -44,6 +44,9 @@
     [Parameter]
     public WfStateAction ActAction { get; set; } = new();
 
+    [Parameter]
+    public WfStateAction PersistedAction { get; set; } = new();
+
     private List<int> actActionNotificationIds = [];
     private EmailAttachedContent actAttachedContent = EmailAttachedContent.None;
     private bool actConfirmSentMail;
@@ -140,14 +143,14 @@
 
     private async Task PersistActionNotificationIds()
     {
-        if (ActAction.Id <= 0 || ActAction.ActionType != nameof(StateActionTypes.SendEmail))
+        if (PersistedAction.Id <= 0 || PersistedAction.ActionType != nameof(StateActionTypes.SendEmail))
         {
             return;
         }
 
         string externalParams = EmailExternalParams();
-        int updatedId = await UpdateAction(ActAction, externalParams);
-        if (updatedId != ActAction.Id)
+        int updatedId = await UpdateAction(PersistedAction, externalParams);
+        if (updatedId != PersistedAction.Id)
         {
             DisplayMessageInUi(null, userConfig.GetText("save_action"), userConfig.GetText("E8011"), true);
             return;
