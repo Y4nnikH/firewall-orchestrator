@@ -162,40 +162,16 @@ namespace FWO.Report
                 Query.QueryVariables[QueryVar.RulebaseIds] = scopedRulebaseIds;
 
                 bool keepFetching = true;
-#if DEBUG
-                int pageCount = 0;
-                int fetchedRuleCount = 0;
-                int attachedRuleCount = 0;
-                int skippedRuleCount = 0;
-                Log.WriteDebug("Generate Rules Report", $"Rule paging scope: management={management.Id}, scopedRulebases={scopedRulebaseIds.Length}");
-#endif
                 while (keepFetching)
                 {
                     ct.ThrowIfCancellationRequested();
-#if DEBUG
-                    Stopwatch fetchStopwatch = Stopwatch.StartNew();
-#endif
+
                     List<Rule> rules = await apiConnection.SendQueryAsync<List<Rule>>(Query.StandardRulesPageQuery, Query.QueryVariables);
-#if DEBUG
-                    fetchStopwatch.Stop();
-                    Stopwatch attachStopwatch = Stopwatch.StartNew();
-#endif
                     RuleAttachCounts attachCounts = AttachRulesToRulebases(managementReport, rules);
-#if DEBUG
-                    attachStopwatch.Stop();
-                    pageCount++;
-                    fetchedRuleCount += rules.Count;
-                    attachedRuleCount += attachCounts.Attached;
-                    skippedRuleCount += attachCounts.Skipped;
-                    Log.WriteDebug("Generate Rules Report", $"Rule page processed: management={management.Id}, page={pageCount}, fetchedRules={rules.Count}, attachedRules={attachCounts.Attached}, skippedRules={attachCounts.Skipped}, offset={Query.QueryVariables[QueryVar.Offset]}, fetchMilliseconds={double.Round(fetchStopwatch.Elapsed.TotalMilliseconds)}, attachMilliseconds={double.Round(attachStopwatch.Elapsed.TotalMilliseconds)}");
-#endif
                     keepFetching = rules.Count >= elementsPerFetch;
                     Query.QueryVariables[QueryVar.Offset] = (int)Query.QueryVariables[QueryVar.Offset] + elementsPerFetch;
                     await callback(ReportData);
                 }
-#if DEBUG
-                Log.WriteDebug("Generate Rules Report", $"Rule paging summary: management={management.Id}, pages={pageCount}, fetchedRules={fetchedRuleCount}, attachedRules={attachedRuleCount}, skippedRules={skippedRuleCount}, scopedRulebases={scopedRulebaseIds.Length}");
-#endif
             }
 
             await LogExecutionTime(phaseStopwatch, "Filling report data", true);
@@ -337,22 +313,13 @@ namespace FWO.Report
             _rulesCache.Clear();
 
             int ruleCount = 0;
-#if DEBUG
-            List<(string Label, long Milliseconds, int Rules)> ruleTreeTimings = [];
-#endif
 
             foreach (ManagementReport managementReport in ReportData.ManagementData)
             {
                 foreach (DeviceReport deviceReport in managementReport.Devices)
                 {
                     bool suppressEmptyHeaders = !string.IsNullOrWhiteSpace(Query.RawFilter);
-#if DEBUG
-                    Stopwatch deviceStopwatch = Stopwatch.StartNew();
-#endif
                     List<Rule> allRules = scopedRuleTreeBuilder.BuildRuleTree(managementReport.Rulebases, deviceReport.RulebaseLinks, managementReport.Id, deviceReport.Id, suppressEmptyHeaders);
-#if DEBUG
-                    deviceStopwatch.Stop();
-#endif
                     ApplyPreferredCollapseState(scopedRuleTreeBuilder, managementReport.Id, deviceReport.Id);
 
                     Rule[] rulesArray = GetRealRulesForExport(allRules);
@@ -365,27 +332,11 @@ namespace FWO.Report
                     );
 
                     ruleCount += rulesArray.Length;
-#if DEBUG
-                    ruleTreeTimings.Add(($"management={managementReport.Id}, device={deviceReport.Id}", deviceStopwatch.ElapsedMilliseconds, rulesArray.Length));
-#endif
                 }
             }
 
             ReportData.ElementsCount = ruleCount;
-#if DEBUG
-            LogSlowestRuleTreeBuilds(ruleTreeTimings);
-#endif
         }
-
-#if DEBUG
-        private static void LogSlowestRuleTreeBuilds(List<(string Label, long Milliseconds, int Rules)> ruleTreeTimings)
-        {
-            foreach ((string label, long milliseconds, int rules) in ruleTreeTimings.OrderByDescending(timing => timing.Milliseconds).Take(10))
-            {
-                Log.WriteDebug("Generate Rules Report", $"Rule tree build detail: {label}, rules={rules}, milliseconds={milliseconds}");
-            }
-        }
-#endif
 
         /// <summary>
         /// Applies the user's preferred initial collapse state to the generated rule tree.
