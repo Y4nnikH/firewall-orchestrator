@@ -9,13 +9,6 @@ namespace FWO.Middleware.Server.Requests;
 public sealed class GetApplicationZonesRequest
 {
     /// <summary>
-    /// Gets or sets the optional list of positive application ids to query. When omitted, null, or empty,
-    /// application zones for every application visible to the caller are returned.
-    /// </summary>
-    [JsonPropertyName("applicationIds")]
-    public List<int>? ApplicationIds { get; set; }
-
-    /// <summary>
     /// Gets or sets the optional response options. When omitted, this defaults to an empty object.
     /// </summary>
     [JsonPropertyName("options")]
@@ -44,22 +37,22 @@ public sealed class GetApplicationZonesOptions
 public sealed class ApplicationZoneFilter
 {
     /// <summary>
-    /// Gets or sets the optional application id filter. When <see cref="GetApplicationZonesRequest.ApplicationIds"/>
-    /// is omitted, this selects the matching visible application, including one without an application-zone.
+    /// Gets or sets the optional application id filter. This selects the matching visible application, including one
+    /// without an application-zone.
     /// </summary>
     [JsonPropertyName("applicationId")]
     public int? ApplicationId { get; set; }
 
     /// <summary>
-    /// Gets or sets the optional case-insensitive application name filter with <c>*</c> and <c>?</c> wildcards. When <see cref="GetApplicationZonesRequest.ApplicationIds"/>
-    /// is omitted, this selects matching visible applications, including applications without an application-zone.
+    /// Gets or sets the optional case-insensitive application name filter with <c>*</c> and <c>?</c> wildcards.
+    /// This selects matching visible applications, including applications without an application-zone.
     /// </summary>
     [JsonPropertyName("applicationName")]
     public string? ApplicationName { get; set; }
 
     /// <summary>
-    /// Gets or sets the optional case-insensitive external application-id filter with <c>*</c> and <c>?</c> wildcards. When <see cref="GetApplicationZonesRequest.ApplicationIds"/>
-    /// is omitted, this selects matching visible applications, including applications without an application-zone.
+    /// Gets or sets the optional case-insensitive external application-id filter with <c>*</c> and <c>?</c> wildcards.
+    /// This selects matching visible applications, including applications without an application-zone.
     /// </summary>
     [JsonPropertyName("appIdExternal")]
     public string? AppIdExternal { get; set; }

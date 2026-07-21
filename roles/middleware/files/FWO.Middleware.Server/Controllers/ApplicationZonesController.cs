@@ -25,12 +25,11 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     private const int kFilterPatternTimeoutMilliseconds = 100;
 
     /// <summary>
-    /// Returns complete application-zone objects, including all addresses, for the requested or visible applications.
+    /// Returns complete application-zone objects, including all addresses, for visible applications.
     /// </summary>
     /// <remarks>
     /// Requires the <c>admin</c>, <c>auditor</c>, or <c>modeller</c> role. A caller with only the modeller role
     /// receives application zones only for applications in the <c>x-hasura-editable-owners</c> JWT claim.
-    /// The <c>applicationIds</c> root key defaults to all applications visible to the caller when omitted, null, or empty.
     /// The <c>options</c> root key defaults to <c>{}</c> when omitted.
     /// Every field in <c>options.filter</c> is nullable; an omitted or null field does not restrict the response.
     /// </remarks>
@@ -56,15 +55,10 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
 
         try
         {
-            List<int>? applicationIds = GetAccessibleApplicationIds(effectiveRequest.ApplicationIds);
-            List<FwoOwner>? filteredApplications = await GetFilteredApplicationsAsync(
-                applicationIds, effectiveRequest.Options!.Filter);
-            if (filteredApplications is not null)
-            {
-                applicationIds = filteredApplications.Select(application => application.Id).ToList();
-            }
-            List<ApplicationZoneResponse> applicationZones = await GetApplicationZonesAsync(
-                applicationIds, filteredApplications);
+            List<int>? accessibleApplicationIds = GetAccessibleApplicationIds();
+            List<FwoOwner> filteredApplications = await GetFilteredApplicationsAsync(
+                accessibleApplicationIds, effectiveRequest.Options!.Filter);
+            List<ApplicationZoneResponse> applicationZones = await GetApplicationZonesAsync(filteredApplications);
             return Ok(ApplyFilter(applicationZones, effectiveRequest.Options!.Filter));
         }
         catch (Exception exception)
@@ -80,7 +74,6 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     internal static Dictionary<string, string[]> ValidateRequest(GetApplicationZonesRequest request)
     {
         Dictionary<string, string[]> errors = [];
-        ValidateApplicationIds(request.ApplicationIds, errors);
         if (request.Options is null)
         {
             AddError(errors, "options", "options must be an object when supplied.");
@@ -115,22 +108,6 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
                 ApplicationId = appServer.Content.AppId
             }).ToList()
         };
-    }
-
-    private static void ValidateApplicationIds(List<int>? applicationIds, Dictionary<string, string[]> errors)
-    {
-        if (applicationIds is null)
-        {
-            return;
-        }
-
-        for (int index = 0; index < applicationIds.Count; index++)
-        {
-            if (applicationIds[index] <= 0)
-            {
-                AddError(errors, $"applicationIds[{index}]", "applicationIds entries must be positive integers.");
-            }
-        }
     }
 
     private static void ValidateFilter(ApplicationZoneFilter? filter, Dictionary<string, string[]> errors)
@@ -172,72 +149,41 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         }
     }
 
-    private List<int>? GetAccessibleApplicationIds(List<int>? applicationIds)
+    private List<int>? GetAccessibleApplicationIds()
     {
         if (ShouldRestrictToEditableApplications(User))
         {
-            HashSet<int> editableApplicationIds = JwtClaimParser.ExtractIntClaimValues(
-                User.Claims, "x-hasura-editable-owners").ToHashSet();
-            return applicationIds is { Count: > 0 }
-                ? applicationIds.Where(editableApplicationIds.Contains).Distinct().ToList()
-                : editableApplicationIds.ToList();
+            return JwtClaimParser.ExtractIntClaimValues(User.Claims, "x-hasura-editable-owners").ToList();
         }
 
-        return applicationIds is { Count: > 0 } ? applicationIds.Distinct().ToList() : null;
+        return null;
     }
 
-    private async Task<List<ApplicationZoneResponse>> GetApplicationZonesAsync(
-        List<int>? applicationIds, List<FwoOwner>? filteredApplications)
+    private async Task<List<ApplicationZoneResponse>> GetApplicationZonesAsync(List<FwoOwner> applications)
     {
-        List<ApplicationZoneResponse> applicationZones = await GetApplicationZoneResponsesAsync(applicationIds);
-        List<int> responseApplicationIds = applicationIds ?? applicationZones
-            .Select(applicationZone => applicationZone.ApplicationId)
-            .Distinct()
+        if (applications.Count == 0)
+        {
+            return [];
+        }
+
+        HashSet<int> applicationIds = applications.Select(application => application.Id).ToHashSet();
+        List<ModellingAppZone> zones = await apiConnection.SendQueryAsync<List<ModellingAppZone>>(
+            ModellingQueries.getAllAppZones) ?? [];
+        List<ApplicationZoneResponse> applicationZones = zones
+            .Where(zone => zone.AppId is not null && applicationIds.Contains(zone.AppId.Value))
+            .Select(ToResponse)
             .ToList();
-        List<FwoOwner> applications = filteredApplications ?? (responseApplicationIds.Count == 0
-            ? []
-            : await GetExistingApplicationsAsync(responseApplicationIds));
-        return AddApplicationZoneDetails(responseApplicationIds, applicationZones, applications);
+        return AddApplicationZoneDetails(applications.Select(application => application.Id).ToList(), applicationZones, applications);
     }
 
-    private async Task<List<ApplicationZoneResponse>> GetApplicationZoneResponsesAsync(List<int>? applicationIds)
-    {
-        List<ApplicationZoneResponse> applicationZones = [];
-        if (applicationIds is null)
-        {
-            List<ModellingAppZone> zones = await apiConnection.SendQueryAsync<List<ModellingAppZone>>(
-                ModellingQueries.getAllAppZones) ?? [];
-            applicationZones.AddRange(zones.Select(ToResponse));
-            return applicationZones;
-        }
-
-        foreach (int applicationId in applicationIds)
-        {
-            List<ModellingAppZone> zones = await apiConnection.SendQueryAsync<List<ModellingAppZone>>(
-                ModellingQueries.getAppZonesByAppId, new { appId = applicationId }) ?? [];
-            applicationZones.AddRange(zones.Select(ToResponse));
-        }
-        return applicationZones;
-    }
-
-    private async Task<List<FwoOwner>?> GetFilteredApplicationsAsync(
+    private async Task<List<FwoOwner>> GetFilteredApplicationsAsync(
         List<int>? applicationIds, ApplicationZoneFilter? filter)
     {
-        if (!HasApplicationSelectionFilter(filter))
-        {
-            return null;
-        }
-
         List<FwoOwner> applications = await GetExistingApplicationsAsync(applicationIds);
         return applications.Where(application =>
-            (filter!.ApplicationId is null || application.Id == filter.ApplicationId) &&
-            MatchesTextFilter(application.Name, filter.ApplicationName) &&
-            MatchesTextFilter(application.ExtAppId, filter.AppIdExternal)).ToList();
-    }
-
-    private static bool HasApplicationSelectionFilter(ApplicationZoneFilter? filter)
-    {
-        return filter?.ApplicationId is not null || filter?.ApplicationName is not null || filter?.AppIdExternal is not null;
+            (filter?.ApplicationId is null || application.Id == filter.ApplicationId) &&
+            MatchesTextFilter(application.Name, filter?.ApplicationName) &&
+            MatchesTextFilter(application.ExtAppId, filter?.AppIdExternal)).ToList();
     }
 
     private async Task<List<FwoOwner>> GetExistingApplicationsAsync(List<int>? applicationIds)
@@ -250,7 +196,7 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
             };
         List<FwoOwner> owners = await apiConnection.SendQueryAsync<List<FwoOwner>>(
             OwnerQueries.getOwnersFiltered, new { where }) ?? [];
-        return owners;
+        return applicationIds is null ? owners : owners.Where(owner => applicationIds.Contains(owner.Id)).ToList();
     }
 
     private static List<ApplicationZoneResponse> AddApplicationZoneDetails(
