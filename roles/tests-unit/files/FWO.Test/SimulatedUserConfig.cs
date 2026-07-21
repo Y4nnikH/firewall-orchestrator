@@ -350,6 +350,7 @@ namespace FWO.Test
             {"change_default","Change default"},
             {"save","Save"},
             {"api_ticket_initial_state","API ticket initial state"},
+            {"use_default","Use default"},
             {"H5546","API tickets: Here the optional initial state for tickets created via the API is defined. If no state is set, the default start state is still used."},
             {"monitoring","Monitoring"},
             {"modelling","Modelling"},

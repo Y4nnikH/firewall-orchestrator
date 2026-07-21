@@ -119,7 +119,7 @@ namespace FWO.Test
             {
                 ReqAvailableTaskTypes = "[]",
                 ReqPriorities = "[]",
-                ReqApiTicketInitialStateId = 0
+                ReqApiTicketInitialStateId = -1
             };
             SimulatedUserConfig userConfig = new();
             ConfigData editableConfig = await globalConfig.GetEditableConfig();
@@ -131,6 +131,7 @@ namespace FWO.Test
             SetMember(component, "configData", editableConfig);
             SetMember(component, "states", apiConnection.States);
             SetMember(component, "stateIds", apiConnection.States.Select(state => state.Id).ToList());
+            SetMember(component, "selectedApiTicketInitialStateId", 17);
             SetMember(component, "taskTypesActiveDict", Enum.GetValues<WfTaskType>().ToDictionary(type => type, _ => false));
             SetMember(component, "prioList", new List<WfPriority>());
 
@@ -161,7 +162,7 @@ namespace FWO.Test
             SetMember(component, "globalConfig", globalConfig);
             SetMember(component, "userConfig", userConfig);
             SetMember(component, "configData", editableConfig);
-            SetMember(component, "taskTypesActiveDict", Enum.GetValues(typeof(WfTaskType)).Cast<WfTaskType>().ToDictionary(type => type, _ => false));
+            SetMember(component, "taskTypesActiveDict", Enum.GetValues<WfTaskType>().ToDictionary(type => type, _ => false));
             SetMember(component, "prioList", new List<WfPriority>());
 
             Task saveTask = (Task)GetPrivateMethod(typeof(SettingsCustomizing), "Save").Invoke(component, [])!;

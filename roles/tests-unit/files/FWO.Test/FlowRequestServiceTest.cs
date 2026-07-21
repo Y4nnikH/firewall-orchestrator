@@ -587,6 +587,95 @@ internal class FlowRequestServiceTest
     }
 
     [Test]
+    public async Task CreateRequest_UsesMatrixLowestInputStateWhenInitialStateIsUnset()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States =
+            [
+                new WfState { Id = 3, Name = "open" },
+                new WfState { Id = 17, Name = "requested" }
+            ],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }],
+            WorkflowConfigurations =
+            [
+                new WorkflowConfiguration
+                {
+                    Id = 1,
+                    Name = "default",
+                    Phases =
+                    [
+                        new WorkflowConfigurationPhase
+                        {
+                            TaskType = WfTaskType.master.ToString(),
+                            Phase = WorkflowPhases.request.ToString(),
+                            PhaseMatrix = new StateMatrixPhase
+                            {
+                                Id = 11,
+                                Name = "request",
+                                Phase = WorkflowPhases.request.ToString(),
+                                Active = true,
+                                LowestInputState = 3,
+                                LowestStartState = 3,
+                                LowestEndState = 17
+                            }
+                        }
+                    ]
+                }
+            ]
+        };
+        FlowRequestService service = new(apiConnection, new GlobalConfig());
+
+        CreateRequestResponse response = await service.CreateRequestAsync(new CreateRequestRequest
+        {
+            RequestorName = "Alice Example",
+            RequestorId = "alice",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Unset state request",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    SourceObjects = [-1],
+                    DestinationObjects = [-1],
+                    ServiceObjects = [-2]
+                }
+            ]
+        }, 77);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo("open"));
+            Assert.That(response.RequestId, Is.EqualTo(100));
+            Assert.That(GetVariable(apiConnection.NewTicketVariables, "state"), Is.EqualTo(3));
+            Assert.That(apiConnection.SentQueries, Does.Contain(RequestQueries.getActiveStateMatrixConfiguration));
+        });
+    }
+
+    [Test]
     public async Task CreateRequest_ReturnsConfiguredInitialStateFromController()
     {
         FlowRequestServiceApiConn apiConnection = new()
@@ -688,6 +777,7 @@ internal class FlowRequestServiceTest
         public List<IpProtocol> Protocols { get; set; } = [];
         public List<RuleAction> RuleActions { get; set; } = [new RuleAction { Id = 1, Name = "accept", Allowed = true }];
         public List<WfExtState> ExtStates { get; set; } = [];
+        public List<WorkflowConfiguration> WorkflowConfigurations { get; set; } = [];
         public string[]? ExtStateErrors { get; set; }
         public WfTicketWriter? LastTicketWriter { get; private set; }
         public object? NewTicketVariables { get; private set; }
@@ -719,6 +809,11 @@ internal class FlowRequestServiceTest
             if (responseType == typeof(List<RuleAction>))
             {
                 return Task.FromResult((QueryResponseType)(object)RuleActions);
+            }
+
+            if (responseType == typeof(List<WorkflowConfiguration>))
+            {
+                return Task.FromResult((QueryResponseType)(object)WorkflowConfigurations);
             }
 
             if (responseType == typeof(ReturnId))

@@ -2870,6 +2870,8 @@ INSERT INTO txt VALUES ('assign_state_to',      'German',   'Status zuordnen zu:
 INSERT INTO txt VALUES ('assign_state_to',      'English',  'Assign state to: ');
 INSERT INTO txt VALUES ('api_ticket_initial_state','German','API-Ticket-Anfangsstatus');
 INSERT INTO txt VALUES ('api_ticket_initial_state','English','API ticket initial state');
+INSERT INTO txt VALUES ('use_default',          'German',   'Standard verwenden');
+INSERT INTO txt VALUES ('use_default',          'English',  'Use default');
 INSERT INTO txt VALUES ('select_action',        'German',   'Aktion ausw&auml;hlen');
 INSERT INTO txt VALUES ('select_action',        'English',  'Select action');
 INSERT INTO txt VALUES ('lifecycle_states',     'German',   'Lifecycle-Status');

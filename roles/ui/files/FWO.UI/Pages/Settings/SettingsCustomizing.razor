@@ -101,8 +101,8 @@
         <div class="form-group row" data-toggle="tooltip" title="@(userConfig.PureLine("H5546"))">
             <label class="col-form-label col-sm-3">@(userConfig.GetText("api_ticket_initial_state")):</label>
             <div class="col-sm-3">
-                <Dropdown ElementType="int" @bind-SelectedElement="configData!.ReqApiTicketInitialStateId" ElementToString="StateDisplayName"
-                          Elements="stateIds">
+                <Dropdown ElementType="int?" @bind-SelectedElement="selectedApiTicketInitialStateId" ElementToString="StateDisplayName"
+                          Elements="stateIds.Select(stateId => (int?)stateId)" Nullable="true" NoneSelectedText="@(userConfig.GetText("use_default"))">
                     <ElementTemplate Context="stateId">
                         @(StateDisplayName(stateId))
                     </ElementTemplate>
@@ -181,6 +181,7 @@ else
     private Dictionary<WfTaskType, bool> taskTypesActiveDict = [];
 
     private List<WfPriority> prioList = [];
+    private int? selectedApiTicketInitialStateId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -189,9 +190,10 @@ else
             configData = await globalConfig.GetEditableConfig();
             states = await apiConnection.SendQueryAsync<List<WfState>>(RequestQueries.getStates) ?? [];
             stateIds = states.Select(state => state.Id).ToList();
+            selectedApiTicketInitialStateId = configData.ReqApiTicketInitialStateId >= 0 ? configData.ReqApiTicketInitialStateId : null;
             availableTaskTypes = System.Text.Json.JsonSerializer.Deserialize<List<WfTaskType>>(configData.ReqAvailableTaskTypes) ?? throw new JsonException("Config data could not be parsed.");
             taskTypesActiveDict = [];
-            foreach(WfTaskType type in Enum.GetValues(typeof(WfTaskType)))
+            foreach(WfTaskType type in Enum.GetValues<WfTaskType>())
             {
                 taskTypesActiveDict.Add(type, availableTaskTypes.Contains(type));
             }
@@ -204,9 +206,11 @@ else
         }
     }
 
-    private string StateDisplayName(int stateId)
+    private string StateDisplayName(int? stateId)
     {
-        return states.FirstOrDefault(state => state.Id == stateId)?.Name ?? stateId.ToString();
+        return stateId == null
+            ? userConfig.GetText("use_default")
+            : states.FirstOrDefault(state => state.Id == stateId.Value)?.Name ?? stateId.Value.ToString();
     }
 
     private async Task Save()
@@ -215,6 +219,7 @@ else
         {
             if (configData != null)
             {
+                configData.ReqApiTicketInitialStateId = selectedApiTicketInitialStateId ?? -1;
                 availableTaskTypes = [];
                 foreach(WfTaskType type in taskTypesActiveDict.Keys)
                 {

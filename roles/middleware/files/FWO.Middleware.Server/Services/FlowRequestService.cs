@@ -111,17 +111,18 @@ public sealed class FlowRequestService
     {
         List<WfState> states = await apiConnection.SendQueryAsync<List<WfState>>(RequestQueries.getStates) ?? [];
         int configuredStateId = globalConfig.ReqApiTicketInitialStateId;
-        if (states.Any(state => state.Id == configuredStateId))
+        if (configuredStateId >= 0)
         {
-            return configuredStateId;
-        }
+            if (states.Any(state => state.Id == configuredStateId))
+            {
+                return configuredStateId;
+            }
 
-        if (configuredStateId != 0)
-        {
             throw new InvalidOperationException($"Configured API ticket state id {configuredStateId} does not exist in the current state list.");
         }
 
-        return states.Select(state => state.Id).DefaultIfEmpty(0).Min();
+        StateMatrixConfigurationSnapshot stateMatrix = await StateMatrixConfigurationRepository.Load(apiConnection, WfTaskType.master);
+        return stateMatrix.Matrices[WorkflowPhases.request].LowestInputState;
     }
 
     /// <summary>
@@ -202,12 +203,14 @@ public sealed class FlowRequestService
 
         foreach (CreateRequestRequest.CreateAddressObjectRequest addressObject in request.AddressObjects)
         {
-            AddEntity(entities, ParseEntityId(addressObject.Id, "address object"), CreateRequestEntity.FromAddressObject(addressObject));
+            int entityId = ParseEntityId(addressObject.Id, "address object");
+            AddEntity(entities, entityId, CreateRequestEntity.FromAddressObject(entityId, addressObject));
         }
 
         foreach (CreateRequestRequest.CreateServiceObjectRequest serviceObject in request.ServiceObjects)
         {
-            AddEntity(entities, ParseEntityId(serviceObject.Id, "service object"), CreateRequestEntity.FromServiceObject(serviceObject, protocolIds));
+            int entityId = ParseEntityId(serviceObject.Id, "service object");
+            AddEntity(entities, entityId, CreateRequestEntity.FromServiceObject(entityId, serviceObject, protocolIds));
         }
 
         foreach (CreateRequestRequest.CreateAddressGroupRequest addressGroup in request.AddressGroups)
@@ -222,7 +225,8 @@ public sealed class FlowRequestService
 
         foreach (CreateRequestRequest.CreateTimeObjectRequest timeObject in request.TimeObjects)
         {
-            AddEntity(entities, ParseEntityId(timeObject.Id, "time object"), CreateRequestEntity.FromTimeObject(timeObject));
+            int entityId = ParseEntityId(timeObject.Id, "time object");
+            AddEntity(entities, entityId, CreateRequestEntity.FromTimeObject(entityId, timeObject));
         }
 
         return entities;
@@ -346,12 +350,12 @@ public sealed class FlowRequestService
     /// </summary>
     private static int ResolveRuleActionId(string action, Dictionary<string, int> ruleActionIds)
     {
-        action = action.Trim();
         if (string.IsNullOrWhiteSpace(action))
         {
             throw new ArgumentException("'action' must not be empty.");
         }
 
+        action = action.Trim();
         if (ruleActionIds.TryGetValue(action, out int ruleActionId))
         {
             return ruleActionId;
@@ -448,30 +452,36 @@ public sealed class FlowRequestService
     /// </summary>
     private static string BuildGroupAdditionalInfo(CreateRequestRequest request, string groupName, int groupId)
     {
-        Dictionary<string, string> additionalInfo = new()
-        {
-            [AdditionalInfoKeys.GrpName] = groupName,
-            [AdditionalInfoKeys.GroupId] = groupId.ToString()
-        };
-
-        if (!string.IsNullOrWhiteSpace(request.RuleContactName))
-        {
-            additionalInfo[AdditionalInfoKeys.RequestContactName] = request.RuleContactName;
-        }
-        if (!string.IsNullOrWhiteSpace(request.RuleContactId))
-        {
-            additionalInfo[AdditionalInfoKeys.RequestContactId] = request.RuleContactId;
-        }
-        if (!string.IsNullOrWhiteSpace(request.RequestorName))
-        {
-            additionalInfo[AdditionalInfoKeys.RequestorName] = request.RequestorName;
-        }
-        if (!string.IsNullOrWhiteSpace(request.RequestorId))
-        {
-            additionalInfo[AdditionalInfoKeys.RequestorId] = request.RequestorId;
-        }
-
+        Dictionary<string, string> additionalInfo = BuildRequestContactInfo(request.RuleContactName, request.RuleContactId, request.RequestorName, request.RequestorId);
+        additionalInfo[AdditionalInfoKeys.GrpName] = groupName;
+        additionalInfo[AdditionalInfoKeys.GroupId] = groupId.ToString(CultureInfo.InvariantCulture);
         return JsonSerializer.Serialize(additionalInfo);
+    }
+
+    /// <summary>
+    /// Builds the shared request/contact metadata block used by multiple ticket payloads.
+    /// </summary>
+    private static Dictionary<string, string> BuildRequestContactInfo(string? requestContactName, string? requestContactId, string? requestorName, string? requestorId)
+    {
+        Dictionary<string, string> additionalInfo = new();
+        if (!string.IsNullOrWhiteSpace(requestContactName))
+        {
+            additionalInfo[AdditionalInfoKeys.RequestContactName] = requestContactName;
+        }
+        if (!string.IsNullOrWhiteSpace(requestContactId))
+        {
+            additionalInfo[AdditionalInfoKeys.RequestContactId] = requestContactId;
+        }
+        if (!string.IsNullOrWhiteSpace(requestorName))
+        {
+            additionalInfo[AdditionalInfoKeys.RequestorName] = requestorName;
+        }
+        if (!string.IsNullOrWhiteSpace(requestorId))
+        {
+            additionalInfo[AdditionalInfoKeys.RequestorId] = requestorId;
+        }
+
+        return additionalInfo;
     }
 
     /// <summary>
@@ -538,26 +548,10 @@ public sealed class FlowRequestService
     /// </summary>
     private static string BuildAdditionalInfo(string requestContactName, string requestContactId, string requestorName, string requestorId, CreateRequestEntity? timeEntity)
     {
-        Dictionary<string, string> additionalInfo = new();
-        if (!string.IsNullOrWhiteSpace(requestContactName))
-        {
-            additionalInfo[AdditionalInfoKeys.RequestContactName] = requestContactName;
-        }
-        if (!string.IsNullOrWhiteSpace(requestContactId))
-        {
-            additionalInfo[AdditionalInfoKeys.RequestContactId] = requestContactId;
-        }
-        if (!string.IsNullOrWhiteSpace(requestorName))
-        {
-            additionalInfo[AdditionalInfoKeys.RequestorName] = requestorName;
-        }
-        if (!string.IsNullOrWhiteSpace(requestorId))
-        {
-            additionalInfo[AdditionalInfoKeys.RequestorId] = requestorId;
-        }
+        Dictionary<string, string> additionalInfo = BuildRequestContactInfo(requestContactName, requestContactId, requestorName, requestorId);
         if (timeEntity != null)
         {
-            additionalInfo[AdditionalInfoKeys.TimeObjectId] = timeEntity.Id.ToString();
+            additionalInfo[AdditionalInfoKeys.TimeObjectId] = timeEntity.Id.ToString(CultureInfo.InvariantCulture);
         }
         return JsonSerializer.Serialize(additionalInfo);
     }
@@ -585,14 +579,12 @@ public sealed class FlowRequestService
         int? PortStart = null,
         int? PortEnd = null,
         DateTime? TimeStart = null,
-        DateTime? TimeEnd = null,
-        string? RawStartTime = null,
-        string? RawEndTime = null)
+        DateTime? TimeEnd = null)
     {
-        public static CreateRequestEntity FromAddressObject(CreateRequestRequest.CreateAddressObjectRequest request)
+        public static CreateRequestEntity FromAddressObject(int id, CreateRequestRequest.CreateAddressObjectRequest request)
         {
             return new CreateRequestEntity(
-                ParseEntityId(request.Id, "address object"),
+                id,
                 CreateRequestEntityKind.AddressObject,
                 request.Name,
                 request.IpStart,
@@ -604,11 +596,11 @@ public sealed class FlowRequestService
             return new CreateRequestEntity(request.Id, CreateRequestEntityKind.AddressGroup, request.Name);
         }
 
-        public static CreateRequestEntity FromServiceObject(CreateRequestRequest.CreateServiceObjectRequest request, Dictionary<string, int> protocolIds)
+        public static CreateRequestEntity FromServiceObject(int id, CreateRequestRequest.CreateServiceObjectRequest request, Dictionary<string, int> protocolIds)
         {
             int protocolId = ResolveProtocolId(request.Protocol, protocolIds);
             return new CreateRequestEntity(
-                ParseEntityId(request.Id, "service object"),
+                id,
                 CreateRequestEntityKind.ServiceObject,
                 request.Name,
                 ProtocolId: protocolId,
@@ -621,23 +613,28 @@ public sealed class FlowRequestService
             return new CreateRequestEntity(request.Id, CreateRequestEntityKind.ServiceGroup, request.Name);
         }
 
-        public static CreateRequestEntity FromTimeObject(CreateRequestRequest.CreateTimeObjectRequest request)
+        public static CreateRequestEntity FromTimeObject(int id, CreateRequestRequest.CreateTimeObjectRequest request)
         {
-            DateTime? startTime = TryParseDateTime(request.StartTime);
-            DateTime? endTime = TryParseDateTime(request.EndTime);
+            DateTime? startTime = ParseDateTime(request.StartTime, "startTime");
+            DateTime? endTime = ParseDateTime(request.EndTime, "endTime");
             return new CreateRequestEntity(
-                ParseEntityId(request.Id, "time object"),
+                id,
                 CreateRequestEntityKind.TimeObject,
                 request.Name,
                 TimeStart: startTime,
-                TimeEnd: endTime,
-                RawStartTime: request.StartTime,
-                RawEndTime: request.EndTime);
+                TimeEnd: endTime);
         }
 
-        private static DateTime? TryParseDateTime(string value)
+        private static DateTime? ParseDateTime(string value, string fieldName)
         {
-            return DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTime parsed) ? parsed : null;
+            try
+            {
+                return DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            }
+            catch (FormatException exception)
+            {
+                throw new ArgumentException($"The time object {fieldName} '{value}' must be a valid date/time value.", fieldName, exception);
+            }
         }
 
         private static int ResolveProtocolId(string protocol, Dictionary<string, int> protocolIds)
