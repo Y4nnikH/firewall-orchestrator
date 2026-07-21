@@ -173,7 +173,7 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         List<int> applicationIds = applications.Select(application => application.Id).ToList();
         HashSet<int> applicationIdSet = applicationIds.ToHashSet();
         List<ModellingAppZone> zones = await apiConnection.SendQueryAsync<List<ModellingAppZone>>(
-            ModellingQueries.getAllAppZones, new { applicationIds }) ?? [];
+            ModellingQueries.geAppZones, new { applicationIds }) ?? [];
         List<ApplicationZoneResponse> applicationZones = zones
             .Where(zone => zone.AppId is not null && applicationIdSet.Contains(zone.AppId.Value))
             .Select(ToResponse)

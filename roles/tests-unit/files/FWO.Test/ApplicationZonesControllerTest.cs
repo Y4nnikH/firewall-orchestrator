@@ -52,10 +52,10 @@ internal class ApplicationZonesControllerTest
     {
         Assert.Multiple(() =>
         {
-            Assert.That(ModellingQueries.getAllAppZones, Does.Contain("$applicationIds: [Int!]!"));
-            Assert.That(ModellingQueries.getAllAppZones, Does.Contain("app_id: { _in: $applicationIds }"));
-            Assert.That(ModellingQueries.getAllAppZones, Does.Contain("is_deleted: { _eq: false }"));
-            Assert.That(ModellingQueries.getAllAppZones,
+            Assert.That(ModellingQueries.geAppZones, Does.Contain("$applicationIds: [Int!]!"));
+            Assert.That(ModellingQueries.geAppZones, Does.Contain("app_id: { _in: $applicationIds }"));
+            Assert.That(ModellingQueries.geAppZones, Does.Contain("is_deleted: { _eq: false }"));
+            Assert.That(ModellingQueries.geAppZones,
                 Does.Contain("owner_network: { is_deleted: { _eq: false } }"));
         });
     }
@@ -93,7 +93,7 @@ internal class ApplicationZonesControllerTest
             Assert.That(apiConnection.Queries, Is.EqualTo(new List<string>
             {
                 OwnerQueries.getOwnersFiltered,
-                ModellingQueries.getAllAppZones
+                ModellingQueries.geAppZones
             }));
             Assert.That(apiConnection.SetBestRoleCount, Is.Zero);
             Assert.That(JsonSerializer.Serialize(apiConnection.LastApplicationZoneVariables),
@@ -268,7 +268,7 @@ internal class ApplicationZonesControllerTest
             Assert.That(apiConnection.Queries, Is.EqualTo(new List<string>
             {
                 OwnerQueries.getOwnersFiltered,
-                ModellingQueries.getAllAppZones
+                ModellingQueries.geAppZones
             }));
             Assert.That(response.Select(applicationZone => applicationZone.ApplicationId), Is.EqualTo(new List<int> { 7, 8, 9 }));
             Assert.That(response[2].Id, Is.Null);
@@ -579,7 +579,7 @@ internal class ApplicationZonesControllerTest
             {
                 return Task.FromResult((QueryResponseType)(object)GetMatchingOwners(variables));
             }
-            if (query == ModellingQueries.getAllAppZones)
+            if (query == ModellingQueries.geAppZones)
             {
                 LastApplicationZoneVariables = variables;
                 return Task.FromResult((QueryResponseType)(object)AllApplicationZones);
