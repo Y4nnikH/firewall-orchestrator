@@ -102,11 +102,7 @@ namespace FWO.Services.RuleTreeBuilder
         /// Recomputes visibility for every descendant of <paramref name="subtreeRoot"/> in a single
         /// iterative top-down pass. A descendant is visible only when the root's own ancestor chain
         /// is expanded and every expandable node on the path down to that descendant is expanded.
-        /// This replaces the former per-descendant ancestor walk (which rescanned the path back to
-        /// the root for every node) and the nested-yield traversal, both of which produced
-        /// near-quadratic work and heavy enumerator allocation on large rule trees. The visibility
-        /// of <paramref name="subtreeRoot"/> itself is intentionally left unchanged. Leaf
-        /// descendants are appended to <paramref name="leafSink"/> when it is supplied.
+        /// Leaf descendants are appended to <paramref name="leafSink"/> when it is supplied.
         /// </summary>
         private static void PropagateVisibility(RuleTreeItem subtreeRoot, bool subtreeRootAncestorsExpanded, List<RuleTreeItem>? leafSink)
         {
@@ -145,8 +141,6 @@ namespace FWO.Services.RuleTreeBuilder
 
         /// <summary>
         /// Enumerates <paramref name="root"/> and all of its descendants using an explicit stack.
-        /// This replaces the previous recursively nested iterator, which allocated one enumerator
-        /// state machine per node per level and enumerated in quadratic time on deep trees.
         /// </summary>
         private static IEnumerable<RuleTreeItem> EnumerateSubtree(RuleTreeItem root)
         {
