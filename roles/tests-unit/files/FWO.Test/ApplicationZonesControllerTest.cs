@@ -134,11 +134,11 @@ internal class ApplicationZonesControllerTest
                 Filter = new()
                 {
                     ApplicationId = 7,
-                    ApplicationName = "application seven",
-                    AppIdExternal = "app-7",
+                    ApplicationName = "application *",
+                    AppIdExternal = "app-*",
                     Id = 70,
-                    Name = "az-match",
-                    IdString = "AZ-MATCH",
+                    Name = "az-*",
+                    IdString = "AZ-*",
                     IsDeleted = false
                 }
             }
@@ -354,6 +354,39 @@ internal class ApplicationZonesControllerTest
             Assert.That(response[0].ApplicationId, Is.EqualTo(1));
             Assert.That(response[0].Id, Is.Null);
         });
+    }
+
+    [Test]
+    public async Task GetSupportsSingleCharacterWildcardsForEveryStringFilter()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((7, "Application Seven", "APP-7")),
+            ZonesByApplicationId = new Dictionary<int, List<ModellingAppZone>>
+            {
+                [7] = [CreateApplicationZone(7, 70, "AZ-Match", "az-match", "10.7.0.1", string.Empty)]
+            }
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Auditor));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new()
+            {
+                Filter = new()
+                {
+                    ApplicationName = "Application Seve?",
+                    AppIdExternal = "APP-?",
+                    Name = "AZ-Matc?",
+                    IdString = "az-matc?"
+                }
+            }
+        };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        OkObjectResult okResult = (OkObjectResult)result.Result!;
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)okResult.Value!;
+        Assert.That(response.Select(applicationZone => applicationZone.Id), Is.EqualTo(new List<long> { 70 }));
     }
 
     private static ModellingAppZone CreateApplicationZone(

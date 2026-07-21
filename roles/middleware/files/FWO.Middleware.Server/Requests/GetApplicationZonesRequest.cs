@@ -36,7 +36,9 @@ public sealed class GetApplicationZonesOptions
 }
 
 /// <summary>
-/// Represents nullable filters for every top-level application-zone response field.
+/// Represents nullable filters for every top-level application-zone response field. String filters support
+/// <c>*</c> for any character sequence and <c>?</c> for one character; values without wildcards match exactly,
+/// case-insensitively.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed class ApplicationZoneFilter
@@ -49,14 +51,14 @@ public sealed class ApplicationZoneFilter
     public int? ApplicationId { get; set; }
 
     /// <summary>
-    /// Gets or sets the optional exact, case-insensitive application name filter. When <see cref="GetApplicationZonesRequest.ApplicationIds"/>
+    /// Gets or sets the optional case-insensitive application name filter with <c>*</c> and <c>?</c> wildcards. When <see cref="GetApplicationZonesRequest.ApplicationIds"/>
     /// is omitted, this selects matching visible applications, including applications without an application-zone.
     /// </summary>
     [JsonPropertyName("applicationName")]
     public string? ApplicationName { get; set; }
 
     /// <summary>
-    /// Gets or sets the optional exact, case-insensitive external application-id filter. When <see cref="GetApplicationZonesRequest.ApplicationIds"/>
+    /// Gets or sets the optional case-insensitive external application-id filter with <c>*</c> and <c>?</c> wildcards. When <see cref="GetApplicationZonesRequest.ApplicationIds"/>
     /// is omitted, this selects matching visible applications, including applications without an application-zone.
     /// </summary>
     [JsonPropertyName("appIdExternal")]
@@ -69,13 +71,13 @@ public sealed class ApplicationZoneFilter
     public long? Id { get; set; }
 
     /// <summary>
-    /// Gets or sets the optional exact, case-insensitive application-zone name filter.
+    /// Gets or sets the optional case-insensitive application-zone name filter with <c>*</c> and <c>?</c> wildcards.
     /// </summary>
     [JsonPropertyName("name")]
     public string? Name { get; set; }
 
     /// <summary>
-    /// Gets or sets the optional exact, case-insensitive application-zone identifier filter.
+    /// Gets or sets the optional case-insensitive application-zone identifier filter with <c>*</c> and <c>?</c> wildcards.
     /// </summary>
     [JsonPropertyName("idString")]
     public string? IdString { get; set; }

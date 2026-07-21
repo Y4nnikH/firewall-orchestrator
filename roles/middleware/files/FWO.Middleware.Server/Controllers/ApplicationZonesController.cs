@@ -9,6 +9,7 @@ using FWO.Middleware.Server.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.RegularExpressions;
 
 namespace FWO.Middleware.Server.Controllers;
 
@@ -21,6 +22,7 @@ namespace FWO.Middleware.Server.Controllers;
 public class ApplicationZonesController(ApiConnection apiConnection) : ControllerBase
 {
     internal const int kMaxFilterTextLength = 256;
+    private const int kFilterPatternTimeoutMilliseconds = 100;
 
     /// <summary>
     /// Returns complete application-zone objects, including all addresses, for the requested or visible applications.
@@ -229,8 +231,8 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         List<FwoOwner> applications = await GetExistingApplicationsAsync(applicationIds);
         return applications.Where(application =>
             (filter!.ApplicationId is null || application.Id == filter.ApplicationId) &&
-            (filter.ApplicationName is null || string.Equals(application.Name, filter.ApplicationName, StringComparison.OrdinalIgnoreCase)) &&
-            (filter.AppIdExternal is null || string.Equals(application.ExtAppId, filter.AppIdExternal, StringComparison.OrdinalIgnoreCase))).ToList();
+            MatchesTextFilter(application.Name, filter.ApplicationName) &&
+            MatchesTextFilter(application.ExtAppId, filter.AppIdExternal)).ToList();
     }
 
     private static bool HasApplicationSelectionFilter(ApplicationZoneFilter? filter)
@@ -301,12 +303,30 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
 
         return applicationZones.Where(applicationZone =>
             (filter.ApplicationId is null || applicationZone.ApplicationId == filter.ApplicationId) &&
-            (filter.ApplicationName is null || string.Equals(applicationZone.ApplicationName, filter.ApplicationName, StringComparison.OrdinalIgnoreCase)) &&
-            (filter.AppIdExternal is null || string.Equals(applicationZone.AppIdExternal, filter.AppIdExternal, StringComparison.OrdinalIgnoreCase)) &&
+            MatchesTextFilter(applicationZone.ApplicationName, filter.ApplicationName) &&
+            MatchesTextFilter(applicationZone.AppIdExternal, filter.AppIdExternal) &&
             (filter.Id is null || applicationZone.Id == filter.Id) &&
-            (filter.Name is null || string.Equals(applicationZone.Name, filter.Name, StringComparison.OrdinalIgnoreCase)) &&
-            (filter.IdString is null || string.Equals(applicationZone.IdString, filter.IdString, StringComparison.OrdinalIgnoreCase)) &&
+            MatchesTextFilter(applicationZone.Name, filter.Name) &&
+            MatchesTextFilter(applicationZone.IdString, filter.IdString) &&
             (filter.IsDeleted is null || applicationZone.IsDeleted == filter.IsDeleted)).ToList();
+    }
+
+    private static bool MatchesTextFilter(string? value, string? filter)
+    {
+        if (filter is null)
+        {
+            return true;
+        }
+        if (value is null)
+        {
+            return false;
+        }
+
+        string pattern = "^" + Regex.Escape(filter)
+            .Replace("\\*", ".*")
+            .Replace("\\?", ".") + "$";
+        return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(kFilterPatternTimeoutMilliseconds));
     }
 
     private static void AddError(Dictionary<string, string[]> errors, string fieldName, string error)
