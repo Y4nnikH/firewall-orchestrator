@@ -50,6 +50,19 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task GetAsync_ReturnsAnonymousJwt_WhenParametersAreNull()
+        {
+            AuthenticationTokenController controller = CreateController();
+
+            ActionResult<string> result = await controller.GetAsync(null!);
+
+            string jwt = ExtractOkString(result);
+            JwtSecurityToken token = new JwtSecurityTokenHandler().ReadJwtToken(jwt);
+
+            Assert.That(token.Claims.Single(claim => claim.Type == "x-hasura-default-role").Value, Is.EqualTo(Roles.Anonymous));
+        }
+
+        [Test]
         public async Task GetTokenPair_ReturnsAnonymousBootstrapPair_WhenCredentialsAreMissing()
         {
             AuthenticationTokenController controller = CreateController();
@@ -64,6 +77,20 @@ namespace FWO.Test
                 Assert.That(tokenPair.RefreshToken, Is.Empty);
                 Assert.That(token.Claims.Single(claim => claim.Type == "x-hasura-default-role").Value, Is.EqualTo(Roles.Anonymous));
             });
+        }
+
+        [Test]
+        public async Task GetTokenPair_ReturnsAnonymousBootstrapPair_WhenParametersAreNull()
+        {
+            AuthenticationTokenController controller = CreateController();
+
+            ActionResult<TokenPair> result = await controller.GetTokenPair(null!);
+
+            TokenPair tokenPair = ExtractOkValue(result);
+            JwtSecurityToken token = new JwtSecurityTokenHandler().ReadJwtToken(tokenPair.AccessToken);
+
+            Assert.That(tokenPair.RefreshToken, Is.Empty);
+            Assert.That(token.Claims.Single(claim => claim.Type == "x-hasura-default-role").Value, Is.EqualTo(Roles.Anonymous));
         }
 
         [Test]
@@ -158,6 +185,63 @@ namespace FWO.Test
             ActionResult result = await controller.RevokeToken(null!);
 
             Assert.That(result, Is.TypeOf<BadRequestObjectResult>());
+        }
+
+        [Test]
+        public async Task RefreshToken_ReturnsUnauthorizedWhenRefreshTokenIsUnknown()
+        {
+            AuthenticationTokenController controller = CreateController(new RecordingApiConnection
+            {
+                NextResult = Array.Empty<RefreshTokenInfo>()
+            });
+
+            ActionResult<TokenPair> result = await controller.RefreshToken(new RefreshTokenRequest { RefreshToken = "refresh-token" });
+
+            Assert.That(result.Result, Is.TypeOf<UnauthorizedObjectResult>());
+            Assert.That(((UnauthorizedObjectResult)result.Result!).Value, Is.EqualTo("Invalid or expired refresh token"));
+        }
+
+        [Test]
+        public async Task RefreshToken_ReturnsUnauthorizedWhenUserCannotBeFound()
+        {
+            RecordingApiConnection apiConnection = new();
+            apiConnection.QueueResult(new[] { new RefreshTokenInfo { UserId = 7 } });
+            apiConnection.QueueResult(Array.Empty<UiUser>());
+            AuthenticationTokenController controller = CreateController(apiConnection);
+
+            ActionResult<TokenPair> result = await controller.RefreshToken(new RefreshTokenRequest { RefreshToken = "refresh-token" });
+
+            Assert.That(result.Result, Is.TypeOf<UnauthorizedObjectResult>());
+            Assert.That(((UnauthorizedObjectResult)result.Result!).Value, Is.EqualTo("User not found"));
+        }
+
+        [Test]
+        public async Task RevokeToken_ReturnsUnauthorizedWhenRefreshTokenIsUnknown()
+        {
+            AuthenticationTokenController controller = CreateController(new RecordingApiConnection
+            {
+                NextResult = Array.Empty<RefreshTokenInfo>()
+            });
+
+            ActionResult result = await controller.RevokeToken(new RefreshTokenRequest { RefreshToken = "refresh-token" });
+
+            Assert.That(result, Is.TypeOf<UnauthorizedObjectResult>());
+            Assert.That(((UnauthorizedObjectResult)result).Value, Is.EqualTo("Invalid or expired refresh token"));
+        }
+
+        [Test]
+        public async Task RevokeToken_ReturnsUnauthorizedWhenRevocationAffectsNoRows()
+        {
+            RecordingApiConnection apiConnection = new();
+            apiConnection.QueueResult(new[] { new RefreshTokenInfo { UserId = 7 } });
+            apiConnection.QueueResult(new[] { new UiUser { DbId = 7, Name = "token-user" } });
+            apiConnection.QueueResult(new ReturnId { AffectedRows = 0 });
+            AuthenticationTokenController controller = CreateController(apiConnection);
+
+            ActionResult result = await controller.RevokeToken(new RefreshTokenRequest { RefreshToken = "refresh-token" });
+
+            Assert.That(result, Is.TypeOf<UnauthorizedObjectResult>());
+            Assert.That(((UnauthorizedObjectResult)result).Value, Is.EqualTo("Invalid or expired refresh token"));
         }
 
         [Test]
@@ -318,11 +402,16 @@ namespace FWO.Test
 
         private static AuthenticationTokenController CreateController()
         {
+            return CreateController(new RecordingApiConnection());
+        }
+
+        private static AuthenticationTokenController CreateController(ApiConnection apiConnection)
+        {
             RSA rsa = RSA.Create(2048);
             return new AuthenticationTokenController(
                 new JwtWriter(new RsaSecurityKey(rsa)),
                 [],
-                new SimulatedApiConnection(),
+                apiConnection,
                 new FixedTokenLifetimeProvider());
         }
 
@@ -381,7 +470,13 @@ namespace FWO.Test
             public string? LastOperationName { get; private set; }
             public int CallCount { get; private set; }
             public object? NextResult { get; set; }
+            public Queue<object> QueuedResults { get; } = new();
             public Exception? ThrowOnQuery { get; set; }
+
+            public void QueueResult(object result)
+            {
+                QueuedResults.Enqueue(result);
+            }
 
             public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, FWO.Api.Client.QueryChunkingOptions? chunkingOptions = null)
             {
@@ -393,6 +488,15 @@ namespace FWO.Test
                 if (ThrowOnQuery != null)
                 {
                     throw ThrowOnQuery;
+                }
+
+                if (QueuedResults.Count > 0)
+                {
+                    object queuedResult = QueuedResults.Dequeue();
+                    if (queuedResult is QueryResponseType queuedTypedResult)
+                    {
+                        return Task.FromResult(queuedTypedResult);
+                    }
                 }
 
                 if (NextResult is QueryResponseType typedResult)

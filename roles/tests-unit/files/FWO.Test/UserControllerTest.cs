@@ -177,6 +177,29 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task AddReturnsZeroWhenLdapIdDoesNotMatchConfiguredLdap()
+        {
+            UserControllerTestApiConnection apiConnection = new();
+            UserController controller = CreateController(
+                [new Ldap { Id = 3 }],
+                apiConnection,
+                PrincipalWithRoles(Roles.Admin));
+
+            int result = await controller.Add(new UserAddParameters
+            {
+                LdapId = 2,
+                UserDn = "uid=newuser,dc=fworch,dc=internal",
+                Password = "password",
+                TenantId = 1
+            });
+
+            Assert.That(result, Is.Zero);
+            Assert.That(apiConnection.UserQueryCount, Is.Zero);
+            Assert.That(apiConnection.ReturnIdQueryCount, Is.Zero);
+            Assert.That(apiConnection.ReturnIdWrapperQueryCount, Is.Zero);
+        }
+
+        [Test]
         public void ChangeThrowsForUnknownUser()
         {
             UserControllerTestApiConnection apiConnection = new();
@@ -192,6 +215,30 @@ namespace FWO.Test
             });
 
             Assert.That(exception?.Message, Is.EqualTo("Wrong UserId"));
+            Assert.That(apiConnection.UserQueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.ReturnIdQueryCount, Is.Zero);
+        }
+
+        [Test]
+        public async Task ChangeReturnsFalseWhenLdapIdDoesNotMatchConfiguredLdap()
+        {
+            UserControllerTestApiConnection apiConnection = new()
+            {
+                Users = [CreateUser(42)]
+            };
+            UserController controller = CreateController(
+                [new Ldap { Id = 3 }],
+                apiConnection,
+                PrincipalWithRoles(Roles.Admin));
+
+            bool result = await controller.Change(new UserEditParameters
+            {
+                UserId = 42,
+                LdapId = 2,
+                Email = "new@test"
+            });
+
+            Assert.That(result, Is.False);
             Assert.That(apiConnection.UserQueryCount, Is.EqualTo(1));
             Assert.That(apiConnection.ReturnIdQueryCount, Is.Zero);
         }
@@ -238,6 +285,29 @@ namespace FWO.Test
             Assert.That(apiConnection.UserQueryCount, Is.EqualTo(1));
             Assert.That(apiConnection.ReturnIdQueryCount, Is.EqualTo(1));
             Assert.That(apiConnection.LastVariablesText, Does.Contain("42"));
+        }
+
+        [Test]
+        public async Task DeleteReturnsFalseWhenLdapIdDoesNotMatchConfiguredLdap()
+        {
+            UserControllerTestApiConnection apiConnection = new()
+            {
+                Users = [new() { DbId = 42, Dn = "uid=user,dc=fworch,dc=internal" }]
+            };
+            UserController controller = CreateController(
+                [new Ldap { Id = 3 }],
+                apiConnection,
+                PrincipalWithRoles(Roles.Admin));
+
+            bool result = await controller.Delete(new UserDeleteParameters
+            {
+                LdapId = 2,
+                UserId = 42
+            });
+
+            Assert.That(result, Is.False);
+            Assert.That(apiConnection.UserQueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.ReturnIdQueryCount, Is.Zero);
         }
 
         [Test]
