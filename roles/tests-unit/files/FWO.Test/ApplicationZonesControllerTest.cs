@@ -67,6 +67,7 @@ internal class ApplicationZonesControllerTest
             Assert.That(apiConnection.Queries, Has.Count.EqualTo(2));
             Assert.That(apiConnection.Queries, Is.All.EqualTo(ModellingQueries.getAppZonesByAppId));
             Assert.That(apiConnection.ApplicationIds, Is.EqualTo(request.ApplicationIds));
+            Assert.That(apiConnection.SetBestRoleCount, Is.Zero);
             Assert.That(response, Has.Count.EqualTo(2));
             Assert.That(response[0].ApplicationId, Is.EqualTo(7));
             Assert.That(response[0].Addresses[0].Ip, Is.EqualTo("10.7.0.1"));
@@ -271,6 +272,12 @@ internal class ApplicationZonesControllerTest
         public Dictionary<int, List<ModellingAppZone>> ZonesByApplicationId { get; set; } = [];
         public List<string> Queries { get; } = [];
         public List<int> ApplicationIds { get; } = [];
+        public int SetBestRoleCount { get; private set; }
+
+        public override void SetBestRole(ClaimsPrincipal user, List<string> targetRoleList)
+        {
+            SetBestRoleCount++;
+        }
 
         public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(
             string query,

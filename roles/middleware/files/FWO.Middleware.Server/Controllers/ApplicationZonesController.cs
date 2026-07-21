@@ -183,10 +183,8 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         List<ApplicationZoneResponse> applicationZones = [];
         foreach (int applicationId in applicationIds)
         {
-            List<ModellingAppZone> zones = await apiConnection.RunWithModellingRole(
-                User,
-                async () => await apiConnection.SendQueryAsync<List<ModellingAppZone>>(
-                    ModellingQueries.getAppZonesByAppId, new { appId = applicationId })) ?? [];
+            List<ModellingAppZone> zones = await apiConnection.SendQueryAsync<List<ModellingAppZone>>(
+                ModellingQueries.getAppZonesByAppId, new { appId = applicationId }) ?? [];
             applicationZones.AddRange(zones.Select(ToResponse));
         }
         return applicationZones;
