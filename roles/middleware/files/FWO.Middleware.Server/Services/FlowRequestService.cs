@@ -407,8 +407,7 @@ public sealed class FlowRequestService
             return null;
         }
 
-        CreateRequestEntity entity = GetEntity(entities, timeObjectId);
-        if (entity.Kind != CreateRequestEntityKind.TimeObject)
+        if (!entities.TryGetValue(timeObjectId, out CreateRequestEntity? entity) || entity.Kind != CreateRequestEntityKind.TimeObject)
         {
             throw new ArgumentException($"Time object id {timeObjectId} must reference a time object.");
         }
