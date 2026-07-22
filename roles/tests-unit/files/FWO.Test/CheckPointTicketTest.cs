@@ -71,6 +71,29 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task CreateRequestStringForGroupCreateReplacesSlashInNetworkObjectName()
+        {
+            CheckPointTicket ticket = new(checkPointSystem);
+            List<WfReqTask> tasks = new() { CreateGroupCreateTaskWithNewNetworkMemberHavingSlashInName() };
+            List<IpProtocol> ipProtos = new();
+
+            await ticket.CreateRequestString(tasks, ipProtos, new ModellingNamingConvention());
+
+            using JsonDocument document = JsonDocument.Parse(ticket.TicketText);
+            List<JsonElement> planSteps = document.RootElement.GetProperty("Steps").EnumerateArray().ToList();
+
+            ClassicAssert.AreEqual(4, planSteps.Count);
+            ClassicAssert.AreEqual(CheckPointTaskTypes.NetworkCreate, planSteps[1].GetProperty("TaskType").GetString());
+            ClassicAssert.AreEqual(CheckPointTaskTypes.GroupAddMembers, planSteps[2].GetProperty("TaskType").GetString());
+
+            JsonElement networkBody = planSteps[1].GetProperty("Body");
+            ClassicAssert.AreEqual("netz_1.2.3.4_25", networkBody.GetProperty("name").GetString());
+
+            JsonElement addMemberBody = planSteps[2].GetProperty("Body");
+            ClassicAssert.AreEqual("netz_1.2.3.4_25", addMemberBody.GetProperty("members").GetProperty("add")[0].GetString());
+        }
+
+        [Test]
         public async Task CreateExternalTicketRetriesGroupMemberObjectCreationWithIgnoreWarnings()
         {
 
@@ -383,6 +406,27 @@ namespace FWO.Test
                         RequestAction = RequestAction.create.ToString()
                     }
                 ]
+            };
+        }
+
+        private static WfReqTask CreateGroupCreateTaskWithNewNetworkMemberHavingSlashInName()
+        {
+            return new()
+            {
+                Id = 3,
+                TaskNumber = 3,
+                TaskType = WfTaskType.group_create.ToString(),
+                AdditionalInfo = "{\"GrpName\":\"cp-group\"}",
+                Elements = new List<WfReqElement>
+                {
+                    new()
+                    {
+                        Name = "netz_1.2.3.4/25",
+                        Field = ElemFieldType.source.ToString(),
+                        IpString = "1.2.3.4/25",
+                        RequestAction = RequestAction.create.ToString()
+                    }
+                }
             };
         }
 

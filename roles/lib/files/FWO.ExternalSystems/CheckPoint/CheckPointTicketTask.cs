@@ -179,7 +179,12 @@ namespace FWO.ExternalSystems.CheckPoint
 
         private static string GetMemberName(WfReqElement element)
         {
-            return element.Name ?? "";
+            return ToCheckPointObjectName(element.Name);
+        }
+
+        private static string ToCheckPointObjectName(string? name)
+        {
+            return (name ?? "").Replace("/", "_");
         }
 
         private static bool IsNetworkMember(WfReqElement element)
@@ -204,7 +209,7 @@ namespace FWO.ExternalSystems.CheckPoint
             return new()
             {
                 NetworkObjectType = objectType,
-                Name = element.Name ?? "",
+                Name = ToCheckPointObjectName(element.Name),
                 RequestAction = element.RequestAction ?? nameof(RequestAction.create),
                 Range = range,
                 Comment = ""
