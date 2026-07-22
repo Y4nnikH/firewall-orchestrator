@@ -11,7 +11,7 @@
 ### OS basics needed in every installation mode
 - name: Add the OS specific varibles
   include_vars: "{{ ansible_facts['os_family'] }}.yml"
-  tags: ["test", "integrationtests"]
+  tags: ["always"]
 
 # the ldap client tools are used by the upgrade, sample-auth-data and integration test tasks,
 # so they must not depend on the server installation block below
