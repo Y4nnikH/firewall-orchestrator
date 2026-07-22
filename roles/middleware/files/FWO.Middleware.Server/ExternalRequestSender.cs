@@ -180,6 +180,17 @@ namespace FWO.Middleware.Server
 
                 request.ExtRequestState = ExtStates.ExtReqRequested.ToString();
                 await UpdateRequestCreation(request);
+
+                try
+                {
+                    using ExternalRequestHandler extReqHandler = new(userConfig, apiConnection);
+                    await extReqHandler.HandleStateChange(request);
+                }
+                catch (Exception exception)
+                {
+                    Log.WriteError(LogMessageTitle, $"{RequestInfo(request)} was created externally, but ticket sync failed.", exception);
+                }
+
                 Log.WriteDebug(LogMessageTitle, $"{RequestInfo(request)}. Success Message: " + ticketIdResponse.Content);
             }
             else
