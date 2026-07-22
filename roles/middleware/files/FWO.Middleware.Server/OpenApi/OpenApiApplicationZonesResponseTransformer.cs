@@ -18,6 +18,7 @@ public sealed class OpenApiApplicationZonesResponseTransformer : IOpenApiOperati
     {
         if (!Matches(context.Description)
             || operation.Responses?.TryGetValue(StatusCodes.Status200OK.ToString(), out IOpenApiResponse? response) != true
+            || response is null
             || response.Content is null)
         {
             return;
@@ -31,7 +32,7 @@ public sealed class OpenApiApplicationZonesResponseTransformer : IOpenApiOperati
     /// <summary>
     /// Adds the compact response shape as an alternative to every successful response media type.
     /// </summary>
-    internal static void ApplyIpOnlyResponseSchema(IOpenApiResponse response, IOpenApiSchema ipOnlySchema)
+    public static void ApplyIpOnlyResponseSchema(IOpenApiResponse response, IOpenApiSchema ipOnlySchema)
     {
         if (response.Content is null)
         {

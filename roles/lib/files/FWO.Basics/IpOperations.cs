@@ -225,8 +225,8 @@ namespace FWO.Basics
             if (startOverlap <= endOverlap)
             {
                 return new IPAddressRange(
-                    FromBigInteger(startOverlap, a.Begin.AddressFamily),
-                    FromBigInteger(endOverlap, a.Begin.AddressFamily)
+                    IPNetwork2.ToIPAddress(startOverlap, a.Begin.AddressFamily),
+                    IPNetwork2.ToIPAddress(endOverlap, a.Begin.AddressFamily)
                 );
             }
 
