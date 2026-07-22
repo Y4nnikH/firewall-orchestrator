@@ -499,12 +499,13 @@ internal class FlowRequestServiceTest
     }
 
     [Test]
-    public async Task CreateRequest_ReturnsOkResponseAndUsesRequesterClaim()
+    public async Task CreateRequest_ReturnsOkResponseAndUsesPayloadRequester()
     {
         FlowRequestServiceApiConn apiConnection = new()
         {
             States = [new WfState { Id = 0, Name = "draft" }],
-            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }]
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }],
+            Owners = [new FwoOwner { Id = 42, Name = "Finance" }]
         };
         FlowRequestController controller = new(new FlowRequestService(apiConnection, new GlobalConfig()));
         controller.ControllerContext = new ControllerContext
@@ -512,15 +513,19 @@ internal class FlowRequestServiceTest
             HttpContext = new DefaultHttpContext
             {
                 User = new ClaimsPrincipal(new ClaimsIdentity(
-                    [new Claim("x-hasura-user-id", "77")],
+                    [
+                        new Claim("x-hasura-user-id", "77"),
+                        new Claim(ClaimTypes.Name, "Trusted Requester"),
+                        new Claim("x-hasura-uuid", "uid=trusted,dc=fworch,dc=internal")
+                    ],
                     "test"))
             }
         };
 
         ActionResult<CreateRequestResponse> result = await controller.CreateRequest(new CreateRequestRequest
         {
-            RequestorName = "Alice Example",
-            RequestorId = "alice",
+            RequestorName = "Payload Requester",
+            RequestorId = "payload-requester",
             RuleContactName = "Bob Approver",
             RuleContactId = "bob",
             Title = "Allow HTTPS to app server",
@@ -583,6 +588,16 @@ internal class FlowRequestServiceTest
             Assert.That(response.RequestId, Is.EqualTo(100));
             Assert.That(apiConnection.LastTicketWriter, Is.Not.Null);
             Assert.That(apiConnection.LastTicketWriter!.Tasks, Has.Count.EqualTo(3));
+            Assert.That(apiConnection.CreatedTicket!.Requester?.Name, Is.EqualTo("Payload Requester"));
+            Assert.That(apiConnection.CreatedTicket.Requester?.Dn, Is.EqualTo("payload-requester"));
+            Assert.That(GetVariable(apiConnection.NewTicketVariables, "requesterName"), Is.EqualTo("Payload Requester"));
+            Assert.That(GetVariable(apiConnection.NewTicketVariables, "requesterDn"), Is.EqualTo("payload-requester"));
+            Assert.That(apiConnection.CreatedTicket.Tasks[2].GetAddInfoValue(AdditionalInfoKeys.RequestorName), Is.EqualTo("Payload Requester"));
+            Assert.That(apiConnection.CreatedTicket.Tasks[2].GetAddInfoValue(AdditionalInfoKeys.RequestorId), Is.EqualTo("payload-requester"));
+            Assert.That(apiConnection.CreatedTicket.Tasks[2].Owners, Has.Count.EqualTo(1));
+            Assert.That(apiConnection.CreatedTicket.Tasks[2].Owners[0].Owner.Id, Is.EqualTo(42));
+            Assert.That(apiConnection.LastTicketWriter!.Tasks[2].Owners.WfOwnerList, Has.Count.EqualTo(1));
+            Assert.That(apiConnection.LastTicketWriter.Tasks[2].Owners.WfOwnerList[0].OwnerId, Is.EqualTo(42));
         });
     }
 
@@ -693,7 +708,11 @@ internal class FlowRequestServiceTest
             HttpContext = new DefaultHttpContext
             {
                 User = new ClaimsPrincipal(new ClaimsIdentity(
-                    [new Claim("x-hasura-user-id", "77")],
+                    [
+                        new Claim("x-hasura-user-id", "77"),
+                        new Claim(ClaimTypes.Name, "Trusted Requester"),
+                        new Claim("x-hasura-uuid", "uid=trusted,dc=fworch,dc=internal")
+                    ],
                     "test"))
             }
         };
@@ -749,6 +768,150 @@ internal class FlowRequestServiceTest
         });
     }
 
+    [Test]
+    public async Task CreateRequest_ReturnsBadRequestForUnknownNumericProtocolId()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States = [new WfState { Id = 0, Name = "draft" }],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }]
+        };
+        FlowRequestController controller = new(new FlowRequestService(apiConnection, new GlobalConfig()));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim("x-hasura-user-id", "77"),
+                        new Claim(ClaimTypes.Name, "Trusted Requester"),
+                        new Claim("x-hasura-uuid", "uid=trusted,dc=fworch,dc=internal")
+                    ],
+                    "test"))
+            }
+        };
+
+        ActionResult<CreateRequestResponse> result = await controller.CreateRequest(new CreateRequestRequest
+        {
+            RequestorName = "Payload Requester",
+            RequestorId = "payload-requester",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Unknown protocol request",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "999",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    SourceObjects = [-1],
+                    DestinationObjects = [-1],
+                    ServiceObjects = [-2]
+                }
+            ]
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Result, Is.TypeOf<BadRequestObjectResult>());
+            Assert.That(((BadRequestObjectResult)result.Result!).Value?.ToString(), Does.Contain("protocol"));
+            Assert.That(apiConnection.LastTicketWriter, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task CreateRequest_ReturnsBadRequestForUnknownOwnerId()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States = [new WfState { Id = 0, Name = "draft" }],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }],
+            Owners = [new FwoOwner { Id = 42, Name = "Finance" }]
+        };
+        FlowRequestController controller = new(new FlowRequestService(apiConnection, new GlobalConfig()));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim("x-hasura-user-id", "77"),
+                        new Claim(ClaimTypes.Name, "Trusted Requester"),
+                        new Claim("x-hasura-uuid", "uid=trusted,dc=fworch,dc=internal")
+                    ],
+                    "test"))
+            }
+        };
+
+        ActionResult<CreateRequestResponse> result = await controller.CreateRequest(new CreateRequestRequest
+        {
+            RequestorName = "Payload Requester",
+            RequestorId = "payload-requester",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Unknown owner request",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    OwnerId = 999,
+                    SourceObjects = [-1],
+                    DestinationObjects = [-1],
+                    ServiceObjects = [-2]
+                }
+            ]
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Result, Is.TypeOf<BadRequestObjectResult>());
+            Assert.That(((BadRequestObjectResult)result.Result!).Value?.ToString(), Does.Contain("owner"));
+            Assert.That(apiConnection.LastTicketWriter, Is.Null);
+        });
+    }
+
     private static WfCommentDataHelper NewComment(string text, DateTime creationDate)
     {
         return new WfCommentDataHelper(new WfComment
@@ -775,6 +938,7 @@ internal class FlowRequestServiceTest
         public WfTicket? Ticket { get; set; }
         public List<WfState> States { get; set; } = [];
         public List<IpProtocol> Protocols { get; set; } = [];
+        public List<FwoOwner> Owners { get; set; } = [];
         public List<RuleAction> RuleActions { get; set; } = [new RuleAction { Id = 1, Name = "accept", Allowed = true }];
         public List<WfExtState> ExtStates { get; set; } = [];
         public List<WorkflowConfiguration> WorkflowConfigurations { get; set; } =
@@ -829,6 +993,11 @@ internal class FlowRequestServiceTest
             if (responseType == typeof(List<IpProtocol>))
             {
                 return Task.FromResult((QueryResponseType)(object)Protocols);
+            }
+
+            if (responseType == typeof(List<FwoOwner>))
+            {
+                return Task.FromResult((QueryResponseType)(object)Owners);
             }
 
             if (responseType == typeof(List<RuleAction>))
@@ -940,7 +1109,13 @@ internal class FlowRequestServiceTest
                         ManagementId = taskWriter.ManagementId,
                         Elements = [],
                         Approvals = [],
-                        Owners = []
+                        Owners = [.. taskWriter.Owners.WfOwnerList.Select(ownerWriter => new FwoOwnerDataHelper
+                        {
+                            Owner = new FwoOwner
+                            {
+                                Id = ownerWriter.OwnerId ?? 0
+                            }
+                        })]
                     });
                 }
             }

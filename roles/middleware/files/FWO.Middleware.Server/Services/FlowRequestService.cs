@@ -42,16 +42,17 @@ public sealed class FlowRequestService
         }
 
         int ticketStateId = await ResolveInitialRequestStateIdAsync();
+        Dictionary<int, FwoOwner> ownersById = await ResolveOwnersAsync();
         Dictionary<string, int> ruleActionIds = await ResolveRuleActionIdsAsync();
         Dictionary<string, int> protocolIds = await ResolveProtocolIdsAsync();
-        WfTicket ticket = BuildTicket(request, ticketStateId, requesterId, ruleActionIds, protocolIds);
+        WfTicket ticket = BuildTicket(request, ticketStateId, requesterId, ownersById, ruleActionIds, protocolIds);
         ticket = await SaveTicketAsync(ticket);
         string status = await BuildRequestStatusAsync(ticket.StateId, tolerateExternalStateErrors: true);
 
         return new CreateRequestResponse
         {
             Status = status,
-            RequestId = checked((int)ticket.Id)
+            RequestId = ticket.Id
         };
     }
 
@@ -138,6 +139,18 @@ public sealed class FlowRequestService
     }
 
     /// <summary>
+    /// Resolves the owners visible to the middleware role.
+    /// </summary>
+    private async Task<Dictionary<int, FwoOwner>> ResolveOwnersAsync()
+    {
+        List<FwoOwner> owners = await apiConnection.SendQueryAsync<List<FwoOwner>>(OwnerQueries.getOwners) ?? [];
+        return owners
+            .Where(owner => owner.Id > 0)
+            .GroupBy(owner => owner.Id)
+            .ToDictionary(group => group.Key, group => group.First());
+    }
+
+    /// <summary>
     /// Resolves the available STM IP protocol ids by name.
     /// </summary>
     private async Task<Dictionary<string, int>> ResolveProtocolIdsAsync()
@@ -152,7 +165,7 @@ public sealed class FlowRequestService
     /// <summary>
     /// Builds the ticket object that is persisted through the existing whole-ticket insert path.
     /// </summary>
-    private static WfTicket BuildTicket(CreateRequestRequest request, int ticketStateId, int requesterId, Dictionary<string, int> ruleActionIds,
+    private static WfTicket BuildTicket(CreateRequestRequest request, int ticketStateId, int requesterId, Dictionary<int, FwoOwner> ownersById, Dictionary<string, int> ruleActionIds,
         Dictionary<string, int> protocolIds)
     {
         Dictionary<int, CreateRequestEntity> entities = BuildEntityIndex(request, protocolIds);
@@ -160,7 +173,7 @@ public sealed class FlowRequestService
         int taskNumber = 1;
 
         tasks.AddRange(BuildGroupTasks(request, entities, ticketStateId, ref taskNumber));
-        tasks.AddRange(BuildRuleTasks(request, entities, ticketStateId, ruleActionIds, ref taskNumber));
+        tasks.AddRange(BuildRuleTasks(request, entities, ticketStateId, ownersById, ruleActionIds, ref taskNumber));
 
         return new WfTicket
         {
@@ -175,6 +188,8 @@ public sealed class FlowRequestService
 
     /// <summary>
     /// Resolves the requestor into a user object used by the database insert.
+    /// The API payload intentionally supplies these display fields so technical callers can submit
+    /// requests on behalf of someone else while the authenticated caller still provides requesterId.
     /// </summary>
     private static UiUser BuildRequester(CreateRequestRequest request, int requesterId)
     {
@@ -236,12 +251,12 @@ public sealed class FlowRequestService
     /// Builds the access tasks for the request rules.
     /// </summary>
     private static List<WfReqTask> BuildRuleTasks(CreateRequestRequest request, Dictionary<int, CreateRequestEntity> entities,
-        int ticketStateId, Dictionary<string, int> ruleActionIds, ref int taskNumber)
+        int ticketStateId, Dictionary<int, FwoOwner> ownersById, Dictionary<string, int> ruleActionIds, ref int taskNumber)
     {
         List<WfReqTask> tasks = [];
         foreach (CreateRequestRequest.CreateRequestRuleRequest rule in request.Rules)
         {
-            tasks.Add(BuildRuleTask(request, rule, entities, ticketStateId, ruleActionIds, taskNumber++));
+            tasks.Add(BuildRuleTask(request, rule, entities, ticketStateId, ownersById, ruleActionIds, taskNumber++));
         }
         return tasks;
     }
@@ -311,7 +326,7 @@ public sealed class FlowRequestService
     /// Creates an access task for one request rule.
     /// </summary>
     private static WfReqTask BuildRuleTask(CreateRequestRequest request, CreateRequestRequest.CreateRequestRuleRequest rule,
-        Dictionary<int, CreateRequestEntity> entities, int ticketStateId, Dictionary<string, int> ruleActionIds, int taskNumber)
+        Dictionary<int, CreateRequestEntity> entities, int ticketStateId, Dictionary<int, FwoOwner> ownersById, Dictionary<string, int> ruleActionIds, int taskNumber)
     {
         List<WfReqElement> elements =
         [
@@ -321,6 +336,7 @@ public sealed class FlowRequestService
         ];
 
         int ruleActionId = ResolveRuleActionId(rule.Action, ruleActionIds);
+        FwoOwner? taskOwner = ResolveRuleOwner(rule.OwnerId, ownersById);
 
         CreateRequestEntity? timeEntity = rule.TimeObjectId != 0 && entities.TryGetValue(rule.TimeObjectId, out CreateRequestEntity? matchedTime)
             ? matchedTime
@@ -341,8 +357,27 @@ public sealed class FlowRequestService
             AdditionalInfo = BuildAdditionalInfo(request.RuleContactName, request.RuleContactId, request.RequestorName, request.RequestorId, timeEntity),
             Elements = elements,
             Approvals = [BuildApproval(ticketStateId)],
+            Owners = taskOwner == null ? [] : [new() { Owner = taskOwner }],
             Locked = true
         };
+    }
+
+    /// <summary>
+    /// Resolves the owner id configured on a rule.
+    /// </summary>
+    private static FwoOwner? ResolveRuleOwner(int ownerId, Dictionary<int, FwoOwner> ownersById)
+    {
+        if (ownerId <= 0)
+        {
+            return null;
+        }
+
+        if (ownersById.TryGetValue(ownerId, out FwoOwner? owner))
+        {
+            return owner;
+        }
+
+        throw new ArgumentException($"Unknown owner id {ownerId}.");
     }
 
     /// <summary>
@@ -546,7 +581,8 @@ public sealed class FlowRequestService
     /// <summary>
     /// Serializes the metadata we want to keep alongside the ticket task.
     /// </summary>
-    private static string BuildAdditionalInfo(string requestContactName, string requestContactId, string requestorName, string requestorId, CreateRequestEntity? timeEntity)
+    private static string BuildAdditionalInfo(string requestContactName, string requestContactId, string requestorName, string requestorId,
+        CreateRequestEntity? timeEntity)
     {
         Dictionary<string, string> additionalInfo = BuildRequestContactInfo(requestContactName, requestContactId, requestorName, requestorId);
         if (timeEntity != null)
@@ -639,9 +675,14 @@ public sealed class FlowRequestService
 
         private static int ResolveProtocolId(string protocol, Dictionary<string, int> protocolIds)
         {
-            if (int.TryParse(protocol, out int protocolId) && protocolId > 0)
+            if (int.TryParse(protocol, out int protocolId))
             {
-                return protocolId;
+                if (protocolId > 0 && protocolIds.Values.Contains(protocolId))
+                {
+                    return protocolId;
+                }
+
+                throw new ArgumentException($"The service object protocol '{protocol}' must match a configured STM protocol name or id.");
             }
 
             if (protocolIds.TryGetValue(protocol, out protocolId))

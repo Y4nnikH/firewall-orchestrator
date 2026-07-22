@@ -82,6 +82,10 @@ public class FlowRequestController : ControllerBase
     {
         try
         {
+            if (request == null)
+            {
+                return BadRequest("Request body is missing.");
+            }
             int requesterId = FWO.Basics.JwtClaimParser.ExtractIntClaimValues(User.Claims, "x-hasura-user-id").FirstOrDefault();
             CreateRequestResponse response = await flowRequestService.CreateRequestAsync(request, requesterId);
             return Ok(response);
