@@ -101,6 +101,33 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task FlowServiceObjectsPage_CreateCustomObject_ReusesExistingMatchingHash()
+        {
+            await using BunitContext context = CreateCustomServiceReuseContext(out FlowServiceObjectsCustomCreateApiConn apiConnection);
+
+            IRenderedComponent<SettingsFlowServiceObjects> component = RenderPage<SettingsFlowServiceObjects>(context);
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-primary"), Is.Not.Empty));
+
+            component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("input.form-control.form-control-sm"), Is.Not.Empty));
+
+            component.FindAll("input.form-control.form-control-sm")[0].Change("Custom Service");
+            component.FindAll("button.btn-outline-primary")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-success"), Is.Not.Empty));
+            component.FindAll("button.btn.btn-sm.btn-primary")[^1].Click();
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(apiConnection.Queries, Does.Not.Contain(FlowQueries.insertFlowSvcObjects));
+                Assert.That(apiConnection.InsertedServiceObject, Is.Null);
+                Assert.That(apiConnection.MappingCalls, Is.EqualTo(new List<(long ServiceId, long FlowSvcobjId, bool ActiveOnMgm)>
+                {
+                    (11, 777, true)
+                }));
+            });
+        }
+
+        [Test]
         public async Task FlowServiceObjectsPage_CreateCustomObject_DoesNotOfferServiceGroupCandidates()
         {
             await using BunitContext context = CreateCustomServiceCreateContext(out _);
@@ -623,6 +650,35 @@ namespace FWO.Test
             context.Services.AddLocalization();
             context.Services.AddSingleton<IAuthorizationService, AllowAllAuthorizationService>();
             apiConnection = new FlowServiceObjectsProtocolOnlyApiConn();
+            context.Services.AddSingleton<ApiConnection>(apiConnection);
+            context.Services.AddScoped<DomEventService>();
+            context.Services.AddSingleton<UserConfig>(new SimulatedUserConfig
+            {
+                User = { Roles = [Roles.Admin] }
+            });
+            context.Services.AddSingleton<AuthenticationStateProvider>(new FlowSettingsPagesAuthStateProvider(Roles.Admin));
+            return context;
+        }
+
+        private static BunitContext CreateCustomServiceReuseContext(out FlowServiceObjectsCustomCreateApiConn apiConnection)
+        {
+            BunitContext context = new();
+            context.JSInterop.Mode = JSRuntimeMode.Loose;
+            context.Services.AddAuthorizationCore();
+            context.Services.AddLocalization();
+            context.Services.AddSingleton<IAuthorizationService, AllowAllAuthorizationService>();
+            apiConnection = new FlowServiceObjectsCustomCreateApiConn(
+                existingFlowSvcObject: new FlowSvcObject
+                {
+                    Id = 777,
+                    Name = "Existing HTTP Service",
+                    PortStart = 80,
+                    PortEnd = 80,
+                    ProtoId = 6,
+                    Hash = FlowHashGenerator.GenerateSvcObjectHash(6, 80, 80),
+                    State = FlowState.Implemented,
+                    ShowInRequestModule = true
+                });
             context.Services.AddSingleton<ApiConnection>(apiConnection);
             context.Services.AddScoped<DomEventService>();
             context.Services.AddSingleton<UserConfig>(new SimulatedUserConfig
@@ -1235,16 +1291,7 @@ namespace FWO.Test
         public FlowSvcObjectInsert? InsertedServiceObject { get; private set; }
         public List<(long ServiceId, long FlowSvcobjId, bool ActiveOnMgm)> MappingCalls { get; } = [];
 
-        private readonly FlowSvcObject flowSvcObject = new()
-        {
-            Id = 100,
-            Name = "Flow Service Object",
-            PortStart = 80,
-            PortEnd = 80,
-            ProtoId = 6,
-            State = FlowState.Requested,
-            ShowInRequestModule = true
-        };
+        private readonly FlowSvcObject flowSvcObject;
 
         private readonly Management managementOne = new()
         {
@@ -1296,6 +1343,21 @@ namespace FWO.Test
                 }
             ]
         };
+
+        public FlowServiceObjectsCustomCreateApiConn(FlowSvcObject? existingFlowSvcObject = null)
+        {
+            flowSvcObject = existingFlowSvcObject ?? new FlowSvcObject
+            {
+                Id = 100,
+                Name = "Flow Service Object",
+                PortStart = 8080,
+                PortEnd = 8080,
+                ProtoId = 6,
+                Hash = FlowHashGenerator.GenerateSvcObjectHash(6, 8080, 8080),
+                State = FlowState.Requested,
+                ShowInRequestModule = true
+            };
+        }
 
         public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
         {

@@ -475,35 +475,14 @@ else
             workInProgress = true;
             StateHasChanged();
 
-            string hash = firstSignature.DestinationPortStart.HasValue && firstSignature.DestinationPortEnd.HasValue
-                ? FlowHashGenerator.GenerateSvcObjectHash(firstSignature.ProtoId, firstSignature.DestinationPortStart, firstSignature.DestinationPortEnd)
-                : FlowHashGenerator.GenerateRandomHash();
-            FlowSvcObjectInsertResult createdObjects = await apiConnection.SendQueryAsync<FlowSvcObjectInsertResult>(FlowQueries.insertFlowSvcObjects, new
-            {
-                objects = new[]
-                {
-                    new FlowSvcObjectInsert
-                    {
-                        Name = NewCustomFlowSvcObject.Name.Trim(),
-                        PortStart = firstSignature.DestinationPortStart,
-                        PortEnd = firstSignature.DestinationPortEnd,
-                        IpProtoId = firstSignature.ProtoId,
-                        SvcObjHash = hash,
-                        State = FlowState.Implemented,
-                        RemovedDate = null,
-                        ShowInRequestModule = NewCustomFlowSvcObject.ShowInRequestModule
-                    }
-                }
-            });
-
-            FlowSvcObject createdObject = createdObjects.Returning.FirstOrDefault() ?? throw new InvalidOperationException("Created flow object not returned by API.");
+            FlowSvcObject targetObject = await GetOrCreateCustomFlowSvcObject(firstSignature);
 
             foreach (CustomObjectManagementSelection selection in selectedManagements)
             {
                 NetworkService updatedService = await apiConnection.SendQueryAsync<NetworkService>(FlowMutations.upsertFlowSvcObjectMapping, new
                 {
                     svcId = selection.SelectedService!.Id,
-                    flowSvcobjId = createdObject.Id,
+                    flowSvcobjId = targetObject.Id,
                     activeOnMgm = true
                 });
                 UpdateCustomServiceInCatalog(updatedService);
@@ -520,6 +499,52 @@ else
         }
 
         StateHasChanged();
+    }
+
+    /// <summary>
+    /// Reuses an existing flow service object when the selected service signature already maps to a deterministic hash.
+    /// </summary>
+    private async Task<FlowSvcObject> GetOrCreateCustomFlowSvcObject(CustomServiceSignature signature)
+    {
+        if (signature.DestinationPortStart.HasValue && signature.DestinationPortEnd.HasValue)
+        {
+            string deterministicHash = FlowHashGenerator.GenerateSvcObjectHash(signature.ProtoId, signature.DestinationPortStart, signature.DestinationPortEnd);
+            FlowSvcObject? existingObject = flowSvcObjects.FirstOrDefault(flowSvcObject => string.Equals(flowSvcObject.Hash, deterministicHash, StringComparison.Ordinal));
+            if (existingObject != null)
+            {
+                return existingObject;
+            }
+
+            return await InsertCustomFlowSvcObject(signature, deterministicHash);
+        }
+
+        return await InsertCustomFlowSvcObject(signature, FlowHashGenerator.GenerateRandomHash());
+    }
+
+    /// <summary>
+    /// Inserts a new flow service object for a custom service selection.
+    /// </summary>
+    private async Task<FlowSvcObject> InsertCustomFlowSvcObject(CustomServiceSignature signature, string hash)
+    {
+        FlowSvcObjectInsertResult createdObjects = await apiConnection.SendQueryAsync<FlowSvcObjectInsertResult>(FlowQueries.insertFlowSvcObjects, new
+        {
+            objects = new[]
+            {
+                new FlowSvcObjectInsert
+                {
+                    Name = NewCustomFlowSvcObject.Name.Trim(),
+                    PortStart = signature.DestinationPortStart,
+                    PortEnd = signature.DestinationPortEnd,
+                    IpProtoId = signature.ProtoId,
+                    SvcObjHash = hash,
+                    State = FlowState.Implemented,
+                    RemovedDate = null,
+                    ShowInRequestModule = NewCustomFlowSvcObject.ShowInRequestModule
+                }
+            }
+        });
+
+        return createdObjects.Returning.FirstOrDefault() ?? throw new InvalidOperationException("Created flow object not returned by API.");
     }
 
     private static string BuildFlowSvcObjectSearchText(FlowSvcObject svcObject)
