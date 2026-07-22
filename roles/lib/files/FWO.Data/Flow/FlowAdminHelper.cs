@@ -534,24 +534,28 @@ namespace FWO.Data.Flow
         {
             MergeNetworkServiceMappingFields(cachedService, updatedService);
             cachedService.FlowServiceObjectId = updatedService.FlowServiceObjectId;
+            cachedService.FlowServiceGroupId = null;
         }
 
         public static void MergeServiceGroupMappingUpdate(NetworkService cachedService, NetworkService updatedService)
         {
             MergeNetworkServiceMappingFields(cachedService, updatedService);
             cachedService.FlowServiceGroupId = updatedService.FlowServiceGroupId;
+            cachedService.FlowServiceObjectId = null;
         }
 
         public static void MergeNetworkObjectMappingUpdate(NetworkObject cachedObject, NetworkObject updatedObject)
         {
             MergeNetworkObjectMappingFields(cachedObject, updatedObject);
             cachedObject.FlowNetworkObjectId = updatedObject.FlowNetworkObjectId;
+            cachedObject.FlowNetworkGroupId = null;
         }
 
         public static void MergeNetworkGroupMappingUpdate(NetworkObject cachedObject, NetworkObject updatedObject)
         {
             MergeNetworkObjectMappingFields(cachedObject, updatedObject);
             cachedObject.FlowNetworkGroupId = updatedObject.FlowNetworkGroupId;
+            cachedObject.FlowNetworkObjectId = null;
         }
 
         private static void MergeNetworkServiceMappingFields(NetworkService cachedService, NetworkService updatedService)

@@ -828,5 +828,141 @@ namespace FWO.Test
 
             Assert.That(summary, Is.EqualTo("None"));
         }
+
+        [Test]
+        public void MergeNetworkObjectMappingUpdate_ClearsCachedGroupMapping()
+        {
+            NetworkObject cachedObject = new()
+            {
+                Id = 42,
+                Name = "cached",
+                IP = "",
+                IpEnd = "",
+                Uid = "cached-uid",
+                Active = true,
+                FlowActive = false,
+                FlowNetworkObjectId = null,
+                FlowNetworkGroupId = 700
+            };
+            NetworkObject updatedObject = new()
+            {
+                Id = 42,
+                Name = "updated",
+                IP = "",
+                IpEnd = "",
+                Uid = "updated-uid",
+                Active = true,
+                FlowActive = true,
+                FlowNetworkObjectId = 800
+            };
+
+            FlowAdminHelper.MergeNetworkObjectMappingUpdate(cachedObject, updatedObject);
+
+            Assert.That(cachedObject.FlowNetworkObjectId, Is.EqualTo(800));
+            Assert.That(cachedObject.FlowNetworkGroupId, Is.Null);
+            Assert.That(cachedObject.FlowActive, Is.True);
+        }
+
+        [Test]
+        public void MergeNetworkGroupMappingUpdate_ClearsCachedObjectMapping()
+        {
+            NetworkObject cachedObject = new()
+            {
+                Id = 42,
+                Name = "cached",
+                IP = "",
+                IpEnd = "",
+                Uid = "cached-uid",
+                Active = true,
+                FlowActive = false,
+                FlowNetworkObjectId = 700,
+                FlowNetworkGroupId = null
+            };
+            NetworkObject updatedObject = new()
+            {
+                Id = 42,
+                Name = "updated",
+                IP = "",
+                IpEnd = "",
+                Uid = "updated-uid",
+                Active = true,
+                FlowActive = true,
+                FlowNetworkGroupId = 800
+            };
+
+            FlowAdminHelper.MergeNetworkGroupMappingUpdate(cachedObject, updatedObject);
+
+            Assert.That(cachedObject.FlowNetworkGroupId, Is.EqualTo(800));
+            Assert.That(cachedObject.FlowNetworkObjectId, Is.Null);
+            Assert.That(cachedObject.FlowActive, Is.True);
+        }
+
+        [Test]
+        public void MergeServiceObjectMappingUpdate_ClearsCachedGroupMapping()
+        {
+            NetworkService cachedService = new()
+            {
+                Id = 52,
+                Name = "cached",
+                Uid = "cached-uid",
+                DestinationPort = 80,
+                DestinationPortEnd = 80,
+                Active = true,
+                FlowActive = false,
+                FlowServiceObjectId = null,
+                FlowServiceGroupId = 900
+            };
+            NetworkService updatedService = new()
+            {
+                Id = 52,
+                Name = "updated",
+                Uid = "updated-uid",
+                DestinationPort = 443,
+                DestinationPortEnd = 443,
+                Active = true,
+                FlowActive = true,
+                FlowServiceObjectId = 901
+            };
+
+            FlowAdminHelper.MergeServiceObjectMappingUpdate(cachedService, updatedService);
+
+            Assert.That(cachedService.FlowServiceObjectId, Is.EqualTo(901));
+            Assert.That(cachedService.FlowServiceGroupId, Is.Null);
+            Assert.That(cachedService.FlowActive, Is.True);
+        }
+
+        [Test]
+        public void MergeServiceGroupMappingUpdate_ClearsCachedObjectMapping()
+        {
+            NetworkService cachedService = new()
+            {
+                Id = 52,
+                Name = "cached",
+                Uid = "cached-uid",
+                DestinationPort = 80,
+                DestinationPortEnd = 80,
+                Active = true,
+                FlowActive = false,
+                FlowServiceObjectId = 900,
+                FlowServiceGroupId = null
+            };
+            NetworkService updatedService = new()
+            {
+                Id = 52,
+                Name = "updated",
+                Uid = "updated-uid",
+                DestinationPort = 443,
+                DestinationPortEnd = 443,
+                Active = true,
+                FlowActive = true,
+                FlowServiceGroupId = 901
+            };
+
+            FlowAdminHelper.MergeServiceGroupMappingUpdate(cachedService, updatedService);
+
+            Assert.That(cachedService.FlowServiceGroupId, Is.EqualTo(901));
+            Assert.That(cachedService.FlowServiceObjectId, Is.Null);
+            Assert.That(cachedService.FlowActive, Is.True);
+        }
     }
 }

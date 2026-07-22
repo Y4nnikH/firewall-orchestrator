@@ -144,7 +144,7 @@
             flowSvcObjects = await apiConnection.SendQueryAsync<List<FlowSvcObject>>(FlowQueries.getFlowServiceObjects) ?? [];
             flowSvcGroups = await apiConnection.SendQueryAsync<List<FlowSvcGroup>>(FlowQueries.getFlowServiceGroups) ?? [];
             flowTimeObjects = await apiConnection.SendQueryAsync<List<FlowTimeObject>>(FlowQueries.getFlowTimeObjects) ?? [];
-            await LoadNamingCandidateManagements();
+            await LoadNamingCandidateManagements(forceReload: true);
 
             workInProgress = false;
         }
@@ -296,11 +296,12 @@
         StateHasChanged();
     }
 
-    private async Task LoadNamingCandidateManagements()
+    private async Task LoadNamingCandidateManagements(bool forceReload = false)
     {
-        if (namingNetworkObjectManagements.Count > 0 ||
-            namingNetworkGroupManagements.Count > 0 ||
-            namingServiceManagements.Count > 0 ||
+        if (!forceReload &&
+            namingNetworkObjectManagements.Count > 0 &&
+            namingNetworkGroupManagements.Count > 0 &&
+            namingServiceManagements.Count > 0 &&
             namingTimeManagements.Count > 0)
         {
             return;
