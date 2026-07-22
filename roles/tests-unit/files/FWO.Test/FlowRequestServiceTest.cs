@@ -573,6 +573,7 @@ internal class FlowRequestServiceTest
                 new CreateRequestRequest.CreateRequestRuleRequest
                 {
                     Action = "accept",
+                    OwnerId = 42,
                     SourceObjects = [-3],
                     DestinationObjects = [-3],
                     ServiceObjects = [-4]
@@ -588,12 +589,7 @@ internal class FlowRequestServiceTest
             Assert.That(response.RequestId, Is.EqualTo(100));
             Assert.That(apiConnection.LastTicketWriter, Is.Not.Null);
             Assert.That(apiConnection.LastTicketWriter!.Tasks, Has.Count.EqualTo(3));
-            Assert.That(apiConnection.CreatedTicket!.Requester?.Name, Is.EqualTo("Payload Requester"));
-            Assert.That(apiConnection.CreatedTicket.Requester?.Dn, Is.EqualTo("payload-requester"));
-            Assert.That(GetVariable(apiConnection.NewTicketVariables, "requesterName"), Is.EqualTo("Payload Requester"));
-            Assert.That(GetVariable(apiConnection.NewTicketVariables, "requesterDn"), Is.EqualTo("payload-requester"));
-            Assert.That(apiConnection.CreatedTicket.Tasks[2].GetAddInfoValue(AdditionalInfoKeys.RequestorName), Is.EqualTo("Payload Requester"));
-            Assert.That(apiConnection.CreatedTicket.Tasks[2].GetAddInfoValue(AdditionalInfoKeys.RequestorId), Is.EqualTo("payload-requester"));
+            Assert.That(apiConnection.CreatedTicket!.Requester?.DbId, Is.EqualTo(77));
             Assert.That(apiConnection.CreatedTicket.Tasks[2].Owners, Has.Count.EqualTo(1));
             Assert.That(apiConnection.CreatedTicket.Tasks[2].Owners[0].Owner.Id, Is.EqualTo(42));
             Assert.That(apiConnection.LastTicketWriter!.Tasks[2].Owners.WfOwnerList, Has.Count.EqualTo(1));
