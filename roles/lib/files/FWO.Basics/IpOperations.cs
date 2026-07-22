@@ -316,6 +316,11 @@ namespace FWO.Basics
                 cidrNotation = string.Empty;
                 return false;
             }
+            catch (FormatException)
+            {
+                cidrNotation = string.Empty;
+                return false;
+            }
         }
 
         /// <summary>
