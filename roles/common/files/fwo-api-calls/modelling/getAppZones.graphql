@@ -1,5 +1,5 @@
-query geAppZones($applicationIds: [Int!]!) {
-  modelling_nwgroup (where: { group_type: { _eq: 21 }, app_id: { _in: $applicationIds }, is_deleted: { _eq: false } } order_by: { name: asc }) {
+query getAppZones($where: modelling_nwgroup_bool_exp = {}) {
+  modelling_nwgroup (where: { _and: [{ group_type: { _eq: 21 }, is_deleted: { _eq: false } }, $where] } order_by: { name: asc }) {
     id
     app_id
     name

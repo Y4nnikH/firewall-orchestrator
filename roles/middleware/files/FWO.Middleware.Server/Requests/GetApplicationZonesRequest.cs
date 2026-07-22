@@ -26,14 +26,36 @@ public sealed class GetApplicationZonesOptions
     /// </summary>
     [JsonPropertyName("filter")]
     public ApplicationZoneFilter? Filter { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether applications with an inactive lifecycle state are excluded. This defaults to
+    /// <c>true</c>; set it to <c>false</c> to also return them. Applications without any lifecycle state are
+    /// always returned.
+    /// </summary>
+    [JsonPropertyName("showOnlyActiveState")]
+    public bool? ShowOnlyActiveState { get; set; }
+
+    /// <summary>
+    /// Gets or sets the optional maximum number of applications to read. When omitted, every matching
+    /// application is returned. Applications are ordered by name, so this pages the result deterministically
+    /// together with <see cref="Offset"/>.
+    /// </summary>
+    [JsonPropertyName("limit")]
+    public int? Limit { get; set; }
+
+    /// <summary>
+    /// Gets or sets the optional number of applications to skip before the first returned application.
+    /// </summary>
+    [JsonPropertyName("offset")]
+    public int? Offset { get; set; }
 }
 
 /// <summary>
 /// Represents nullable filters for every top-level application-zone response field. Application fields select
 /// applications before zones are loaded. Zone fields apply only to concrete zones, so they exclude placeholders for
-/// applications without a zone. Deleted zones and member addresses are excluded by default. String filters support
-/// <c>*</c> for any character sequence and <c>?</c> for one character; values without wildcards match exactly,
-/// case-insensitively.
+/// applications without a zone. Deleted zones and member addresses are excluded by default. String filters are
+/// case-insensitive and support <c>*</c> for any character sequence and <c>?</c> for one character; plain text
+/// without wildcards is matched as a contains search, matching the owner endpoint.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed class ApplicationZoneFilter

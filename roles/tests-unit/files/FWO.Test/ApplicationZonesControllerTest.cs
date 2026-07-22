@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using FWO.Api.Client;
 using FWO.Api.Client.Queries;
 using FWO.Basics;
@@ -9,6 +11,7 @@ using FWO.Data.Modelling;
 using FWO.Middleware.Server.Controllers;
 using FWO.Middleware.Server.Requests;
 using FWO.Middleware.Server.Responses;
+using FWO.Middleware.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -48,15 +51,27 @@ internal class ApplicationZonesControllerTest
     }
 
     [Test]
-    public void ApplicationZoneQueryLimitsResultsToActiveRequestedData()
+    public void ApplicationZoneQueryLimitsResultsToActiveApplicationZones()
     {
         Assert.Multiple(() =>
         {
-            Assert.That(ModellingQueries.geAppZones, Does.Contain("$applicationIds: [Int!]!"));
-            Assert.That(ModellingQueries.geAppZones, Does.Contain("app_id: { _in: $applicationIds }"));
-            Assert.That(ModellingQueries.geAppZones, Does.Contain("is_deleted: { _eq: false }"));
-            Assert.That(ModellingQueries.geAppZones,
+            Assert.That(ModellingQueries.getAppZones, Does.Contain("query getAppZones"));
+            Assert.That(ModellingQueries.getAppZones, Does.Contain("$where: modelling_nwgroup_bool_exp"));
+            Assert.That(ModellingQueries.getAppZones, Does.Contain("group_type: { _eq: 21 }"));
+            Assert.That(ModellingQueries.getAppZones, Does.Contain("is_deleted: { _eq: false }"));
+            Assert.That(ModellingQueries.getAppZones,
                 Does.Contain("owner_network: { is_deleted: { _eq: false } }"));
+        });
+    }
+
+    [Test]
+    public void ApplicationQuerySupportsPaging()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(OwnerQueries.getOwnersFiltered, Does.Contain("$limit: Int"));
+            Assert.That(OwnerQueries.getOwnersFiltered, Does.Contain("$offset: Int"));
+            Assert.That(OwnerQueries.getOwnersFiltered, Does.Contain("limit: $limit, offset: $offset"));
         });
     }
 
@@ -74,7 +89,7 @@ internal class ApplicationZonesControllerTest
     {
         ApplicationZonesApiConnection apiConnection = new()
         {
-            Owners = CreateOwners((7, "Application Seven", "APP-7"), (8, "Application Eight", "APP-8")),
+            Owners = CreateOwners((7, "Application 07", "APP-7"), (8, "Application 08", "APP-8")),
             AllApplicationZones = new List<ModellingAppZone>
             {
                 CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", "10.7.0.9"),
@@ -93,14 +108,14 @@ internal class ApplicationZonesControllerTest
             Assert.That(apiConnection.Queries, Is.EqualTo(new List<string>
             {
                 OwnerQueries.getOwnersFiltered,
-                ModellingQueries.geAppZones
+                ModellingQueries.getAppZones
             }));
             Assert.That(apiConnection.SetBestRoleCount, Is.Zero);
-            Assert.That(JsonSerializer.Serialize(apiConnection.LastApplicationZoneVariables),
-                Is.EqualTo("""{"applicationIds":[7,8]}"""));
+            Assert.That(SerializeVariables(apiConnection.LastApplicationZoneVariables),
+                Does.Contain("""{"app_id":{"_in":[7,8]}}"""));
             Assert.That(response, Has.Count.EqualTo(2));
             Assert.That(response[0].ApplicationId, Is.EqualTo(7));
-            Assert.That(response[0].ApplicationName, Is.EqualTo("Application Seven"));
+            Assert.That(response[0].ApplicationName, Is.EqualTo("Application 07"));
             Assert.That(response[0].AppIdExternal, Is.EqualTo("APP-7"));
             Assert.That(response[0].Addresses[0].Ip, Is.EqualTo("10.7.0.1"));
             Assert.That(response[0].Addresses[0].IpEnd, Is.EqualTo("10.7.0.9"));
@@ -114,7 +129,7 @@ internal class ApplicationZonesControllerTest
     {
         ApplicationZonesApiConnection apiConnection = new()
         {
-            Owners = CreateOwners((7, "Application Seven", "APP-7"), (9, "Application Nine", "APP-9")),
+            Owners = CreateOwners((7, "Application 07", "APP-7"), (9, "Application 09", "APP-9")),
             AllApplicationZones = new List<ModellingAppZone>
             {
                 CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty),
@@ -135,7 +150,7 @@ internal class ApplicationZonesControllerTest
     {
         ApplicationZonesApiConnection apiConnection = new()
         {
-            Owners = CreateOwners((7, "Application Seven", "APP-7"), (9, "Application Nine", "APP-9")),
+            Owners = CreateOwners((7, "Application 07", "APP-7"), (9, "Application 09", "APP-9")),
             AllApplicationZones = new List<ModellingAppZone>
             {
                 CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty),
@@ -156,7 +171,7 @@ internal class ApplicationZonesControllerTest
     {
         ApplicationZonesApiConnection apiConnection = new()
         {
-            Owners = CreateOwners((7, "Application Seven", "APP-7")),
+            Owners = CreateOwners((7, "Application 07", "APP-7")),
             AllApplicationZones = new List<ModellingAppZone>
             {
                 CreateApplicationZone(7, 70, "AZ-Match", "az-match", "10.7.0.1", string.Empty),
@@ -197,6 +212,9 @@ internal class ApplicationZonesControllerTest
         {
             Assert.That(request.Options, Is.Not.Null);
             Assert.That(request.Options!.Filter, Is.Null);
+            Assert.That(request.Options.Limit, Is.Null);
+            Assert.That(request.Options.Offset, Is.Null);
+            Assert.That(request.Options.ShowOnlyActiveState, Is.Null);
         });
     }
 
@@ -219,12 +237,14 @@ internal class ApplicationZonesControllerTest
                 Filter = new()
                 {
                     ApplicationId = 0,
-                    ApplicationName = "bad\u0001application",
+                    ApplicationName = "badapplication",
                     AppIdExternal = new string('a', GetMaxFilterTextLength() + 1),
                     Id = 0,
-                    Name = "bad\u0001name",
+                    Name = "badname",
                     IdString = new string('a', GetMaxFilterTextLength() + 1)
-                }
+                },
+                Limit = 0,
+                Offset = -1
             }
         };
 
@@ -239,7 +259,99 @@ internal class ApplicationZonesControllerTest
             Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.id"));
             Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.name"));
             Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.idString"));
+            Assert.That(validationProblem.Errors.Keys, Does.Contain("options.limit"));
+            Assert.That(validationProblem.Errors.Keys, Does.Contain("options.offset"));
         });
+    }
+
+    [Test]
+    public async Task GetRejectsLimitAboveTheAllowedMaximum()
+    {
+        ApplicationZonesController controller = CreateController(new ApplicationZonesApiConnection(), PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new() { Limit = GetMaxLimit() + 1 }
+        };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        ValidationProblemDetails validationProblem = (ValidationProblemDetails)((ObjectResult)result.Result!).Value!;
+        Assert.That(validationProblem.Errors.Keys, Does.Contain("options.limit"));
+    }
+
+    [Test]
+    public async Task GetPassesLimitAndOffsetToTheApplicationQuery()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners(
+                (7, "Application 07", "APP-7"),
+                (8, "Application 08", "APP-8"),
+                (9, "Application 09", "APP-9"))
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new() { Limit = 1, Offset = 1 }
+        };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)((OkObjectResult)result.Result!).Value!;
+        string variables = SerializeVariables(apiConnection.LastApplicationVariables);
+        Assert.Multiple(() =>
+        {
+            Assert.That(variables, Does.Contain("\"limit\":1"));
+            Assert.That(variables, Does.Contain("\"offset\":1"));
+            Assert.That(response.Select(applicationZone => applicationZone.ApplicationId), Is.EqualTo(new List<int> { 8 }));
+        });
+    }
+
+    [Test]
+    public async Task GetOmitsPagingVariablesWhenNoPageIsRequested()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((7, "Application 07", "APP-7"))
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+
+        await controller.Get(new GetApplicationZonesRequest());
+
+        string variables = SerializeVariables(apiConnection.LastApplicationVariables);
+        Assert.Multiple(() =>
+        {
+            Assert.That(variables, Does.Not.Contain("\"limit\""));
+            Assert.That(variables, Does.Not.Contain("\"offset\""));
+        });
+    }
+
+    [Test]
+    public async Task GetExcludesApplicationsWithInactiveLifecycleStateByDefault()
+    {
+        ApplicationZonesApiConnection apiConnection = new() { Owners = CreateOwnersWithLifecycleStates() };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(new GetApplicationZonesRequest());
+
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)((OkObjectResult)result.Result!).Value!;
+        Assert.That(response.Select(applicationZone => applicationZone.ApplicationId), Is.EqualTo(new List<int> { 1, 3 }));
+    }
+
+    [Test]
+    public async Task GetIncludesApplicationsWithInactiveLifecycleStateOnRequest()
+    {
+        ApplicationZonesApiConnection apiConnection = new() { Owners = CreateOwnersWithLifecycleStates() };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new() { ShowOnlyActiveState = false }
+        };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)((OkObjectResult)result.Result!).Value!;
+        Assert.That(response.Select(applicationZone => applicationZone.ApplicationId), Is.EqualTo(new List<int> { 1, 2, 3 }));
     }
 
     [Test]
@@ -248,9 +360,9 @@ internal class ApplicationZonesControllerTest
         ApplicationZonesApiConnection apiConnection = new()
         {
             Owners = CreateOwners(
-                (7, "Application Seven", "APP-7"),
-                (8, "Application Eight", "APP-8"),
-                (9, "Application Nine", "APP-9")),
+                (7, "Application 07", "APP-7"),
+                (8, "Application 08", "APP-8"),
+                (9, "Application 09", "APP-9")),
             AllApplicationZones = new List<ModellingAppZone>
             {
                 CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty),
@@ -268,7 +380,7 @@ internal class ApplicationZonesControllerTest
             Assert.That(apiConnection.Queries, Is.EqualTo(new List<string>
             {
                 OwnerQueries.getOwnersFiltered,
-                ModellingQueries.geAppZones
+                ModellingQueries.getAppZones
             }));
             Assert.That(response.Select(applicationZone => applicationZone.ApplicationId), Is.EqualTo(new List<int> { 7, 8, 9 }));
             Assert.That(response[2].Id, Is.Null);
@@ -280,7 +392,7 @@ internal class ApplicationZonesControllerTest
     {
         ApplicationZonesApiConnection apiConnection = new()
         {
-            Owners = CreateOwners((7, "Application Seven", "APP-7")),
+            Owners = CreateOwners((7, "Application 07", "APP-7")),
             AllApplicationZones = new List<ModellingAppZone>
             {
                 CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty)
@@ -294,10 +406,22 @@ internal class ApplicationZonesControllerTest
 
         OkObjectResult okResult = (OkObjectResult)result.Result!;
         List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)okResult.Value!;
-        Assert.Multiple(() =>
+        Assert.That(response.Select(applicationZone => applicationZone.Id), Is.EqualTo(new List<long> { 70 }));
+    }
+
+    [Test]
+    public async Task GetReturnsNothingForModellerWithoutEditableApplications()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
         {
-            Assert.That(response.Select(applicationZone => applicationZone.Id), Is.EqualTo(new List<long> { 70 }));
-        });
+            Owners = CreateOwners((7, "Application 07", "APP-7"))
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRolesAndClaims(kModellerRole));
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(new GetApplicationZonesRequest());
+
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)((OkObjectResult)result.Result!).Value!;
+        Assert.That(response, Is.Empty);
     }
 
     [Test]
@@ -305,7 +429,7 @@ internal class ApplicationZonesControllerTest
     {
         ApplicationZonesApiConnection apiConnection = new()
         {
-            Owners = CreateOwners((2, "Application Two", "APP-2"))
+            Owners = CreateOwners((2, "Application 02", "APP-2"))
         };
         ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
         GetApplicationZonesRequest request = new()
@@ -324,7 +448,7 @@ internal class ApplicationZonesControllerTest
         {
             Assert.That(response, Has.Count.EqualTo(1));
             Assert.That(response[0].ApplicationId, Is.EqualTo(2));
-            Assert.That(response[0].ApplicationName, Is.EqualTo("Application Two"));
+            Assert.That(response[0].ApplicationName, Is.EqualTo("Application 02"));
             Assert.That(response[0].AppIdExternal, Is.EqualTo("APP-2"));
             Assert.That(response[0].Id, Is.Null);
             Assert.That(response[0].Name, Is.Null);
@@ -341,8 +465,8 @@ internal class ApplicationZonesControllerTest
         {
             Owners = new List<FwoOwner>
             {
-                new() { Id = 0, Name = "super-owner", ExtAppId = "NONE", IsDefault = true },
-                new() { Id = 2, Name = "Application Two", ExtAppId = "APP-2" }
+                new() { Id = 4, Name = "super-owner", ExtAppId = "NONE", IsDefault = true },
+                new() { Id = 2, Name = "Application 02", ExtAppId = "APP-2" }
             }
         };
         ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
@@ -358,7 +482,7 @@ internal class ApplicationZonesControllerTest
     {
         ApplicationZonesApiConnection apiConnection = new()
         {
-            Owners = CreateOwners((2, "Application Two", "APP-2"), (3, "Application Three", "APP-3")),
+            Owners = CreateOwners((2, "Application 02", "APP-2"), (3, "Application 03", "APP-3")),
             AllApplicationZones = new List<ModellingAppZone>
             {
                 CreateApplicationZone(2, 20, "AZ-2", "az-2", "10.2.0.1", string.Empty)
@@ -374,6 +498,33 @@ internal class ApplicationZonesControllerTest
 
         List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)((OkObjectResult)result.Result!).Value!;
         Assert.That(response.Select(applicationZone => applicationZone.ApplicationId), Is.EqualTo(new List<int> { 2 }));
+    }
+
+    [Test]
+    public async Task GetReturnsNothingForDeletedApplicationZones()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((2, "Application 02", "APP-2")),
+            AllApplicationZones = new List<ModellingAppZone>
+            {
+                CreateApplicationZone(2, 20, "AZ-2", "az-2", "10.2.0.1", string.Empty)
+            }
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new() { Filter = new() { IsDeleted = true } }
+        };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)((OkObjectResult)result.Result!).Value!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(response, Is.Empty);
+            Assert.That(apiConnection.Queries, Does.Not.Contain(ModellingQueries.getAppZones));
+        });
     }
 
     [Test]
@@ -444,7 +595,7 @@ internal class ApplicationZonesControllerTest
     {
         ApplicationZonesApiConnection apiConnection = new()
         {
-            Owners = CreateOwners((7, "Application Seven", "APP-7")),
+            Owners = CreateOwners((7, "Application 07", "APP-7")),
             AllApplicationZones = new List<ModellingAppZone>
             {
                 CreateApplicationZone(7, 70, "AZ-Match", "az-match", "10.7.0.1", string.Empty)
@@ -457,7 +608,7 @@ internal class ApplicationZonesControllerTest
             {
                 Filter = new()
                 {
-                    ApplicationName = "Application Seve?",
+                    ApplicationName = "Application 0?",
                     AppIdExternal = "APP-?",
                     Name = "AZ-Matc?",
                     IdString = "az-matc?"
@@ -473,18 +624,84 @@ internal class ApplicationZonesControllerTest
     }
 
     [Test]
-    public void MatchesTextFilterTreatsTimedOutPatternsAsNoMatch()
+    public async Task GetMatchesPlainTextFiltersAsContainsSearch()
     {
-        string filter = string.Concat(Enumerable.Repeat("*a", 127)) + "*b";
-        string value = new string('a', 4096);
-        MethodInfo matchesTextFilter = typeof(ApplicationZonesController).GetMethod(
-            "MatchesTextFilter", BindingFlags.NonPublic | BindingFlags.Static)!;
-        object?[] filterArguments = new object?[2];
-        filterArguments[0] = value;
-        filterArguments[1] = filter;
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((7, "Application 07", "APP-7")),
+            AllApplicationZones = new List<ModellingAppZone>
+            {
+                CreateApplicationZone(7, 70, "AZ-Match", "az-match", "10.7.0.1", string.Empty)
+            }
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Auditor));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new()
+            {
+                Filter = new()
+                {
+                    ApplicationName = "APPLICATION 07",
+                    Name = "match"
+                }
+            }
+        };
 
-        bool isMatch = (bool)matchesTextFilter.Invoke(null, filterArguments)!;
-        Assert.That(isMatch, Is.False);
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)((OkObjectResult)result.Result!).Value!;
+        Assert.That(response.Select(applicationZone => applicationZone.Id), Is.EqualTo(new List<long> { 70 }));
+    }
+
+    [Test]
+    public void ApplicationZoneVariablesPushEveryZoneFilterToTheQuery()
+    {
+        ApplicationZoneFilter filter = new()
+        {
+            Id = 70,
+            Name = "AZ-*",
+            IdString = "az-match"
+        };
+
+        string variables = SerializeVariables(
+            ApplicationZoneQueryBuilder.BuildApplicationZoneVariables(new List<int> { 7 }, filter));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(variables, Does.Contain("""{"app_id":{"_in":[7]}}"""));
+            Assert.That(variables, Does.Contain("""{"id":{"_eq":70}}"""));
+            Assert.That(variables, Does.Contain("""{"name":{"_ilike":"AZ-%"}}"""));
+            Assert.That(variables, Does.Contain("""{"id_string":{"_ilike":"%az-match%"}}"""));
+        });
+    }
+
+    [Test]
+    public void ApplicationVariablesEscapeLiteralSqlWildcards()
+    {
+        GetApplicationZonesOptions options = new()
+        {
+            Filter = new() { ApplicationName = "100%_owner" }
+        };
+
+        string variables = SerializeVariables(
+            ApplicationZoneQueryBuilder.BuildApplicationVariables(options, PrincipalWithRoles(Roles.Admin)));
+
+        Assert.That(variables, Does.Contain("""%100\\%\\_owner%"""));
+    }
+
+    [Test]
+    public void HasZoneFilterDetectsEveryZoneLevelFilterField()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(ApplicationZoneQueryBuilder.HasZoneFilter(null), Is.False);
+            Assert.That(ApplicationZoneQueryBuilder.HasZoneFilter(new ApplicationZoneFilter()), Is.False);
+            Assert.That(ApplicationZoneQueryBuilder.HasZoneFilter(new ApplicationZoneFilter { ApplicationId = 7 }), Is.False);
+            Assert.That(ApplicationZoneQueryBuilder.HasZoneFilter(new ApplicationZoneFilter { Id = 70 }), Is.True);
+            Assert.That(ApplicationZoneQueryBuilder.HasZoneFilter(new ApplicationZoneFilter { Name = "AZ" }), Is.True);
+            Assert.That(ApplicationZoneQueryBuilder.HasZoneFilter(new ApplicationZoneFilter { IdString = "az" }), Is.True);
+            Assert.That(ApplicationZoneQueryBuilder.HasZoneFilter(new ApplicationZoneFilter { IsDeleted = false }), Is.True);
+        });
     }
 
     private static ModellingAppZone CreateApplicationZone(
@@ -536,6 +753,30 @@ internal class ApplicationZonesControllerTest
         }).ToList();
     }
 
+    private static List<FwoOwner> CreateOwnersWithLifecycleStates()
+    {
+        return new List<FwoOwner>
+        {
+            new() { Id = 1, Name = "Application 01", ExtAppId = "APP-1" },
+            new()
+            {
+                Id = 2,
+                Name = "Application 02",
+                ExtAppId = "APP-2",
+                OwnerLifeCycleStateId = 5,
+                OwnerLifeCycleState = new OwnerLifeCycleState { Id = 5, Name = "Decommissioned", ActiveState = false }
+            },
+            new()
+            {
+                Id = 3,
+                Name = "Application 03",
+                ExtAppId = "APP-3",
+                OwnerLifeCycleStateId = 1,
+                OwnerLifeCycleState = new OwnerLifeCycleState { Id = 1, Name = "Active", ActiveState = true }
+            }
+        };
+    }
+
     private static ClaimsPrincipal PrincipalWithRoles(params string[] roles)
     {
         return PrincipalWithRolesAndClaims(roles);
@@ -548,11 +789,26 @@ internal class ApplicationZonesControllerTest
         return new ClaimsPrincipal(identity);
     }
 
+    private static string SerializeVariables(object? variables)
+    {
+        return JsonSerializer.Serialize(variables);
+    }
+
     private static int GetMaxFilterTextLength()
     {
-        FieldInfo maxFilterTextLength = typeof(ApplicationZonesController).GetField(
-            "kMaxFilterTextLength", BindingFlags.NonPublic | BindingFlags.Static)!;
-        return (int)maxFilterTextLength.GetRawConstantValue()!;
+        return GetControllerConstant("kMaxFilterTextLength");
+    }
+
+    private static int GetMaxLimit()
+    {
+        return GetControllerConstant("kMaxLimit");
+    }
+
+    private static int GetControllerConstant(string fieldName)
+    {
+        FieldInfo constant = typeof(ApplicationZonesController).GetField(
+            fieldName, BindingFlags.NonPublic | BindingFlags.Static)!;
+        return (int)constant.GetRawConstantValue()!;
     }
 
     private sealed class ApplicationZonesApiConnection : SimulatedApiConnection
@@ -560,6 +816,7 @@ internal class ApplicationZonesControllerTest
         public List<ModellingAppZone> AllApplicationZones { get; set; } = new();
         public List<FwoOwner> Owners { get; set; } = new();
         public List<string> Queries { get; } = new();
+        public object? LastApplicationVariables { get; private set; }
         public object? LastApplicationZoneVariables { get; private set; }
         public int SetBestRoleCount { get; private set; }
 
@@ -577,12 +834,13 @@ internal class ApplicationZonesControllerTest
             Queries.Add(query);
             if (query == OwnerQueries.getOwnersFiltered)
             {
+                LastApplicationVariables = variables;
                 return Task.FromResult((QueryResponseType)(object)GetMatchingOwners(variables));
             }
-            if (query == ModellingQueries.geAppZones)
+            if (query == ModellingQueries.getAppZones)
             {
                 LastApplicationZoneVariables = variables;
-                return Task.FromResult((QueryResponseType)(object)AllApplicationZones);
+                return Task.FromResult((QueryResponseType)(object)GetMatchingApplicationZones(variables));
             }
 
             return Task.FromResult((QueryResponseType)(object)new List<ModellingAppZone>());
@@ -590,22 +848,168 @@ internal class ApplicationZonesControllerTest
 
         private List<FwoOwner> GetMatchingOwners(object? variables)
         {
-            List<int>? applicationIds = GetApplicationIds(variables);
-            return Owners.Where(owner => !owner.IsDefault &&
-                (applicationIds is null || applicationIds.Contains(owner.Id))).ToList();
+            Dictionary<string, object> where = GetWhere(variables);
+            List<FwoOwner> owners = Owners
+                .Where(owner => SimulatedGraphQlFilter.Matches(where, OwnerField(owner)))
+                .OrderBy(owner => owner.Name, StringComparer.Ordinal)
+                .ToList();
+            if (GetPagingValue(variables, "offset") is int offset)
+            {
+                owners = owners.Skip(offset).ToList();
+            }
+            if (GetPagingValue(variables, "limit") is int limit)
+            {
+                owners = owners.Take(limit).ToList();
+            }
+            return owners;
         }
 
-        private static List<int>? GetApplicationIds(object? variables)
+        private List<ModellingAppZone> GetMatchingApplicationZones(object? variables)
         {
-            if (variables?.GetType().GetProperty("where")?.GetValue(variables) is not Dictionary<string, object> where ||
-                !where.TryGetValue("id", out object? idExpression) ||
-                idExpression is not Dictionary<string, object> idFilter ||
-                !idFilter.TryGetValue("_in", out object? rawApplicationIds))
+            Dictionary<string, object> where = GetWhere(variables);
+            return AllApplicationZones
+                .Where(applicationZone => SimulatedGraphQlFilter.Matches(where, ApplicationZoneField(applicationZone)))
+                .ToList();
+        }
+
+        private static Func<string, object?> OwnerField(FwoOwner owner)
+        {
+            return fieldName => fieldName switch
+            {
+                "id" => owner.Id,
+                "name" => owner.Name,
+                "app_id_external" => owner.ExtAppId,
+                "is_default" => owner.IsDefault,
+                "owner_lifecycle_state_id" => owner.OwnerLifeCycleStateId,
+                "owner_lifecycle_state" => OwnerLifecycleStateField(owner),
+                _ => null
+            };
+        }
+
+        private static object? OwnerLifecycleStateField(FwoOwner owner)
+        {
+            if (owner.OwnerLifeCycleState is null)
             {
                 return null;
             }
+            return (Func<string, object?>)(fieldName =>
+                fieldName == "active_state" ? owner.OwnerLifeCycleState.ActiveState : null);
+        }
 
-            return rawApplicationIds as List<int>;
+        private static Func<string, object?> ApplicationZoneField(ModellingAppZone applicationZone)
+        {
+            return fieldName => fieldName switch
+            {
+                "id" => applicationZone.Id,
+                "app_id" => applicationZone.AppId,
+                "name" => applicationZone.Name,
+                "id_string" => applicationZone.IdString,
+                _ => null
+            };
+        }
+
+        private static Dictionary<string, object> GetWhere(object? variables)
+        {
+            if (variables is Dictionary<string, object> variableValues &&
+                variableValues.TryGetValue("where", out object? where) &&
+                where is Dictionary<string, object> whereExpression)
+            {
+                return whereExpression;
+            }
+            return new Dictionary<string, object>();
+        }
+
+        private static int? GetPagingValue(object? variables, string fieldName)
+        {
+            if (variables is Dictionary<string, object> variableValues &&
+                variableValues.TryGetValue(fieldName, out object? value))
+            {
+                return (int)value;
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Evaluates the subset of Hasura boolean expressions that the controllers build, so that the tests verify
+    /// the pushed-down filters instead of re-implementing them.
+    /// </summary>
+    private static class SimulatedGraphQlFilter
+    {
+        public static bool Matches(Dictionary<string, object> where, Func<string, object?> getValue)
+        {
+            return where.All(expression => MatchesExpression(expression, getValue));
+        }
+
+        private static bool MatchesExpression(KeyValuePair<string, object> expression, Func<string, object?> getValue)
+        {
+            if (expression.Key is "_and" or "_or")
+            {
+                List<Dictionary<string, object>> operands = (List<Dictionary<string, object>>)expression.Value;
+                return expression.Key == "_and"
+                    ? operands.All(operand => Matches(operand, getValue))
+                    : operands.Any(operand => Matches(operand, getValue));
+            }
+            return MatchesField(expression.Key, (Dictionary<string, object>)expression.Value, getValue);
+        }
+
+        private static bool MatchesField(
+            string fieldName, Dictionary<string, object> comparison, Func<string, object?> getValue)
+        {
+            object? value = getValue(fieldName);
+            if (value is Func<string, object?> nestedGetValue)
+            {
+                return Matches(comparison, nestedGetValue);
+            }
+            if (value is null && !comparison.ContainsKey("_is_null"))
+            {
+                return false;
+            }
+            return comparison.All(operation => MatchesOperation(operation, value));
+        }
+
+        private static bool MatchesOperation(KeyValuePair<string, object> operation, object? value)
+        {
+            return operation.Key switch
+            {
+                "_eq" => Equals(value, operation.Value),
+                "_in" => value is int intValue && ((List<int>)operation.Value).Contains(intValue),
+                "_is_null" => Equals(value is null, operation.Value),
+                "_ilike" => MatchesLikePattern(value as string, (string)operation.Value),
+                _ => throw new NotSupportedException($"Unsupported operator '{operation.Key}'.")
+            };
+        }
+
+        private static bool MatchesLikePattern(string? value, string pattern)
+        {
+            if (value is null)
+            {
+                return false;
+            }
+
+            StringBuilder regexPattern = new("^");
+            for (int index = 0; index < pattern.Length; index++)
+            {
+                char patternCharacter = pattern[index];
+                if (patternCharacter == '\\' && index + 1 < pattern.Length)
+                {
+                    regexPattern.Append(Regex.Escape(pattern[++index].ToString()));
+                }
+                else if (patternCharacter == '%')
+                {
+                    regexPattern.Append(".*");
+                }
+                else if (patternCharacter == '_')
+                {
+                    regexPattern.Append('.');
+                }
+                else
+                {
+                    regexPattern.Append(Regex.Escape(patternCharacter.ToString()));
+                }
+            }
+            regexPattern.Append('$');
+            return Regex.IsMatch(value, regexPattern.ToString(), RegexOptions.IgnoreCase);
         }
     }
 }
