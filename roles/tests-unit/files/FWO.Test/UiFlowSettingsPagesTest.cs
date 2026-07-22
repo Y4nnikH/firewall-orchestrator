@@ -516,6 +516,22 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task FlowNetworkObjectsPage_Refresh_ReloadsCustomObjectCandidates()
+        {
+            await using BunitContext context = CreateNetworkObjectsContext(out FlowNetworkObjectsNamingApiConn apiConnection);
+
+            IRenderedComponent<SettingsFlowNetworkObjects> component = RenderPage<SettingsFlowNetworkObjects>(context);
+            MethodInfo? refresh = typeof(SettingsFlowNetworkObjects).GetMethod("Refresh", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(refresh, Is.Not.Null);
+
+            component.WaitForAssertion(() => Assert.That(apiConnection.CustomObjectCandidateQueryCount, Is.EqualTo(1)));
+
+            await component.InvokeAsync(async () => await (Task)refresh!.Invoke(component.Instance, null)!);
+
+            component.WaitForAssertion(() => Assert.That(apiConnection.CustomObjectCandidateQueryCount, Is.EqualTo(2)));
+        }
+
+        [Test]
         public async Task FlowNetworkObjectsPage_ResolveDuplicateMapping_PreservesTypeForCustomObjectSearch()
         {
             await using BunitContext context = CreateNetworkDuplicateResolverContext(out FlowNetworkObjectsDuplicateResolverApiConn apiConnection);
@@ -775,6 +791,7 @@ namespace FWO.Test
     {
         public List<string> Queries { get; } = [];
         public List<string> UpdatedFlowObjectNames { get; } = [];
+        public int CustomObjectCandidateQueryCount { get; private set; }
 
         private readonly FlowNwObject flowNwObject = new()
         {
@@ -863,6 +880,7 @@ namespace FWO.Test
             }
             if (query == FlowQueries.getFlowCustomObjectCandidates)
             {
+                CustomObjectCandidateQueryCount++;
                 return Task.FromResult((QueryResponseType)(object)new List<Management> { localManagement });
             }
             if (query == FlowQueries.getFlowCustomObjectNamingCandidates)

@@ -6,6 +6,7 @@ mutation upsertFlowSvcGroupMapping(
   update_firewall_nw_service_by_pk(
     pk_columns: { svc_id: $svcId }
     _set: {
+      flow_svcobj_id: null
       flow_svcgrp_id: $flowSvcgrpId
       flow_active: $activeOnMgm
     }

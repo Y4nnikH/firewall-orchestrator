@@ -321,7 +321,7 @@ else
 
             selectableManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowSelectableManagements);
             flowNwObjects = await apiConnection.SendQueryAsync<List<FlowNwObject>>(FlowQueries.getFlowNwObjectCatalog);
-            await LoadObjectManagements();
+            await LoadObjectManagements(forceReload: true);
             duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowNwObjects, namingObjectManagements);
             customObjectSelections = [];
 
@@ -449,9 +449,9 @@ else
         CreateCustomObjectMode = false;
     }
 
-    private async Task LoadObjectManagements()
+    private async Task LoadObjectManagements(bool forceReload = false)
     {
-        if (customObjectManagements.Count > 0 && namingObjectManagements.Count > 0)
+        if (!forceReload && customObjectManagements.Count > 0 && namingObjectManagements.Count > 0)
         {
             return;
         }

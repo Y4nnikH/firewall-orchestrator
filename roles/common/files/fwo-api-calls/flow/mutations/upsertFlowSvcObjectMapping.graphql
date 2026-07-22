@@ -7,6 +7,7 @@ mutation upsertFlowSvcObjectMapping(
     pk_columns: { svc_id: $svcId }
     _set: {
       flow_svcobj_id: $flowSvcobjId
+      flow_svcgrp_id: null
       flow_active: $activeOnMgm
     }
   ) {
