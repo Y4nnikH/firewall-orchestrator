@@ -174,12 +174,13 @@ namespace FWO.Data.Flow
         {
             return ResolveNameByRanking(
                 nwObject.Id,
-                managements,
                 preferredManagementRanking,
-                management => management.Objects,
-                candidate => candidate.FlowNetworkObjectId,
-                candidate => candidate.Name,
-                candidate => candidate.FlowActive,
+                new NameResolutionContext<NetworkObject>(
+                    managements,
+                    management => management.Objects,
+                    candidate => candidate.FlowNetworkObjectId,
+                    candidate => candidate.Name,
+                    candidate => candidate.FlowActive),
                 fallbackName);
         }
 
@@ -200,12 +201,13 @@ namespace FWO.Data.Flow
         {
             return ResolveNameByRanking(
                 nwGroup.Id,
-                managements,
                 preferredManagementRanking,
-                management => management.Objects,
-                candidate => candidate.FlowNetworkGroupId,
-                candidate => candidate.Name,
-                candidate => candidate.FlowActive,
+                new NameResolutionContext<NetworkObject>(
+                    managements,
+                    management => management.Objects,
+                    candidate => candidate.FlowNetworkGroupId,
+                    candidate => candidate.Name,
+                    candidate => candidate.FlowActive),
                 fallbackName);
         }
 
@@ -216,12 +218,13 @@ namespace FWO.Data.Flow
         {
             return ResolveNameByRanking(
                 svcObject.Id,
-                managements,
                 preferredManagementRanking,
-                management => management.Services,
-                candidate => candidate.FlowServiceObjectId,
-                candidate => candidate.Name,
-                candidate => candidate.FlowActive,
+                new NameResolutionContext<NetworkService>(
+                    managements,
+                    management => management.Services,
+                    candidate => candidate.FlowServiceObjectId,
+                    candidate => candidate.Name,
+                    candidate => candidate.FlowActive),
                 fallbackName);
         }
 
@@ -242,12 +245,13 @@ namespace FWO.Data.Flow
         {
             return ResolveNameByRanking(
                 svcGroup.Id,
-                managements,
                 preferredManagementRanking,
-                management => management.Services,
-                candidate => candidate.FlowServiceGroupId,
-                candidate => candidate.Name,
-                candidate => candidate.FlowActive,
+                new NameResolutionContext<NetworkService>(
+                    managements,
+                    management => management.Services,
+                    candidate => candidate.FlowServiceGroupId,
+                    candidate => candidate.Name,
+                    candidate => candidate.FlowActive),
                 fallbackName);
         }
 
@@ -258,12 +262,13 @@ namespace FWO.Data.Flow
         {
             return ResolveNameByRanking(
                 timeObject.Id,
-                managements,
                 preferredManagementRanking,
-                management => management.TimeObjects,
-                candidate => candidate.FlowTimeObjectId,
-                candidate => candidate.Name,
-                candidate => candidate.FlowActive,
+                new NameResolutionContext<TimeObject>(
+                    managements,
+                    management => management.TimeObjects,
+                    candidate => candidate.FlowTimeObjectId,
+                    candidate => candidate.Name,
+                    candidate => candidate.FlowActive),
                 fallbackName);
         }
 
@@ -294,24 +299,20 @@ namespace FWO.Data.Flow
         /// </summary>
         private static string ResolveNameByRanking<TCandidate>(
             long flowObjectId,
-            IEnumerable<Management>? managements,
             IReadOnlyList<int>? preferredManagementRanking,
-            Func<Management, IEnumerable<TCandidate>?> candidateSelector,
-            Func<TCandidate, long?> flowObjectIdSelector,
-            Func<TCandidate, string?> nameSelector,
-            Func<TCandidate, bool> activeSelector,
+            NameResolutionContext<TCandidate> context,
             string fallbackName = "")
         {
-            List<Management> managementList = managements?.ToList() ?? [];
+            List<Management> managementList = context.Managements?.ToList() ?? [];
             Dictionary<int, List<TCandidate>> candidatesByManagementId = managementList.ToDictionary(
                 management => management.Id,
-                management => (candidateSelector(management) ?? [])
-                    .Where(candidate => flowObjectIdSelector(candidate) == flowObjectId)
+                management => (context.CandidateSelector(management) ?? [])
+                    .Where(candidate => context.FlowObjectIdSelector(candidate) == flowObjectId)
                     .ToList());
 
             string? preferredName = ResolvePreferredNameByRanking(
                 preferredManagementRanking,
-                managementId => GetBestName(candidatesByManagementId.GetValueOrDefault(managementId), nameSelector, activeSelector),
+                managementId => GetBestName(candidatesByManagementId.GetValueOrDefault(managementId), context.NameSelector, context.ActiveSelector),
                 fallbackName: "");
             if (!string.IsNullOrWhiteSpace(preferredName))
             {
@@ -320,8 +321,8 @@ namespace FWO.Data.Flow
 
             string? activeName = GetBestName(
                 candidatesByManagementId.Values.SelectMany(candidates => candidates),
-                nameSelector,
-                activeSelector);
+                context.NameSelector,
+                context.ActiveSelector);
             if (!string.IsNullOrWhiteSpace(activeName))
             {
                 return activeName;
@@ -329,11 +330,18 @@ namespace FWO.Data.Flow
 
             string? firstName = GetBestName(
                 candidatesByManagementId.Values.SelectMany(candidates => candidates),
-                nameSelector,
+                context.NameSelector,
                 _ => false,
                 preferActive: false);
             return string.IsNullOrWhiteSpace(firstName) ? fallbackName : firstName;
         }
+
+        private sealed record NameResolutionContext<TCandidate>(
+            IEnumerable<Management>? Managements,
+            Func<Management, IEnumerable<TCandidate>?> CandidateSelector,
+            Func<TCandidate, long?> FlowObjectIdSelector,
+            Func<TCandidate, string?> NameSelector,
+            Func<TCandidate, bool> ActiveSelector);
 
         /// <summary>
         /// Returns the best available candidate name, preferring active candidates when requested.

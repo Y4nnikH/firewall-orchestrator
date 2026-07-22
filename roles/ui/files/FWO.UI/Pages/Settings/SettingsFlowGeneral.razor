@@ -404,199 +404,50 @@
     /// </summary>
     private async Task BackfillMissingNamesAsync(IReadOnlyList<int> preferredManagementRanking)
     {
-        List<FlowNwObject> updatedNwObjects = [];
-        List<object> nwObjectUpdates = [];
-        foreach (FlowNwObject nwObject in flowNwObjects
-                     .Where(nwObject => string.IsNullOrWhiteSpace(nwObject.Name))
-                     .ToList())
-        {
-            string resolvedName = FlowNamingHelper.ResolveMissingNwObjectNameByRanking(nwObject, namingNetworkObjectManagements, preferredManagementRanking, "");
-            if (string.IsNullOrWhiteSpace(resolvedName))
-            {
-                continue;
-            }
+        await ApplyFlowNameUpdatesAsync(
+            flowNwObjects.Where(nwObject => string.IsNullOrWhiteSpace(nwObject.Name)),
+            nwObject => FlowNamingHelper.ResolveMissingNwObjectNameByRanking(nwObject, namingNetworkObjectManagements, preferredManagementRanking, ""),
+            (_, resolvedName) => !string.IsNullOrWhiteSpace(resolvedName),
+            CreateUpdatedFlowNwObject,
+            BuildFlowNwObjectUpdate,
+            ReplaceFlowNwObjectInCatalog,
+            FlowMutations.updateFlowNwObjects);
 
-            updatedNwObjects.Add(new FlowNwObject
-            {
-                Id = nwObject.Id,
-                Name = resolvedName,
-                IpStart = nwObject.IpStart,
-                IpEnd = nwObject.IpEnd,
-                Hash = nwObject.Hash,
-                State = nwObject.State,
-                RemovedDate = nwObject.RemovedDate,
-                ShowInRequestModule = nwObject.ShowInRequestModule
-            });
-            nwObjectUpdates.Add(new
-            {
-                where = new { nwobj_id = new { _eq = nwObject.Id } },
-                _set = new
-                {
-                    name = resolvedName,
-                    show_in_request_module = nwObject.ShowInRequestModule
-                }
-            });
-        }
-        await SendFlowBatchUpdateAsync(FlowMutations.updateFlowNwObjects, nwObjectUpdates, updatedNwObjects.Count);
-        foreach (FlowNwObject updatedObject in updatedNwObjects)
-        {
-            ReplaceFlowNwObjectInCatalog(updatedObject);
-        }
+        await ApplyFlowNameUpdatesAsync(
+            flowNwGroups.Where(nwGroup => string.IsNullOrWhiteSpace(nwGroup.Name)),
+            nwGroup => FlowNamingHelper.ResolveNwGroupNameByRanking(nwGroup, namingNetworkGroupManagements, preferredManagementRanking, ""),
+            (_, resolvedName) => !string.IsNullOrWhiteSpace(resolvedName),
+            CreateUpdatedFlowNwGroup,
+            BuildFlowNwGroupUpdate,
+            ReplaceFlowNwGroupInCatalog,
+            FlowMutations.updateFlowNwGroups);
 
-        List<FlowNwGroup> updatedNwGroups = [];
-        List<object> nwGroupUpdates = [];
-        foreach (FlowNwGroup nwGroup in flowNwGroups
-                     .Where(nwGroup => string.IsNullOrWhiteSpace(nwGroup.Name))
-                     .ToList())
-        {
-            string resolvedName = FlowNamingHelper.ResolveNwGroupNameByRanking(nwGroup, namingNetworkGroupManagements, preferredManagementRanking, "");
-            if (string.IsNullOrWhiteSpace(resolvedName))
-            {
-                continue;
-            }
+        await ApplyFlowNameUpdatesAsync(
+            flowSvcObjects.Where(svcObject => string.IsNullOrWhiteSpace(svcObject.Name)),
+            svcObject => FlowNamingHelper.ResolveMissingSvcObjectNameByRanking(svcObject, namingServiceManagements, preferredManagementRanking, ""),
+            (_, resolvedName) => !string.IsNullOrWhiteSpace(resolvedName),
+            CreateUpdatedFlowSvcObject,
+            BuildFlowSvcObjectUpdate,
+            ReplaceFlowSvcObjectInCatalog,
+            FlowMutations.updateFlowSvcObjects);
 
-            updatedNwGroups.Add(new FlowNwGroup
-            {
-                Id = nwGroup.Id,
-                Name = resolvedName,
-                Hash = nwGroup.Hash,
-                State = nwGroup.State,
-                RemovedDate = nwGroup.RemovedDate,
-                ShowInRequestModule = nwGroup.ShowInRequestModule,
-                NwGroupMembers = [.. nwGroup.NwGroupMembers]
-            });
-            nwGroupUpdates.Add(new
-            {
-                where = new { nwgrp_id = new { _eq = nwGroup.Id } },
-                _set = new
-                {
-                    name = resolvedName,
-                    show_in_request_module = nwGroup.ShowInRequestModule
-                }
-            });
-        }
-        await SendFlowBatchUpdateAsync(FlowMutations.updateFlowNwGroups, nwGroupUpdates, updatedNwGroups.Count);
-        foreach (FlowNwGroup updatedGroup in updatedNwGroups)
-        {
-            ReplaceFlowNwGroupInCatalog(updatedGroup);
-        }
+        await ApplyFlowNameUpdatesAsync(
+            flowSvcGroups.Where(svcGroup => string.IsNullOrWhiteSpace(svcGroup.Name)),
+            svcGroup => FlowNamingHelper.ResolveSvcGroupNameByRanking(svcGroup, namingServiceManagements, preferredManagementRanking, ""),
+            (_, resolvedName) => !string.IsNullOrWhiteSpace(resolvedName),
+            CreateUpdatedFlowSvcGroup,
+            BuildFlowSvcGroupUpdate,
+            ReplaceFlowSvcGroupInCatalog,
+            FlowMutations.updateFlowSvcGroups);
 
-        List<FlowSvcObject> updatedSvcObjects = [];
-        List<object> svcObjectUpdates = [];
-        foreach (FlowSvcObject svcObject in flowSvcObjects
-                     .Where(svcObject => string.IsNullOrWhiteSpace(svcObject.Name))
-                     .ToList())
-        {
-            string resolvedName = FlowNamingHelper.ResolveMissingSvcObjectNameByRanking(svcObject, namingServiceManagements, preferredManagementRanking, "");
-            if (string.IsNullOrWhiteSpace(resolvedName))
-            {
-                continue;
-            }
-
-            updatedSvcObjects.Add(new FlowSvcObject
-            {
-                Id = svcObject.Id,
-                Name = resolvedName,
-                PortStart = svcObject.PortStart,
-                PortEnd = svcObject.PortEnd,
-                ProtoId = svcObject.ProtoId,
-                Hash = svcObject.Hash,
-                State = svcObject.State,
-                RemovedDate = svcObject.RemovedDate,
-                ShowInRequestModule = svcObject.ShowInRequestModule
-            });
-            svcObjectUpdates.Add(new
-            {
-                where = new { svcobj_id = new { _eq = svcObject.Id } },
-                _set = new
-                {
-                    name = resolvedName,
-                    show_in_request_module = svcObject.ShowInRequestModule
-                }
-            });
-        }
-        await SendFlowBatchUpdateAsync(FlowMutations.updateFlowSvcObjects, svcObjectUpdates, updatedSvcObjects.Count);
-        foreach (FlowSvcObject updatedObject in updatedSvcObjects)
-        {
-            ReplaceFlowSvcObjectInCatalog(updatedObject);
-        }
-
-        List<FlowSvcGroup> updatedSvcGroups = [];
-        List<object> svcGroupUpdates = [];
-        foreach (FlowSvcGroup svcGroup in flowSvcGroups
-                     .Where(svcGroup => string.IsNullOrWhiteSpace(svcGroup.Name))
-                     .ToList())
-        {
-            string resolvedName = FlowNamingHelper.ResolveSvcGroupNameByRanking(svcGroup, namingServiceManagements, preferredManagementRanking, "");
-            if (string.IsNullOrWhiteSpace(resolvedName))
-            {
-                continue;
-            }
-
-            updatedSvcGroups.Add(new FlowSvcGroup
-            {
-                Id = svcGroup.Id,
-                Name = resolvedName,
-                Hash = svcGroup.Hash,
-                State = svcGroup.State,
-                RemovedDate = svcGroup.RemovedDate,
-                ShowInRequestModule = svcGroup.ShowInRequestModule,
-                SvcGroupMembers = [.. svcGroup.SvcGroupMembers]
-            });
-            svcGroupUpdates.Add(new
-            {
-                where = new { svcgrp_id = new { _eq = svcGroup.Id } },
-                _set = new
-                {
-                    name = resolvedName,
-                    show_in_request_module = svcGroup.ShowInRequestModule
-                }
-            });
-        }
-        await SendFlowBatchUpdateAsync(FlowMutations.updateFlowSvcGroups, svcGroupUpdates, updatedSvcGroups.Count);
-        foreach (FlowSvcGroup updatedGroup in updatedSvcGroups)
-        {
-            ReplaceFlowSvcGroupInCatalog(updatedGroup);
-        }
-
-        List<FlowTimeObject> updatedTimeObjects = [];
-        List<object> timeObjectUpdates = [];
-        foreach (FlowTimeObject timeObject in flowTimeObjects
-                     .Where(timeObject => string.IsNullOrWhiteSpace(timeObject.Name))
-                     .ToList())
-        {
-            string resolvedName = FlowNamingHelper.ResolveMissingTimeObjectNameByRanking(timeObject, namingTimeManagements, preferredManagementRanking, "");
-            if (string.IsNullOrWhiteSpace(resolvedName))
-            {
-                continue;
-            }
-
-            updatedTimeObjects.Add(new FlowTimeObject
-            {
-                Id = timeObject.Id,
-                Name = resolvedName,
-                StartTime = timeObject.StartTime,
-                EndTime = timeObject.EndTime,
-                Hash = timeObject.Hash,
-                State = timeObject.State,
-                RemovedDate = timeObject.RemovedDate,
-                ShowInRequestModule = timeObject.ShowInRequestModule
-            });
-            timeObjectUpdates.Add(new
-            {
-                where = new { timeobj_id = new { _eq = timeObject.Id } },
-                _set = new
-                {
-                    name = resolvedName,
-                    show_in_request_module = timeObject.ShowInRequestModule
-                }
-            });
-        }
-        await SendFlowBatchUpdateAsync(FlowMutations.updateFlowTimeObjects, timeObjectUpdates, updatedTimeObjects.Count);
-        foreach (FlowTimeObject updatedObject in updatedTimeObjects)
-        {
-            ReplaceFlowTimeObjectInCatalog(updatedObject);
-        }
+        await ApplyFlowNameUpdatesAsync(
+            flowTimeObjects.Where(timeObject => string.IsNullOrWhiteSpace(timeObject.Name)),
+            timeObject => FlowNamingHelper.ResolveMissingTimeObjectNameByRanking(timeObject, namingTimeManagements, preferredManagementRanking, ""),
+            (_, resolvedName) => !string.IsNullOrWhiteSpace(resolvedName),
+            CreateUpdatedFlowTimeObject,
+            BuildFlowTimeObjectUpdate,
+            ReplaceFlowTimeObjectInCatalog,
+            FlowMutations.updateFlowTimeObjects);
     }
 
     /// <summary>
@@ -604,188 +455,219 @@
     /// </summary>
     private async Task RecalculateNamesAsync(IReadOnlyList<int> preferredManagementRanking)
     {
-        List<FlowNwObject> updatedNwObjects = [];
-        List<object> nwObjectUpdates = [];
-        foreach (FlowNwObject nwObject in flowNwObjects.ToList())
+        await ApplyFlowNameUpdatesAsync(
+            flowNwObjects,
+            nwObject => FlowNamingHelper.ResolveNwObjectNameByRanking(nwObject, namingNetworkObjectManagements, preferredManagementRanking, nwObject.Name ?? ""),
+            (nwObject, resolvedName) => !string.Equals(resolvedName, nwObject.Name, StringComparison.Ordinal),
+            CreateUpdatedFlowNwObject,
+            BuildFlowNwObjectUpdate,
+            ReplaceFlowNwObjectInCatalog,
+            FlowMutations.updateFlowNwObjects);
+
+        await ApplyFlowNameUpdatesAsync(
+            flowNwGroups,
+            nwGroup => FlowNamingHelper.ResolveNwGroupNameByRanking(nwGroup, namingNetworkGroupManagements, preferredManagementRanking, nwGroup.Name),
+            (nwGroup, resolvedName) => !string.Equals(resolvedName, nwGroup.Name, StringComparison.Ordinal),
+            CreateUpdatedFlowNwGroup,
+            BuildFlowNwGroupUpdate,
+            ReplaceFlowNwGroupInCatalog,
+            FlowMutations.updateFlowNwGroups);
+
+        await ApplyFlowNameUpdatesAsync(
+            flowSvcObjects,
+            svcObject => FlowNamingHelper.ResolveSvcObjectNameByRanking(svcObject, namingServiceManagements, preferredManagementRanking, svcObject.Name),
+            (svcObject, resolvedName) => !string.Equals(resolvedName, svcObject.Name, StringComparison.Ordinal),
+            CreateUpdatedFlowSvcObject,
+            BuildFlowSvcObjectUpdate,
+            ReplaceFlowSvcObjectInCatalog,
+            FlowMutations.updateFlowSvcObjects);
+
+        await ApplyFlowNameUpdatesAsync(
+            flowSvcGroups,
+            svcGroup => FlowNamingHelper.ResolveSvcGroupNameByRanking(svcGroup, namingServiceManagements, preferredManagementRanking, svcGroup.Name),
+            (svcGroup, resolvedName) => !string.Equals(resolvedName, svcGroup.Name, StringComparison.Ordinal),
+            CreateUpdatedFlowSvcGroup,
+            BuildFlowSvcGroupUpdate,
+            ReplaceFlowSvcGroupInCatalog,
+            FlowMutations.updateFlowSvcGroups);
+
+        await ApplyFlowNameUpdatesAsync(
+            flowTimeObjects,
+            timeObject => FlowNamingHelper.ResolveTimeObjectNameByRanking(timeObject, namingTimeManagements, preferredManagementRanking, timeObject.Name),
+            (timeObject, resolvedName) => !string.Equals(resolvedName, timeObject.Name, StringComparison.Ordinal),
+            CreateUpdatedFlowTimeObject,
+            BuildFlowTimeObjectUpdate,
+            ReplaceFlowTimeObjectInCatalog,
+            FlowMutations.updateFlowTimeObjects);
+    }
+
+    private async Task ApplyFlowNameUpdatesAsync<TFlowObject>(
+        IEnumerable<TFlowObject> sourceObjects,
+        Func<TFlowObject, string> resolveName,
+        Func<TFlowObject, string, bool> shouldUpdate,
+        Func<TFlowObject, string, TFlowObject> createUpdatedObject,
+        Func<TFlowObject, string, object> buildUpdate,
+        Action<TFlowObject> replaceInCatalog,
+        string mutation)
+    {
+        List<TFlowObject> updatedObjects = [];
+        List<object> updates = [];
+
+        foreach (TFlowObject flowObject in sourceObjects.ToList())
         {
-            string resolvedName = FlowNamingHelper.ResolveNwObjectNameByRanking(nwObject, namingNetworkObjectManagements, preferredManagementRanking, nwObject.Name ?? "");
-            if (string.Equals(resolvedName, nwObject.Name, StringComparison.Ordinal))
+            string resolvedName = resolveName(flowObject);
+            if (!shouldUpdate(flowObject, resolvedName))
             {
                 continue;
             }
 
-            updatedNwObjects.Add(new FlowNwObject
-            {
-                Id = nwObject.Id,
-                Name = resolvedName,
-                IpStart = nwObject.IpStart,
-                IpEnd = nwObject.IpEnd,
-                Hash = nwObject.Hash,
-                State = nwObject.State,
-                RemovedDate = nwObject.RemovedDate,
-                ShowInRequestModule = nwObject.ShowInRequestModule
-            });
-            nwObjectUpdates.Add(new
-            {
-                where = new { nwobj_id = new { _eq = nwObject.Id } },
-                _set = new
-                {
-                    name = resolvedName,
-                    show_in_request_module = nwObject.ShowInRequestModule
-                }
-            });
-        }
-        await SendFlowBatchUpdateAsync(FlowMutations.updateFlowNwObjects, nwObjectUpdates, updatedNwObjects.Count);
-        foreach (FlowNwObject updatedObject in updatedNwObjects)
-        {
-            ReplaceFlowNwObjectInCatalog(updatedObject);
+            updatedObjects.Add(createUpdatedObject(flowObject, resolvedName));
+            updates.Add(buildUpdate(flowObject, resolvedName));
         }
 
-        List<FlowNwGroup> updatedNwGroups = [];
-        List<object> nwGroupUpdates = [];
-        foreach (FlowNwGroup nwGroup in flowNwGroups.ToList())
+        await SendFlowBatchUpdateAsync(mutation, updates, updatedObjects.Count);
+        foreach (TFlowObject updatedObject in updatedObjects)
         {
-            string resolvedName = FlowNamingHelper.ResolveNwGroupNameByRanking(nwGroup, namingNetworkGroupManagements, preferredManagementRanking, nwGroup.Name);
-            if (string.Equals(resolvedName, nwGroup.Name, StringComparison.Ordinal))
+            replaceInCatalog(updatedObject);
+        }
+    }
+
+    private static FlowNwObject CreateUpdatedFlowNwObject(FlowNwObject nwObject, string resolvedName)
+    {
+        return new FlowNwObject
+        {
+            Id = nwObject.Id,
+            Name = resolvedName,
+            IpStart = nwObject.IpStart,
+            IpEnd = nwObject.IpEnd,
+            Hash = nwObject.Hash,
+            State = nwObject.State,
+            RemovedDate = nwObject.RemovedDate,
+            ShowInRequestModule = nwObject.ShowInRequestModule
+        };
+    }
+
+    private static object BuildFlowNwObjectUpdate(FlowNwObject nwObject, string resolvedName)
+    {
+        return new
+        {
+            where = new { nwobj_id = new { _eq = nwObject.Id } },
+            _set = new
             {
-                continue;
+                name = resolvedName,
+                show_in_request_module = nwObject.ShowInRequestModule
             }
+        };
+    }
 
-            updatedNwGroups.Add(new FlowNwGroup
-            {
-                Id = nwGroup.Id,
-                Name = resolvedName,
-                Hash = nwGroup.Hash,
-                State = nwGroup.State,
-                RemovedDate = nwGroup.RemovedDate,
-                ShowInRequestModule = nwGroup.ShowInRequestModule,
-                NwGroupMembers = [.. nwGroup.NwGroupMembers]
-            });
-            nwGroupUpdates.Add(new
-            {
-                where = new { nwgrp_id = new { _eq = nwGroup.Id } },
-                _set = new
-                {
-                    name = resolvedName,
-                    show_in_request_module = nwGroup.ShowInRequestModule
-                }
-            });
-        }
-        await SendFlowBatchUpdateAsync(FlowMutations.updateFlowNwGroups, nwGroupUpdates, updatedNwGroups.Count);
-        foreach (FlowNwGroup updatedGroup in updatedNwGroups)
+    private static FlowNwGroup CreateUpdatedFlowNwGroup(FlowNwGroup nwGroup, string resolvedName)
+    {
+        return new FlowNwGroup
         {
-            ReplaceFlowNwGroupInCatalog(updatedGroup);
-        }
+            Id = nwGroup.Id,
+            Name = resolvedName,
+            Hash = nwGroup.Hash,
+            State = nwGroup.State,
+            RemovedDate = nwGroup.RemovedDate,
+            ShowInRequestModule = nwGroup.ShowInRequestModule,
+            NwGroupMembers = [.. nwGroup.NwGroupMembers]
+        };
+    }
 
-        List<FlowSvcObject> updatedSvcObjects = [];
-        List<object> svcObjectUpdates = [];
-        foreach (FlowSvcObject svcObject in flowSvcObjects.ToList())
+    private static object BuildFlowNwGroupUpdate(FlowNwGroup nwGroup, string resolvedName)
+    {
+        return new
         {
-            string resolvedName = FlowNamingHelper.ResolveSvcObjectNameByRanking(svcObject, namingServiceManagements, preferredManagementRanking, svcObject.Name);
-            if (string.Equals(resolvedName, svcObject.Name, StringComparison.Ordinal))
+            where = new { nwgrp_id = new { _eq = nwGroup.Id } },
+            _set = new
             {
-                continue;
+                name = resolvedName,
+                show_in_request_module = nwGroup.ShowInRequestModule
             }
+        };
+    }
 
-            updatedSvcObjects.Add(new FlowSvcObject
-            {
-                Id = svcObject.Id,
-                Name = resolvedName,
-                PortStart = svcObject.PortStart,
-                PortEnd = svcObject.PortEnd,
-                ProtoId = svcObject.ProtoId,
-                Hash = svcObject.Hash,
-                State = svcObject.State,
-                RemovedDate = svcObject.RemovedDate,
-                ShowInRequestModule = svcObject.ShowInRequestModule
-            });
-            svcObjectUpdates.Add(new
-            {
-                where = new { svcobj_id = new { _eq = svcObject.Id } },
-                _set = new
-                {
-                    name = resolvedName,
-                    show_in_request_module = svcObject.ShowInRequestModule
-                }
-            });
-        }
-        await SendFlowBatchUpdateAsync(FlowMutations.updateFlowSvcObjects, svcObjectUpdates, updatedSvcObjects.Count);
-        foreach (FlowSvcObject updatedObject in updatedSvcObjects)
+    private static FlowSvcObject CreateUpdatedFlowSvcObject(FlowSvcObject svcObject, string resolvedName)
+    {
+        return new FlowSvcObject
         {
-            ReplaceFlowSvcObjectInCatalog(updatedObject);
-        }
+            Id = svcObject.Id,
+            Name = resolvedName,
+            PortStart = svcObject.PortStart,
+            PortEnd = svcObject.PortEnd,
+            ProtoId = svcObject.ProtoId,
+            Hash = svcObject.Hash,
+            State = svcObject.State,
+            RemovedDate = svcObject.RemovedDate,
+            ShowInRequestModule = svcObject.ShowInRequestModule
+        };
+    }
 
-        List<FlowSvcGroup> updatedSvcGroups = [];
-        List<object> svcGroupUpdates = [];
-        foreach (FlowSvcGroup svcGroup in flowSvcGroups.ToList())
+    private static object BuildFlowSvcObjectUpdate(FlowSvcObject svcObject, string resolvedName)
+    {
+        return new
         {
-            string resolvedName = FlowNamingHelper.ResolveSvcGroupNameByRanking(svcGroup, namingServiceManagements, preferredManagementRanking, svcGroup.Name);
-            if (string.Equals(resolvedName, svcGroup.Name, StringComparison.Ordinal))
+            where = new { svcobj_id = new { _eq = svcObject.Id } },
+            _set = new
             {
-                continue;
+                name = resolvedName,
+                show_in_request_module = svcObject.ShowInRequestModule
             }
+        };
+    }
 
-            updatedSvcGroups.Add(new FlowSvcGroup
-            {
-                Id = svcGroup.Id,
-                Name = resolvedName,
-                Hash = svcGroup.Hash,
-                State = svcGroup.State,
-                RemovedDate = svcGroup.RemovedDate,
-                ShowInRequestModule = svcGroup.ShowInRequestModule,
-                SvcGroupMembers = [.. svcGroup.SvcGroupMembers]
-            });
-            svcGroupUpdates.Add(new
-            {
-                where = new { svcgrp_id = new { _eq = svcGroup.Id } },
-                _set = new
-                {
-                    name = resolvedName,
-                    show_in_request_module = svcGroup.ShowInRequestModule
-                }
-            });
-        }
-        await SendFlowBatchUpdateAsync(FlowMutations.updateFlowSvcGroups, svcGroupUpdates, updatedSvcGroups.Count);
-        foreach (FlowSvcGroup updatedGroup in updatedSvcGroups)
+    private static FlowSvcGroup CreateUpdatedFlowSvcGroup(FlowSvcGroup svcGroup, string resolvedName)
+    {
+        return new FlowSvcGroup
         {
-            ReplaceFlowSvcGroupInCatalog(updatedGroup);
-        }
+            Id = svcGroup.Id,
+            Name = resolvedName,
+            Hash = svcGroup.Hash,
+            State = svcGroup.State,
+            RemovedDate = svcGroup.RemovedDate,
+            ShowInRequestModule = svcGroup.ShowInRequestModule,
+            SvcGroupMembers = [.. svcGroup.SvcGroupMembers]
+        };
+    }
 
-        List<FlowTimeObject> updatedTimeObjects = [];
-        List<object> timeObjectUpdates = [];
-        foreach (FlowTimeObject timeObject in flowTimeObjects.ToList())
+    private static object BuildFlowSvcGroupUpdate(FlowSvcGroup svcGroup, string resolvedName)
+    {
+        return new
         {
-            string resolvedName = FlowNamingHelper.ResolveTimeObjectNameByRanking(timeObject, namingTimeManagements, preferredManagementRanking, timeObject.Name);
-            if (string.Equals(resolvedName, timeObject.Name, StringComparison.Ordinal))
+            where = new { svcgrp_id = new { _eq = svcGroup.Id } },
+            _set = new
             {
-                continue;
+                name = resolvedName,
+                show_in_request_module = svcGroup.ShowInRequestModule
             }
+        };
+    }
 
-            updatedTimeObjects.Add(new FlowTimeObject
-            {
-                Id = timeObject.Id,
-                Name = resolvedName,
-                StartTime = timeObject.StartTime,
-                EndTime = timeObject.EndTime,
-                Hash = timeObject.Hash,
-                State = timeObject.State,
-                RemovedDate = timeObject.RemovedDate,
-                ShowInRequestModule = timeObject.ShowInRequestModule
-            });
-            timeObjectUpdates.Add(new
-            {
-                where = new { timeobj_id = new { _eq = timeObject.Id } },
-                _set = new
-                {
-                    name = resolvedName,
-                    show_in_request_module = timeObject.ShowInRequestModule
-                }
-            });
-        }
-        await SendFlowBatchUpdateAsync(FlowMutations.updateFlowTimeObjects, timeObjectUpdates, updatedTimeObjects.Count);
-        foreach (FlowTimeObject updatedObject in updatedTimeObjects)
+    private static FlowTimeObject CreateUpdatedFlowTimeObject(FlowTimeObject timeObject, string resolvedName)
+    {
+        return new FlowTimeObject
         {
-            ReplaceFlowTimeObjectInCatalog(updatedObject);
-        }
+            Id = timeObject.Id,
+            Name = resolvedName,
+            StartTime = timeObject.StartTime,
+            EndTime = timeObject.EndTime,
+            Hash = timeObject.Hash,
+            State = timeObject.State,
+            RemovedDate = timeObject.RemovedDate,
+            ShowInRequestModule = timeObject.ShowInRequestModule
+        };
+    }
+
+    private static object BuildFlowTimeObjectUpdate(FlowTimeObject timeObject, string resolvedName)
+    {
+        return new
+        {
+            where = new { timeobj_id = new { _eq = timeObject.Id } },
+            _set = new
+            {
+                name = resolvedName,
+                show_in_request_module = timeObject.ShowInRequestModule
+            }
+        };
     }
 }
