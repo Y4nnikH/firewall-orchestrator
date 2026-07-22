@@ -201,6 +201,28 @@ namespace FWO.Test
         }
 
         [Test]
+        public void RangeOverlapExists_OverlappingIPv6_ReturnsTrue()
+        {
+            IPAddressRange a = IPAddressRange.Parse("2001:db8::1-2001:db8::10");
+            IPAddressRange b = IPAddressRange.Parse("2001:db8::5-2001:db8::20");
+
+            bool result = IpOperations.RangeOverlapExists(a, b);
+
+            Assert.That(result);
+        }
+
+        [Test]
+        public void RangeOverlapExists_MixedFamilies_ReturnsFalse()
+        {
+            IPAddressRange ipv4Range = IPAddressRange.Parse("10.0.0.1-10.0.0.10");
+            IPAddressRange ipv6Range = IPAddressRange.Parse("2001:db8::1-2001:db8::10");
+
+            bool result = IpOperations.RangeOverlapExists(ipv4Range, ipv6Range);
+
+            Assert.That(!result);
+        }
+
+        [Test]
         public void IpToUint_And_Back_Roundtrip()
         {
             // Arrange
@@ -351,6 +373,14 @@ namespace FWO.Test
 
             // Assert
             ClassicAssert.AreEqual("10.0.0.5/255.255.255.255", s);
+        }
+
+        [Test]
+        public void ToDotNotation_UnalignedRange_ReturnsSmallestContainingNetwork()
+        {
+            string s = IpOperations.ToDotNotation("192.168.1.1", "192.168.1.9");
+
+            ClassicAssert.AreEqual("192.168.1.0/255.255.255.240", s);
         }
 
         [Test]
@@ -549,6 +579,7 @@ namespace FWO.Test
         public void ToCompactNotation_Subnet_ReturnsCidr()
         {
             Assert.AreEqual("10.2.0.0/24", IpOperations.ToCompactNotation("10.2.0.0/24", "10.2.0.255/24"));
+            Assert.AreEqual("10.2.0.0/24", IpOperations.ToCompactNotation("10.2.0.0/24", ""));
             Assert.AreEqual("10.2.0.0/31", IpOperations.ToCompactNotation("10.2.0.0", "10.2.0.1"));
             Assert.AreEqual("0.0.0.0/0", IpOperations.ToCompactNotation("0.0.0.0", "255.255.255.255"));
         }

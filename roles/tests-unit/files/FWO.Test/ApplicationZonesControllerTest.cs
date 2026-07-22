@@ -209,6 +209,56 @@ internal class ApplicationZonesControllerTest
     }
 
     [Test]
+    public async Task GetIpOnlyExcludesApplicationsWithoutMatchingZone()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((7, "Application 07", "APP-7")),
+            AllApplicationZones = new List<ModellingAppZone>
+            {
+                CreateApplicationZone(7, 70, "AZ-7", "az-7", "10.7.0.1", string.Empty)
+            }
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new()
+            {
+                DetailsLevel = "ip-only",
+                Filter = new() { Name = "AZ-no-match" }
+            }
+        };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        List<ApplicationZoneIpOnlyResponse> response = (List<ApplicationZoneIpOnlyResponse>)((OkObjectResult)result.Result!).Value!;
+        Assert.That(response, Is.Empty);
+    }
+
+    [Test]
+    public async Task GetIpOnlyExcludesApplicationsForDeletedZoneFilter()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((7, "Application 07", "APP-7"))
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new()
+            {
+                DetailsLevel = "ip-only",
+                Filter = new() { IsDeleted = true }
+            }
+        };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        List<ApplicationZoneIpOnlyResponse> response = (List<ApplicationZoneIpOnlyResponse>)((OkObjectResult)result.Result!).Value!;
+        Assert.That(response, Is.Empty);
+    }
+
+    [Test]
     public async Task GetRestrictsModellerToEditableApplications()
     {
         ApplicationZonesApiConnection apiConnection = new()
@@ -227,6 +277,26 @@ internal class ApplicationZonesControllerTest
 
         List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)((OkObjectResult)result.Result!).Value!;
         Assert.That(response.Select(applicationZone => applicationZone.ApplicationId), Is.EqualTo(new List<int> { 7 }));
+    }
+
+    [Test]
+    public async Task GetIpOnlyRestrictsModellerToEditableApplications()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((7, "Application 07", "APP-7"), (9, "Application 09", "APP-9"))
+        };
+        ClaimsPrincipal modeller = PrincipalWithRolesAndClaims(
+            kModellerRole, new Claim("x-hasura-editable-owners", "{7}"));
+        ApplicationZonesController controller = CreateController(apiConnection, modeller);
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(new GetApplicationZonesRequest
+        {
+            Options = new() { DetailsLevel = "ip-only" }
+        });
+
+        List<ApplicationZoneIpOnlyResponse> response = (List<ApplicationZoneIpOnlyResponse>)((OkObjectResult)result.Result!).Value!;
+        Assert.That(response.Select(application => application.AppIdExternal), Is.EqualTo(new List<string?> { "APP-7" }));
     }
 
     [Test]
@@ -311,6 +381,25 @@ internal class ApplicationZonesControllerTest
         GetApplicationZonesRequest? request = JsonSerializer.Deserialize<GetApplicationZonesRequest>(Json);
 
         Assert.That(request?.Options?.DetailsLevel, Is.EqualTo("ip-only"));
+    }
+
+    [Test]
+    public async Task GetTreatsNullDetailsLevelAsFull()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((7, "Application 07", "APP-7"))
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new() { Options = new() { DetailsLevel = null } };
+
+        await controller.Get(request);
+
+        Assert.That(apiConnection.Queries, Is.EqualTo(new List<string>
+        {
+            OwnerQueries.getOwnersFiltered,
+            ModellingQueries.getAppZones
+        }));
     }
 
     [Test]
@@ -401,6 +490,34 @@ internal class ApplicationZonesControllerTest
             Assert.That(variables, Does.Contain("\"limit\":1"));
             Assert.That(variables, Does.Contain("\"offset\":1"));
             Assert.That(response.Select(applicationZone => applicationZone.ApplicationId), Is.EqualTo(new List<int> { 8 }));
+        });
+    }
+
+    [Test]
+    public async Task GetIpOnlyPassesLimitAndOffsetToTheApplicationQuery()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners(
+                (7, "Application 07", "APP-7"),
+                (8, "Application 08", "APP-8"),
+                (9, "Application 09", "APP-9"))
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new()
+        {
+            Options = new() { DetailsLevel = "ip-only", Limit = 1, Offset = 1 }
+        };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        List<ApplicationZoneIpOnlyResponse> response = (List<ApplicationZoneIpOnlyResponse>)((OkObjectResult)result.Result!).Value!;
+        string variables = SerializeVariables(apiConnection.LastApplicationVariables);
+        Assert.Multiple(() =>
+        {
+            Assert.That(variables, Does.Contain("\"limit\":1"));
+            Assert.That(variables, Does.Contain("\"offset\":1"));
+            Assert.That(response.Select(application => application.AppIdExternal), Is.EqualTo(new List<string?> { "APP-8" }));
         });
     }
 
