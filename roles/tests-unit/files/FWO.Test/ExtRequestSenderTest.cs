@@ -130,7 +130,7 @@ namespace FWO.Test
         [Test]
         public void BuildInternalCheckPointTicketNumber_UsesInternalTicketAndTaskReferences()
         {
-            UserConfig userConfig = UserConfig.ForGlobalSettings(globalConfig, new ExtRequestSenderTestApiConn());
+            UserConfig userConfig = new SimulatedUserConfig();
             ExternalRequest request = new()
             {
                 TicketId = 123,
