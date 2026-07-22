@@ -677,7 +677,7 @@ public sealed class FlowRequestService
         {
             if (int.TryParse(protocol, out int protocolId))
             {
-                if (protocolId > 0 && protocolIds.Values.Contains(protocolId))
+                if (protocolId > 0 && protocolIds.ContainsValue(protocolId))
                 {
                     return protocolId;
                 }
