@@ -99,7 +99,8 @@ namespace FWO.Test
             ClassicAssert.AreEqual(2, apiConnection.UpdateExtRequestProcess.Count);
             ClassicAssert.IsTrue(apiConnection.UpdateExtRequestProcess[0].Contains("id = 4"));
             ClassicAssert.IsTrue(apiConnection.UpdateExtRequestProcess[1].Contains("id = 5"));
-            ClassicAssert.AreEqual(0, apiConnection.TriedToGetLdapsForHandleStateChange);
+            // Successful creates are now synced to the workflow immediately so the external ticket id/state is visible on the task.
+            ClassicAssert.AreEqual(2, apiConnection.TriedToGetLdapsForHandleStateChange);
         }
 
         [Test]
