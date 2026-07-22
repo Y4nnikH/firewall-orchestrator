@@ -278,6 +278,17 @@ namespace FWO.Data.Flow
         }
 
         /// <summary>
+        /// Returns the selected duplicate name when the current flow object name is missing.
+        /// Existing names are preserved to avoid overwriting values from higher-ranked managements.
+        /// </summary>
+        public static string? ResolveMissingNameFromDuplicateSelection(string? currentName, string? selectedName)
+        {
+            return string.IsNullOrWhiteSpace(currentName) && !string.IsNullOrWhiteSpace(selectedName)
+                ? selectedName
+                : null;
+        }
+
+        /// <summary>
         /// Resolves the preferred display name for a flow object by checking managements in ranking order first,
         /// then active candidates across all managements, then any remaining candidate, and finally the fallback.
         /// </summary>

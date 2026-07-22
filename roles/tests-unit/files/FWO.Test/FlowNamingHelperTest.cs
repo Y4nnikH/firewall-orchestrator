@@ -192,6 +192,17 @@ namespace FWO.Test
         }
 
         [Test]
+        public void ResolveMissingNameFromDuplicateSelection_ReturnsSelectedNameOnlyForUnnamedObjects()
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(FlowNamingHelper.ResolveMissingNameFromDuplicateSelection("", "duplicate-name"), Is.EqualTo("duplicate-name"));
+                Assert.That(FlowNamingHelper.ResolveMissingNameFromDuplicateSelection("existing-name", "duplicate-name"), Is.Null);
+                Assert.That(FlowNamingHelper.ResolveMissingNameFromDuplicateSelection("", ""), Is.Null);
+            });
+        }
+
+        [Test]
         public void ResolveNwObjectNameByRanking_UsesFirstRankedManagementWithMappedName()
         {
             FlowNwObject nwObject = new()

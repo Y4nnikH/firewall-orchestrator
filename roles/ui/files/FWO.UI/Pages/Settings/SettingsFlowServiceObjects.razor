@@ -257,6 +257,7 @@ else
     private List<IpProtocol> ipProtos = [];
     private List<Management> selectableManagements = [];
     private List<Management> customServiceManagements = [];
+    private List<Management> namingServiceManagements = [];
     private List<FlowSvcObjectDuplicateGroup> duplicateGroups = [];
     private List<CustomObjectManagementSelection> customServiceObjectSelections = [];
     private FlowSvcObjectDuplicateGroup? SelectedDuplicateGroup;
@@ -284,14 +285,8 @@ else
             ipProtos = DisplayBase.CustomSortProtocols(await apiConnection.SendQueryAsync<List<IpProtocol>>(StmQueries.getIpProtocols) ?? []);
             selectableManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowSelectableManagements) ?? [];
 
-            List<int> managementIds = [.. selectableManagements.Select(management => management.Id)];
-            customServiceManagements = managementIds.Count == 0
-                ? []
-                : await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomServiceCandidates, new
-                {
-                    management_id = managementIds
-                }) ?? [];
-            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowSvcObjects, customServiceManagements);
+            await LoadServiceManagements();
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowSvcObjects, namingServiceManagements);
             customServiceObjectSelections = [];
 
             workInProgress = false;
@@ -309,6 +304,7 @@ else
     {
         try
         {
+            await LoadServiceManagements();
             NewCustomFlowSvcObject = new FlowSvcObject
             {
                 ShowInRequestModule = false
@@ -401,9 +397,10 @@ else
                 });
                 UpdateCustomServiceInCatalog(updatedService);
             }
+            await BackfillMissingFlowSvcObjectName(selectedService.Name);
 
             CloseDuplicateResolver();
-            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowSvcObjects, customServiceManagements);
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowSvcObjects, namingServiceManagements);
             workInProgress = false;
         }
         catch (Exception exception)
@@ -545,9 +542,72 @@ else
         return string.IsNullOrWhiteSpace(details) ? "-" : details;
     }
 
+    private async Task LoadServiceManagements()
+    {
+        if (customServiceManagements.Count > 0 && namingServiceManagements.Count > 0)
+        {
+            return;
+        }
+
+        List<int> managementIds = [.. selectableManagements.Select(management => management.Id)];
+        if (managementIds.Count == 0)
+        {
+            customServiceManagements = [];
+            namingServiceManagements = [];
+            return;
+        }
+
+        customServiceManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomServiceCandidates, new
+        {
+            management_id = managementIds
+        }) ?? [];
+        namingServiceManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomServiceNamingCandidates, new
+        {
+            management_id = managementIds
+        }) ?? [];
+    }
+
+    private async Task BackfillMissingFlowSvcObjectName(string? selectedName)
+    {
+        if (SelectedDuplicateGroup == null)
+        {
+            return;
+        }
+
+        FlowSvcObject? flowSvcObject = flowSvcObjects.FirstOrDefault(item => item.Id == SelectedDuplicateGroup.FlowSvcObjectId);
+        string? resolvedName = FlowNamingHelper.ResolveMissingNameFromDuplicateSelection(flowSvcObject?.Name, selectedName);
+        if (string.IsNullOrWhiteSpace(resolvedName) || flowSvcObject == null)
+        {
+            return;
+        }
+
+        FlowSvcObject updatedObject = await apiConnection.SendQueryAsync<FlowSvcObject>(FlowMutations.updateFlowSvcObject, new
+        {
+            svcobjId = flowSvcObject.Id,
+            name = resolvedName,
+            showInRequestModule = flowSvcObject.ShowInRequestModule
+        });
+        ReplaceFlowSvcObjectInCatalog(updatedObject);
+    }
+
+    private void ReplaceFlowSvcObjectInCatalog(FlowSvcObject updatedObject)
+    {
+        int objectIndex = flowSvcObjects.FindIndex(flowObject => flowObject.Id == updatedObject.Id);
+        if (objectIndex >= 0)
+        {
+            flowSvcObjects[objectIndex] = updatedObject;
+        }
+    }
+
     private void UpdateCustomServiceInCatalog(NetworkService updatedService)
     {
-        foreach (Management management in customServiceManagements)
+        UpdateCustomServiceInManagements(customServiceManagements, updatedService);
+        UpdateCustomServiceInManagements(namingServiceManagements, updatedService);
+    }
+
+    private static void UpdateCustomServiceInManagements(List<Management> managements, NetworkService updatedService)
+    {
+        foreach (Management management in managements)
         {
             int objectIndex = Array.FindIndex(management.Services, service => service.Id == updatedService.Id);
             if (objectIndex >= 0)

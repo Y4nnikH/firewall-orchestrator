@@ -289,6 +289,7 @@ else
     private List<FlowNwObject> flowNwObjects = [];
     private List<Management> selectableManagements = [];
     private List<Management> customObjectManagements = [];
+    private List<Management> namingObjectManagements = [];
     private List<FlowNwObjectDuplicateGroup> duplicateGroups = [];
     private List<CustomObjectManagementSelection> customObjectSelections = [];
     private FlowNwObjectDuplicateGroup? SelectedDuplicateGroup;
@@ -320,8 +321,8 @@ else
 
             selectableManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowSelectableManagements);
             flowNwObjects = await apiConnection.SendQueryAsync<List<FlowNwObject>>(FlowQueries.getFlowNwObjectCatalog);
-            await LoadCustomObjectManagements();
-            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowNwObjects, customObjectManagements);
+            await LoadObjectManagements();
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowNwObjects, namingObjectManagements);
             customObjectSelections = [];
 
             workInProgress = false;
@@ -400,9 +401,10 @@ else
                 });
                 UpdateCustomObjectInCatalog(updatedObject);
             }
+            await BackfillMissingFlowNwObjectName(selectedObject.Name);
 
             CloseDuplicateResolver();
-            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowNwObjects, customObjectManagements);
+            duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowNwObjects, namingObjectManagements);
             workInProgress = false;
         }
         catch (Exception exception)
@@ -418,7 +420,7 @@ else
     {
         try
         {
-            await LoadCustomObjectManagements();
+            await LoadObjectManagements();
             NewCustomFlowNwObject = new FlowNwObject
             {
                 ShowInRequestModule = false
@@ -447,9 +449,9 @@ else
         CreateCustomObjectMode = false;
     }
 
-    private async Task LoadCustomObjectManagements()
+    private async Task LoadObjectManagements()
     {
-        if (customObjectManagements.Count > 0)
+        if (customObjectManagements.Count > 0 && namingObjectManagements.Count > 0)
         {
             return;
         }
@@ -458,6 +460,7 @@ else
         if (managementIds.Count == 0)
         {
             customObjectManagements = [];
+            namingObjectManagements = [];
             return;
         }
 
@@ -465,6 +468,33 @@ else
         {
             management_id = managementIds
         });
+        namingObjectManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomObjectNamingCandidates, new
+        {
+            management_id = managementIds
+        });
+    }
+
+    private async Task BackfillMissingFlowNwObjectName(string? selectedName)
+    {
+        if (SelectedDuplicateGroup == null)
+        {
+            return;
+        }
+
+        FlowNwObject? flowNwObject = flowNwObjects.FirstOrDefault(item => item.Id == SelectedDuplicateGroup.FlowNwObjectId);
+        string? resolvedName = FlowNamingHelper.ResolveMissingNameFromDuplicateSelection(flowNwObject?.Name, selectedName);
+        if (string.IsNullOrWhiteSpace(resolvedName) || flowNwObject == null)
+        {
+            return;
+        }
+
+        FlowNwObject updatedObject = await apiConnection.SendQueryAsync<FlowNwObject>(FlowMutations.updateFlowNwObject, new
+        {
+            nwobjId = flowNwObject.Id,
+            name = resolvedName,
+            showInRequestModule = flowNwObject.ShowInRequestModule
+        });
+        ReplaceFlowObjectInCatalog(updatedObject);
     }
 
     private void ReplaceFlowObjectInCatalog(FlowNwObject updatedObject)
@@ -479,6 +509,7 @@ else
     private void UpdateCustomObjectInCatalog(NetworkObject updatedObject)
     {
         UpdateCustomObjectInManagements(customObjectManagements, updatedObject);
+        UpdateCustomObjectInManagements(namingObjectManagements, updatedObject);
     }
 
     private static void UpdateCustomObjectInManagements(List<Management> managements, NetworkObject updatedObject)

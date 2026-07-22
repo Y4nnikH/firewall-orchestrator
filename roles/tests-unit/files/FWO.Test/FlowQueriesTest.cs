@@ -23,9 +23,30 @@ namespace FWO.Test
         {
             Assert.That(FlowQueries.getFlowCustomObjectNamingCandidates, Does.Contain("query getFlowCustomObjectNamingCandidates"));
             Assert.That(FlowQueries.getFlowCustomObjectNamingCandidates, Does.Contain("networkObjects: objects"));
+            Assert.That(FlowQueries.getFlowCustomObjectNamingCandidates, Does.Contain("flow_nwgrp_id"));
             Assert.That(FlowQueries.getFlowCustomObjectNamingCandidates, Does.Contain("hide_in_gui: { _eq: false }"));
             Assert.That(FlowQueries.getFlowCustomObjectNamingCandidates, Does.Contain("is_pure_routing_device: { _eq: false }"));
             Assert.That(FlowQueries.getFlowCustomObjectNamingCandidates, Does.Not.Contain("dev_typ_is_multi_mgmt"));
+        }
+
+        [Test]
+        public void FlowQueries_LoadCustomServiceNamingCandidatesQuery()
+        {
+            Assert.That(FlowQueries.getFlowCustomServiceNamingCandidates, Does.Contain("query getFlowCustomServiceNamingCandidates"));
+            Assert.That(FlowQueries.getFlowCustomServiceNamingCandidates, Does.Contain("serviceObjects: services("));
+            Assert.That(FlowQueries.getFlowCustomServiceNamingCandidates, Does.Contain("flow_svcgrp_id"));
+            Assert.That(FlowQueries.getFlowCustomServiceNamingCandidates, Does.Contain("is_pure_routing_device: { _eq: false }"));
+            Assert.That(FlowQueries.getFlowCustomServiceNamingCandidates, Does.Not.Contain("dev_typ_is_multi_mgmt"));
+        }
+
+        [Test]
+        public void FlowQueries_LoadCustomTimeObjectNamingCandidatesQuery()
+        {
+            Assert.That(FlowQueries.getFlowCustomTimeObjectNamingCandidates, Does.Contain("query getFlowCustomTimeObjectNamingCandidates"));
+            Assert.That(FlowQueries.getFlowCustomTimeObjectNamingCandidates, Does.Contain("timeObjects: time_objects("));
+            Assert.That(FlowQueries.getFlowCustomTimeObjectNamingCandidates, Does.Contain("flow_timeobj_id"));
+            Assert.That(FlowQueries.getFlowCustomTimeObjectNamingCandidates, Does.Contain("is_pure_routing_device: { _eq: false }"));
+            Assert.That(FlowQueries.getFlowCustomTimeObjectNamingCandidates, Does.Not.Contain("dev_typ_is_multi_mgmt"));
         }
 
         [Test]

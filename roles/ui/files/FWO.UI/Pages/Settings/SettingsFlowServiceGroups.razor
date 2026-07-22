@@ -191,7 +191,7 @@ else
             List<int> managementIds = [.. selectableManagements.Select(management => management.Id)];
             customServiceManagements = managementIds.Count == 0
                 ? []
-                : await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomServiceCandidates, new
+                : await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomServiceNamingCandidates, new
                 {
                     management_id = managementIds
                 }) ?? [];
@@ -270,6 +270,7 @@ else
                 });
                 UpdateCustomServiceInCatalog(updatedService);
             }
+            await BackfillMissingFlowSvcGroupName(selectedService.Name);
 
             CloseDuplicateResolver();
             duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowSvcGroups, customServiceManagements);
@@ -342,6 +343,38 @@ else
             ? ""
             : FlowAdminHelper.FormatFlowSvcGroupMemberDetails(flowSvcGroup, 10, userConfig.GetText("none"), userConfig.GetText("duplicate_objects_more"), ipProtos);
         return string.IsNullOrWhiteSpace(details) ? "-" : details;
+    }
+
+    private async Task BackfillMissingFlowSvcGroupName(string? selectedName)
+    {
+        if (SelectedDuplicateGroup == null)
+        {
+            return;
+        }
+
+        FlowSvcGroup? flowSvcGroup = flowSvcGroups.FirstOrDefault(item => item.Id == SelectedDuplicateGroup.FlowSvcGroupId);
+        string? resolvedName = FlowNamingHelper.ResolveMissingNameFromDuplicateSelection(flowSvcGroup?.Name, selectedName);
+        if (string.IsNullOrWhiteSpace(resolvedName) || flowSvcGroup == null)
+        {
+            return;
+        }
+
+        FlowSvcGroup updatedGroup = await apiConnection.SendQueryAsync<FlowSvcGroup>(FlowMutations.updateFlowSvcGroup, new
+        {
+            svcgroupId = flowSvcGroup.Id,
+            name = resolvedName,
+            showInRequestModule = flowSvcGroup.ShowInRequestModule
+        });
+        ReplaceFlowSvcGroupInCatalog(updatedGroup);
+    }
+
+    private void ReplaceFlowSvcGroupInCatalog(FlowSvcGroup updatedGroup)
+    {
+        int groupIndex = flowSvcGroups.FindIndex(flowGroup => flowGroup.Id == updatedGroup.Id);
+        if (groupIndex >= 0)
+        {
+            flowSvcGroups[groupIndex] = updatedGroup;
+        }
     }
 
     private void UpdateCustomServiceInCatalog(NetworkService updatedService)

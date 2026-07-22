@@ -189,7 +189,7 @@ else
             List<int> managementIds = [.. selectableManagements.Select(management => management.Id)];
             customTimeManagements = managementIds.Count == 0
                 ? []
-                : await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomTimeObjectCandidates, new
+                : await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomTimeObjectNamingCandidates, new
                 {
                     management_id = managementIds
                 }) ?? [];
@@ -270,6 +270,7 @@ else
                 });
                 UpdateCustomTimeObjectInCatalog(updatedTimeObject);
             }
+            await BackfillMissingFlowTimeObjectName(selectedTimeObject.Name);
 
             CloseDuplicateResolver();
             duplicateGroups = FlowAdminHelper.BuildDuplicateGroups(flowTimeObjects, customTimeManagements);
@@ -334,6 +335,38 @@ else
         FlowTimeObject? flowTimeObject = flowTimeObjects.FirstOrDefault(item => item.Id == flowTimeObjectId);
         string details = flowTimeObject == null ? "" : FlowAdminHelper.FormatFlowTimeObjectTechnicalDetails(flowTimeObject);
         return string.IsNullOrWhiteSpace(details) ? "-" : details;
+    }
+
+    private async Task BackfillMissingFlowTimeObjectName(string? selectedName)
+    {
+        if (SelectedDuplicateGroup == null)
+        {
+            return;
+        }
+
+        FlowTimeObject? flowTimeObject = flowTimeObjects.FirstOrDefault(item => item.Id == SelectedDuplicateGroup.FlowTimeObjectId);
+        string? resolvedName = FlowNamingHelper.ResolveMissingNameFromDuplicateSelection(flowTimeObject?.Name, selectedName);
+        if (string.IsNullOrWhiteSpace(resolvedName) || flowTimeObject == null)
+        {
+            return;
+        }
+
+        FlowTimeObject updatedObject = await apiConnection.SendQueryAsync<FlowTimeObject>(FlowMutations.updateFlowTimeObject, new
+        {
+            timeobjId = flowTimeObject.Id,
+            name = resolvedName,
+            showInRequestModule = flowTimeObject.ShowInRequestModule
+        });
+        ReplaceFlowTimeObjectInCatalog(updatedObject);
+    }
+
+    private void ReplaceFlowTimeObjectInCatalog(FlowTimeObject updatedObject)
+    {
+        int objectIndex = flowTimeObjects.FindIndex(flowObject => flowObject.Id == updatedObject.Id);
+        if (objectIndex >= 0)
+        {
+            flowTimeObjects[objectIndex] = updatedObject;
+        }
     }
 
     private void UpdateCustomTimeObjectInCatalog(TimeObject updatedTimeObject)

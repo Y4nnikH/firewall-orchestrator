@@ -320,15 +320,15 @@
         {
             management_id = managementIds
         }) ?? [];
-        namingNetworkGroupManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomObjectCandidates, new
+        namingNetworkGroupManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomObjectNamingCandidates, new
         {
             management_id = managementIds
         }) ?? [];
-        namingServiceManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomServiceCandidates, new
+        namingServiceManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomServiceNamingCandidates, new
         {
             management_id = managementIds
         }) ?? [];
-        namingTimeManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomTimeObjectCandidates, new
+        namingTimeManagements = await apiConnection.SendQueryAsync<List<Management>>(FlowQueries.getFlowCustomTimeObjectNamingCandidates, new
         {
             management_id = managementIds
         }) ?? [];
