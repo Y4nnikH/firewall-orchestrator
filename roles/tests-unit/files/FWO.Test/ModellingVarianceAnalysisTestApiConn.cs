@@ -50,7 +50,8 @@ namespace FWO.Test
             Name = "NonModelledRule",
             Comment = "XXX3",
             Froms = [new(new(), NwObj1)],
-            RulebaseId = 3
+            RulebaseId = 3,
+            EnforcingGateways = [new() { Content = new() { Id = 3, Name = "Gateway3" } }]
         };
         static readonly Rule Rule4 = new()
         {
