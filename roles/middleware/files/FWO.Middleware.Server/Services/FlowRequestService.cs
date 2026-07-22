@@ -338,9 +338,7 @@ public sealed class FlowRequestService
         int ruleActionId = ResolveRuleActionId(rule.Action, ruleActionIds);
         FwoOwner? taskOwner = ResolveRuleOwner(rule.OwnerId, ownersById);
 
-        CreateRequestEntity? timeEntity = rule.TimeObjectId != 0 && entities.TryGetValue(rule.TimeObjectId, out CreateRequestEntity? matchedTime)
-            ? matchedTime
-            : null;
+        CreateRequestEntity? timeEntity = ResolveTimeObject(rule.TimeObjectId, entities);
 
         return new WfReqTask
         {
@@ -400,6 +398,25 @@ public sealed class FlowRequestService
     }
 
     /// <summary>
+    /// Resolves the referenced time object, if any.
+    /// </summary>
+    private static CreateRequestEntity? ResolveTimeObject(int timeObjectId, Dictionary<int, CreateRequestEntity> entities)
+    {
+        if (timeObjectId == 0)
+        {
+            return null;
+        }
+
+        CreateRequestEntity entity = GetEntity(entities, timeObjectId);
+        if (entity.Kind != CreateRequestEntityKind.TimeObject)
+        {
+            throw new ArgumentException($"Time object id {timeObjectId} must reference a time object.");
+        }
+
+        return entity;
+    }
+
+    /// <summary>
     /// Builds elements for rule references.
     /// </summary>
     private static IEnumerable<WfReqElement> BuildReferencedElements(IEnumerable<int> references, Dictionary<int, CreateRequestEntity> entities, ElemFieldType field)
@@ -416,41 +433,54 @@ public sealed class FlowRequestService
     private static WfReqElement BuildReferencedElement(int reference, Dictionary<int, CreateRequestEntity> entities, ElemFieldType field)
     {
         CreateRequestEntity entity = GetEntity(entities, reference);
-        return entity.Kind switch
+        if (field == ElemFieldType.service)
         {
-            CreateRequestEntityKind.AddressObject => new WfReqElement
+            return entity.Kind switch
             {
-                Field = field.ToString(),
-                RequestAction = RequestAction.create.ToString(),
-                Name = entity.DisplayName,
-                IpString = entity.IpStart,
-                IpEnd = entity.IpEnd
-            },
-            CreateRequestEntityKind.AddressGroup => new WfReqElement
+                CreateRequestEntityKind.ServiceObject => new WfReqElement
+                {
+                    Field = field.ToString(),
+                    RequestAction = RequestAction.create.ToString(),
+                    Name = entity.DisplayName,
+                    Port = entity.PortStart,
+                    PortEnd = entity.PortEnd,
+                    ProtoId = entity.ProtocolId
+                },
+                CreateRequestEntityKind.ServiceGroup => new WfReqElement
+                {
+                    Field = field.ToString(),
+                    RequestAction = RequestAction.create.ToString(),
+                    Name = entity.DisplayName,
+                    GroupName = entity.DisplayName,
+                },
+                _ => throw new ArgumentException($"Reference id {reference} is not valid for field '{field}'. The field requires a service object or service group.")
+            };
+        }
+
+        if (field == ElemFieldType.source || field == ElemFieldType.destination)
+        {
+            return entity.Kind switch
             {
-                Field = field.ToString(),
-                RequestAction = RequestAction.create.ToString(),
-                Name = entity.DisplayName,
-                GroupName = entity.DisplayName,
-            },
-            CreateRequestEntityKind.ServiceObject => new WfReqElement
-            {
-                Field = field.ToString(),
-                RequestAction = RequestAction.create.ToString(),
-                Name = entity.DisplayName,
-                Port = entity.PortStart,
-                PortEnd = entity.PortEnd,
-                ProtoId = entity.ProtocolId
-            },
-            CreateRequestEntityKind.ServiceGroup => new WfReqElement
-            {
-                Field = field.ToString(),
-                RequestAction = RequestAction.create.ToString(),
-                Name = entity.DisplayName,
-                GroupName = entity.DisplayName,
-            },
-            _ => throw new ArgumentException($"Reference id {reference} is not valid for field '{field}'.")
-        };
+                CreateRequestEntityKind.AddressObject => new WfReqElement
+                {
+                    Field = field.ToString(),
+                    RequestAction = RequestAction.create.ToString(),
+                    Name = entity.DisplayName,
+                    IpString = entity.IpStart,
+                    IpEnd = entity.IpEnd
+                },
+                CreateRequestEntityKind.AddressGroup => new WfReqElement
+                {
+                    Field = field.ToString(),
+                    RequestAction = RequestAction.create.ToString(),
+                    Name = entity.DisplayName,
+                    GroupName = entity.DisplayName,
+                },
+                _ => throw new ArgumentException($"Reference id {reference} is not valid for field '{field}'. The field requires an address object or address group.")
+            };
+        }
+
+        throw new ArgumentException($"Reference id {reference} is not valid for field '{field}'.");
     }
 
     /// <summary>

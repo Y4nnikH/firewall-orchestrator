@@ -908,6 +908,292 @@ internal class FlowRequestServiceTest
         });
     }
 
+    [Test]
+    public async Task CreateRequest_ReturnsBadRequestForUnknownTimeObjectId()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States = [new WfState { Id = 0, Name = "draft" }],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }]
+        };
+        FlowRequestController controller = new(new FlowRequestService(apiConnection, new GlobalConfig()));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim("x-hasura-user-id", "77"),
+                        new Claim(ClaimTypes.Name, "Trusted Requester"),
+                        new Claim("x-hasura-uuid", "uid=trusted,dc=fworch,dc=internal")
+                    ],
+                    "test"))
+            }
+        };
+
+        ActionResult<CreateRequestResponse> result = await controller.CreateRequest(new CreateRequestRequest
+        {
+            RequestorName = "Payload Requester",
+            RequestorId = "payload-requester",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Unknown time object request",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    SourceObjects = [-1],
+                    DestinationObjects = [-1],
+                    ServiceObjects = [-2],
+                    TimeObjectId = -99
+                }
+            ]
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Result, Is.TypeOf<BadRequestObjectResult>());
+            Assert.That(((BadRequestObjectResult)result.Result!).Value?.ToString(), Does.Contain("time object"));
+            Assert.That(apiConnection.LastTicketWriter, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task CreateRequest_ReturnsBadRequestForWrongKindTimeObjectId()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States = [new WfState { Id = 0, Name = "draft" }],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }]
+        };
+        FlowRequestController controller = new(new FlowRequestService(apiConnection, new GlobalConfig()));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim("x-hasura-user-id", "77"),
+                        new Claim(ClaimTypes.Name, "Trusted Requester"),
+                        new Claim("x-hasura-uuid", "uid=trusted,dc=fworch,dc=internal")
+                    ],
+                    "test"))
+            }
+        };
+
+        ActionResult<CreateRequestResponse> result = await controller.CreateRequest(new CreateRequestRequest
+        {
+            RequestorName = "Payload Requester",
+            RequestorId = "payload-requester",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Wrong kind time object request",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    SourceObjects = [-1],
+                    DestinationObjects = [-1],
+                    ServiceObjects = [-2],
+                    TimeObjectId = -1
+                }
+            ]
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Result, Is.TypeOf<BadRequestObjectResult>());
+            Assert.That(((BadRequestObjectResult)result.Result!).Value?.ToString(), Does.Contain("time object"));
+            Assert.That(apiConnection.LastTicketWriter, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task CreateRequest_ReturnsBadRequestForServiceObjectInSourceObjects()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States = [new WfState { Id = 0, Name = "draft" }],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }]
+        };
+        FlowRequestController controller = new(new FlowRequestService(apiConnection, new GlobalConfig()));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim("x-hasura-user-id", "77"),
+                        new Claim(ClaimTypes.Name, "Trusted Requester"),
+                        new Claim("x-hasura-uuid", "uid=trusted,dc=fworch,dc=internal")
+                    ],
+                    "test"))
+            }
+        };
+
+        ActionResult<CreateRequestResponse> result = await controller.CreateRequest(new CreateRequestRequest
+        {
+            RequestorName = "Payload Requester",
+            RequestorId = "payload-requester",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Wrong source kind request",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    SourceObjects = [-2],
+                    DestinationObjects = [-1],
+                    ServiceObjects = [-2]
+                }
+            ]
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Result, Is.TypeOf<BadRequestObjectResult>());
+            Assert.That(((BadRequestObjectResult)result.Result!).Value?.ToString(), Does.Contain("source"));
+            Assert.That(apiConnection.LastTicketWriter, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task CreateRequest_ReturnsBadRequestForAddressObjectInServiceObjects()
+    {
+        FlowRequestServiceApiConn apiConnection = new()
+        {
+            States = [new WfState { Id = 0, Name = "draft" }],
+            Protocols = [new IpProtocol { Id = 6, Name = "tcp" }]
+        };
+        FlowRequestController controller = new(new FlowRequestService(apiConnection, new GlobalConfig()));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim("x-hasura-user-id", "77"),
+                        new Claim(ClaimTypes.Name, "Trusted Requester"),
+                        new Claim("x-hasura-uuid", "uid=trusted,dc=fworch,dc=internal")
+                    ],
+                    "test"))
+            }
+        };
+
+        ActionResult<CreateRequestResponse> result = await controller.CreateRequest(new CreateRequestRequest
+        {
+            RequestorName = "Payload Requester",
+            RequestorId = "payload-requester",
+            RuleContactName = "Bob Approver",
+            RuleContactId = "bob",
+            Title = "Wrong service kind request",
+            AddressObjects =
+            [
+                new CreateRequestRequest.CreateAddressObjectRequest
+                {
+                    Id = "-1",
+                    Name = "app-server-1",
+                    IpStart = "192.0.2.10",
+                    IpEnd = "192.0.2.10"
+                }
+            ],
+            ServiceObjects =
+            [
+                new CreateRequestRequest.CreateServiceObjectRequest
+                {
+                    Id = "-2",
+                    Name = "https",
+                    Protocol = "tcp",
+                    PortStart = 443,
+                    PortEnd = 443
+                }
+            ],
+            Rules =
+            [
+                new CreateRequestRequest.CreateRequestRuleRequest
+                {
+                    Action = "accept",
+                    SourceObjects = [-1],
+                    DestinationObjects = [-1],
+                    ServiceObjects = [-1]
+                }
+            ]
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Result, Is.TypeOf<BadRequestObjectResult>());
+            Assert.That(((BadRequestObjectResult)result.Result!).Value?.ToString(), Does.Contain("service"));
+            Assert.That(apiConnection.LastTicketWriter, Is.Null);
+        });
+    }
+
     private static WfCommentDataHelper NewComment(string text, DateTime creationDate)
     {
         return new WfCommentDataHelper(new WfComment
