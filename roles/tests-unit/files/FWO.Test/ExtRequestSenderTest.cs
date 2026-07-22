@@ -1,4 +1,5 @@
 using FWO.Basics.Exceptions;
+using FWO.Config.Api;
 using FWO.Data;
 using FWO.ExternalSystems.Tufin.SecureChange;
 using FWO.Middleware.Server;
@@ -101,6 +102,44 @@ namespace FWO.Test
             ClassicAssert.IsTrue(apiConnection.UpdateExtRequestProcess[1].Contains("id = 5"));
             // Successful creates are now synced to the workflow immediately so the external ticket id/state is visible on the task.
             ClassicAssert.AreEqual(2, apiConnection.TriedToGetLdapsForHandleStateChange);
+        }
+
+        [Test]
+        public async Task SendDefaultRequest_SuccessfulCreateTriggersWorkflowSync()
+        {
+            ExtRequestSenderTestApiConn localApiConnection = new();
+            SimulatedSCClient simulatedSCClient = new(ticketSystem);
+            simulatedSCClient.EnqueueResponse("tickets.json", new(new())
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content = "{\"ticket\": {\"id\": 1, \"status\": \"In Progress\" } }"
+            });
+            simulatedSCClient.EnqueueResponse("tickets.json", new(new())
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content = "{\"ticket\": {\"id\": 2, \"status\": \"In Progress\" } }"
+            });
+
+            ExternalRequestSender sender = new(localApiConnection, globalConfig, simulatedSCClient);
+
+            await sender.Run();
+
+            ClassicAssert.AreEqual(2, localApiConnection.TriedToGetLdapsForHandleStateChange);
+        }
+
+        [Test]
+        public void BuildInternalCheckPointTicketNumber_UsesInternalTicketAndTaskReferences()
+        {
+            UserConfig userConfig = UserConfig.ForGlobalSettings(globalConfig, new ExtRequestSenderTestApiConn());
+            ExternalRequest request = new()
+            {
+                TicketId = 123,
+                TaskNumber = 4
+            };
+
+            string result = InvokePrivateStatic<string>("BuildInternalCheckPointTicketNumber", userConfig, request);
+
+            ClassicAssert.AreEqual("Internal (Ticket ID: 123, Task No.: 4)", result);
         }
 
         [Test]

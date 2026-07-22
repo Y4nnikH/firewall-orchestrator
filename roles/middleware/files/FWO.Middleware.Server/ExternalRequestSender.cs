@@ -223,7 +223,7 @@ namespace FWO.Middleware.Server
 
             if (response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Created)
             {
-                request.ExtTicketId = BuildInternalCheckPointTicketNumber(request);
+                request.ExtTicketId = BuildInternalCheckPointTicketNumber(userConfig, request);
                 request.ExtRequestState = ExtStates.ExtReqDone.ToString();
                 await UpdateRequestCreation(request);
 
@@ -261,7 +261,7 @@ namespace FWO.Middleware.Server
                 $"{response.StatusCode}: {response.Content}");
         }
 
-        private string BuildInternalCheckPointTicketNumber(ExternalRequest request)
+        private static string BuildInternalCheckPointTicketNumber(UserConfig userConfig, ExternalRequest request)
         {
             return $"{userConfig.GetText("Internal")} (Ticket ID: {request.TicketId}, Task No.: {request.TaskNumber})";
         }
