@@ -65,6 +65,20 @@ internal class ApplicationZonesControllerTest
     }
 
     [Test]
+    public void IpOnlyQueriesRequestOnlyIdentifiersAndAddressRanges()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(OwnerQueries.getApplicationIdsAndExternalIds, Does.Contain("app_id_external"));
+            Assert.That(OwnerQueries.getApplicationIdsAndExternalIds, Does.Not.Contain("owner_responsibles"));
+            Assert.That(ModellingQueries.getAppZoneIps, Does.Contain("app_id"));
+            Assert.That(ModellingQueries.getAppZoneIps, Does.Contain("ip_end"));
+            Assert.That(ModellingQueries.getAppZoneIps, Does.Not.Contain("import_source"));
+            Assert.That(ModellingQueries.getAppZoneIps, Does.Not.Contain("custom_type"));
+        });
+    }
+
+    [Test]
     public void ApplicationQuerySupportsPaging()
     {
         Assert.Multiple(() =>
@@ -154,6 +168,43 @@ internal class ApplicationZonesControllerTest
             Assert.That(response[2].Addresses[0].Ip, Is.EqualTo("10.3.0.1-10.3.0.9"));
             Assert.That(response[3].Addresses[0].Ip, Is.EqualTo("10.4.0.1"));
             Assert.That(response[3].Addresses[0].IpEnd, Is.EqualTo(string.Empty));
+        });
+    }
+
+    [Test]
+    public async Task GetReturnsOnlyExternalIdAndCompactAddressesForIpOnlyDetailsLevel()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((7, "Application 07", "APP-7"), (8, "Application 08", "APP-8")),
+            AllApplicationZones = new List<ModellingAppZone>
+            {
+                CreateApplicationZone(7, 70, "AZ-7A", "az-7a", "10.7.0.1/32", "10.7.0.1/32"),
+                CreateApplicationZone(7, 71, "AZ-7B", "az-7b", "10.7.0.2", "10.7.0.9"),
+                CreateApplicationZone(8, 80, "AZ-8", "az-8", "10.8.0.0/24", "10.8.0.255/24")
+            }
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = new() { Options = new() { DetailsLevel = "ip-only" } };
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(request);
+
+        List<ApplicationZoneIpOnlyResponse> response = (List<ApplicationZoneIpOnlyResponse>)((OkObjectResult)result.Result!).Value!;
+        string json = JsonSerializer.Serialize(response);
+        Assert.Multiple(() =>
+        {
+            Assert.That(apiConnection.Queries, Is.EqualTo(new List<string>
+            {
+                OwnerQueries.getApplicationIdsAndExternalIds,
+                ModellingQueries.getAppZoneIps
+            }));
+            Assert.That(response[0].AppIdExternal, Is.EqualTo("APP-7"));
+            Assert.That(response[0].Addresses, Is.EqualTo(new List<string> { "10.7.0.1", "10.7.0.2-10.7.0.9" }));
+            Assert.That(response[1].AppIdExternal, Is.EqualTo("APP-8"));
+            Assert.That(response[1].Addresses, Is.EqualTo(new List<string> { "10.8.0.0/24" }));
+            Assert.That(json, Does.Not.Contain("applicationId"));
+            Assert.That(json, Does.Not.Contain("applicationName"));
+            Assert.That(json, Does.Not.Contain("ipStart"));
         });
     }
 
@@ -248,7 +299,18 @@ internal class ApplicationZonesControllerTest
             Assert.That(request.Options.Limit, Is.Null);
             Assert.That(request.Options.Offset, Is.Null);
             Assert.That(request.Options.ShowOnlyActiveState, Is.Null);
+            Assert.That(request.Options.DetailsLevel, Is.EqualTo("full"));
         });
+    }
+
+    [Test]
+    public void RequestDeserializesIpOnlyDetailsLevel()
+    {
+        const string Json = """{"options":{"details-level":"ip-only"}}""";
+
+        GetApplicationZonesRequest? request = JsonSerializer.Deserialize<GetApplicationZonesRequest>(Json);
+
+        Assert.That(request?.Options?.DetailsLevel, Is.EqualTo("ip-only"));
     }
 
     [Test]
@@ -276,6 +338,7 @@ internal class ApplicationZonesControllerTest
                     Name = "badname",
                     IdString = new string('a', GetMaxFilterTextLength() + 1)
                 },
+                DetailsLevel = "summary",
                 Limit = 0,
                 Offset = -1
             }
@@ -292,6 +355,7 @@ internal class ApplicationZonesControllerTest
             Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.id"));
             Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.name"));
             Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.idString"));
+            Assert.That(validationProblem.Errors.Keys, Does.Contain("options.details-level"));
             Assert.That(validationProblem.Errors.Keys, Does.Contain("options.limit"));
             Assert.That(validationProblem.Errors.Keys, Does.Contain("options.offset"));
         });
@@ -870,7 +934,17 @@ internal class ApplicationZonesControllerTest
                 LastApplicationVariables = variables;
                 return Task.FromResult((QueryResponseType)(object)GetMatchingOwners(variables));
             }
+            if (query == OwnerQueries.getApplicationIdsAndExternalIds)
+            {
+                LastApplicationVariables = variables;
+                return Task.FromResult((QueryResponseType)(object)GetMatchingOwners(variables));
+            }
             if (query == ModellingQueries.getAppZones)
+            {
+                LastApplicationZoneVariables = variables;
+                return Task.FromResult((QueryResponseType)(object)GetMatchingApplicationZones(variables));
+            }
+            if (query == ModellingQueries.getAppZoneIps)
             {
                 LastApplicationZoneVariables = variables;
                 return Task.FromResult((QueryResponseType)(object)GetMatchingApplicationZones(variables));

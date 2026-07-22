@@ -58,6 +58,24 @@ public sealed class ApplicationZoneResponse
 }
 
 /// <summary>
+/// Represents the compact application address response returned when <c>details-level</c> is <c>ip-only</c>.
+/// </summary>
+public sealed class ApplicationZoneIpOnlyResponse
+{
+    /// <summary>
+    /// Gets or sets the optional external identifier of the application.
+    /// </summary>
+    [JsonPropertyName("appIdExternal")]
+    public string? AppIdExternal { get; set; }
+
+    /// <summary>
+    /// Gets or sets every compact address assigned to the application.
+    /// </summary>
+    [JsonPropertyName("addresses")]
+    public List<string> Addresses { get; set; } = [];
+}
+
+/// <summary>
 /// Represents one address in an application-zone object.
 /// </summary>
 public sealed class ApplicationZoneAddressResponse

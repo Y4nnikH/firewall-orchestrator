@@ -24,9 +24,11 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
 {
     internal const int kMaxFilterTextLength = 256;
     internal const int kMaxLimit = 1000;
+    private const string kDetailsLevelFull = "full";
+    private const string kDetailsLevelIpOnly = "ip-only";
 
     /// <summary>
-    /// Returns complete application-zone objects, including all addresses, for visible applications.
+    /// Returns application-zone objects for visible applications.
     /// </summary>
     /// <remarks>
     /// Requires the <c>admin</c>, <c>auditor</c>, or <c>modeller</c> role. A caller with only the modeller role
@@ -39,7 +41,9 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     /// placeholder returned for applications that have no application zone.
     /// Applications with an inactive lifecycle state are excluded unless <c>options.showOnlyActiveState</c> is set to
     /// <c>false</c>. Applications are ordered by name, so <c>options.limit</c> and <c>options.offset</c> page the
-    /// result deterministically; without a limit every matching application is returned.
+    /// result deterministically; without a limit every matching application is returned. The
+    /// <c>options.details-level</c> key defaults to <c>full</c>; set it to <c>ip-only</c> to return only each
+    /// application's <c>appIdExternal</c> and compact IP address list.
     /// </remarks>
     [HttpPost("getApplicationZones")]
     [Consumes("application/json")]
@@ -66,7 +70,12 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         {
             GetApplicationZonesOptions options = effectiveRequest.Options!;
             List<FwoOwner> applications = await GetApplicationsAsync(options);
-            return Ok(await GetApplicationZonesAsync(applications, options.Filter));
+            List<ModellingAppZone> zones = await GetApplicationZonesAsync(applications, options.Filter, options.DetailsLevel);
+            if (options.DetailsLevel == kDetailsLevelIpOnly)
+            {
+                return Ok(BuildIpOnlyResponses(applications, zones));
+            }
+            return Ok(BuildResponses(applications, zones, ApplicationZoneQueryBuilder.HasZoneFilter(options.Filter)));
         }
         catch (Exception exception)
         {
@@ -88,6 +97,7 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         }
 
         ValidateFilter(request.Options.Filter, errors);
+        ValidateDetailsLevel(request.Options.DetailsLevel, errors);
         ValidateLimit(request.Options.Limit, errors);
         ValidateOffset(request.Options.Offset, errors);
         return errors;
@@ -137,6 +147,14 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         ValidateFilterText(filter.IdString, "options.filter.idString", errors);
     }
 
+    private static void ValidateDetailsLevel(string? detailsLevel, Dictionary<string, string[]> errors)
+    {
+        if (detailsLevel is not (kDetailsLevelFull or kDetailsLevelIpOnly))
+        {
+            AddError(errors, "options.details-level", "options.details-level must be either 'full' or 'ip-only'.");
+        }
+    }
+
     private static void ValidatePositiveValue(long? value, string fieldName, Dictionary<string, string[]> errors)
     {
         if (value is <= 0)
@@ -180,12 +198,14 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     private async Task<List<FwoOwner>> GetApplicationsAsync(GetApplicationZonesOptions options)
     {
         return await apiConnection.SendQueryAsync<List<FwoOwner>>(
-            OwnerQueries.getOwnersFiltered,
+            options.DetailsLevel == kDetailsLevelIpOnly
+                ? OwnerQueries.getApplicationIdsAndExternalIds
+                : OwnerQueries.getOwnersFiltered,
             ApplicationZoneQueryBuilder.BuildApplicationVariables(options, User)) ?? [];
     }
 
-    private async Task<List<ApplicationZoneResponse>> GetApplicationZonesAsync(
-        List<FwoOwner> applications, ApplicationZoneFilter? filter)
+    private async Task<List<ModellingAppZone>> GetApplicationZonesAsync(
+        List<FwoOwner> applications, ApplicationZoneFilter? filter, string detailsLevel)
     {
         // Deleted application zones are never returned, so an explicit request for them stays empty.
         if (applications.Count == 0 || filter?.IsDeleted == true)
@@ -195,9 +215,9 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
 
         List<int> applicationIds = applications.Select(application => application.Id).ToList();
         List<ModellingAppZone> zones = await apiConnection.SendQueryAsync<List<ModellingAppZone>>(
-            ModellingQueries.getAppZones,
+            detailsLevel == kDetailsLevelIpOnly ? ModellingQueries.getAppZoneIps : ModellingQueries.getAppZones,
             ApplicationZoneQueryBuilder.BuildApplicationZoneVariables(applicationIds, filter)) ?? [];
-        return BuildResponses(applications, zones, ApplicationZoneQueryBuilder.HasZoneFilter(filter));
+        return zones;
     }
 
     private static List<ApplicationZoneResponse> BuildResponses(
@@ -219,6 +239,31 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
             {
                 responses.Add(CreatePlaceholder(application));
             }
+        }
+        return responses;
+    }
+
+    private static List<ApplicationZoneIpOnlyResponse> BuildIpOnlyResponses(
+        List<FwoOwner> applications, List<ModellingAppZone> zones)
+    {
+        Dictionary<int, List<ModellingAppZone>> zonesByApplicationId = zones
+            .Where(zone => zone.AppId is not null)
+            .GroupBy(zone => zone.AppId!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        List<ApplicationZoneIpOnlyResponse> responses = [];
+
+        foreach (FwoOwner application in applications)
+        {
+            List<string> addresses = zonesByApplicationId.TryGetValue(application.Id, out List<ModellingAppZone>? applicationZones)
+                ? applicationZones.SelectMany(zone => zone.AppServers)
+                    .Select(appServer => IpOperations.ToCompactNotation(appServer.Content.Ip, appServer.Content.IpEnd))
+                    .ToList()
+                : [];
+            responses.Add(new ApplicationZoneIpOnlyResponse
+            {
+                AppIdExternal = application.ExtAppId,
+                Addresses = addresses
+            });
         }
         return responses;
     }

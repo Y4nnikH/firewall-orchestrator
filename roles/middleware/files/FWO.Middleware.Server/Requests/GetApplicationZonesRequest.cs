@@ -22,6 +22,14 @@ public sealed class GetApplicationZonesRequest
 public sealed class GetApplicationZonesOptions
 {
     /// <summary>
+    /// Gets or sets the level of detail returned for every application. This defaults to <c>full</c>, which returns
+    /// the complete application-zone response. Set it to <c>ip-only</c> to return only the external application id
+    /// and compact IP addresses for each application.
+    /// </summary>
+    [JsonPropertyName("details-level")]
+    public string DetailsLevel { get; set; } = "full";
+
+    /// <summary>
     /// Gets or sets the optional response filter. Null or omitted filter fields do not restrict the result.
     /// </summary>
     [JsonPropertyName("filter")]
