@@ -111,7 +111,8 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
             {
                 Id = appServer.Content.Id,
                 Name = appServer.Content.Name,
-                Ip = appServer.Content.Ip,
+                Ip = IpOperations.ToCompactNotation(appServer.Content.Ip, appServer.Content.IpEnd),
+                IpStart = appServer.Content.Ip,
                 IpEnd = appServer.Content.IpEnd,
                 ImportSource = appServer.Content.ImportSource,
                 IsDeleted = appServer.Content.IsDeleted,

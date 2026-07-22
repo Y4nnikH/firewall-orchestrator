@@ -117,10 +117,43 @@ internal class ApplicationZonesControllerTest
             Assert.That(response[0].ApplicationId, Is.EqualTo(7));
             Assert.That(response[0].ApplicationName, Is.EqualTo("Application 07"));
             Assert.That(response[0].AppIdExternal, Is.EqualTo("APP-7"));
-            Assert.That(response[0].Addresses[0].Ip, Is.EqualTo("10.7.0.1"));
+            Assert.That(response[0].Addresses[0].Ip, Is.EqualTo("10.7.0.1-10.7.0.9"));
+            Assert.That(response[0].Addresses[0].IpStart, Is.EqualTo("10.7.0.1"));
             Assert.That(response[0].Addresses[0].IpEnd, Is.EqualTo("10.7.0.9"));
             Assert.That(response[0].Addresses[0].ImportSource, Is.EqualTo("manual"));
             Assert.That(response[0].Addresses[0].CustomType, Is.EqualTo(4));
+        });
+    }
+
+    [Test]
+    public async Task GetReturnsCompactIpNotation()
+    {
+        ApplicationZonesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((1, "Application 01", "APP-1"), (2, "Application 02", "APP-2"),
+                (3, "Application 03", "APP-3"), (4, "Application 04", "APP-4")),
+            AllApplicationZones = new List<ModellingAppZone>
+            {
+                CreateApplicationZone(1, 10, "AZ-1", "az-1", "10.1.0.1/32", "10.1.0.1/32"),
+                CreateApplicationZone(2, 20, "AZ-2", "az-2", "10.2.0.0/24", "10.2.0.255/24"),
+                CreateApplicationZone(3, 30, "AZ-3", "az-3", "10.3.0.1/32", "10.3.0.9/32"),
+                CreateApplicationZone(4, 40, "AZ-4", "az-4", "10.4.0.1/32", string.Empty)
+            }
+        };
+        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+
+        ActionResult<List<ApplicationZoneResponse>> result = await controller.Get(new GetApplicationZonesRequest());
+
+        OkObjectResult okResult = (OkObjectResult)result.Result!;
+        List<ApplicationZoneResponse> response = (List<ApplicationZoneResponse>)okResult.Value!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(response[0].Addresses[0].Ip, Is.EqualTo("10.1.0.1"));
+            Assert.That(response[0].Addresses[0].IpStart, Is.EqualTo("10.1.0.1/32"));
+            Assert.That(response[1].Addresses[0].Ip, Is.EqualTo("10.2.0.0/24"));
+            Assert.That(response[2].Addresses[0].Ip, Is.EqualTo("10.3.0.1-10.3.0.9"));
+            Assert.That(response[3].Addresses[0].Ip, Is.EqualTo("10.4.0.1"));
+            Assert.That(response[3].Addresses[0].IpEnd, Is.EqualTo(string.Empty));
         });
     }
 

@@ -537,5 +537,42 @@ namespace FWO.Test
             Assert.AreEqual("2001:db8::2", intersection!.Begin.ToString());
             Assert.AreEqual("2001:db8::2", intersection.End.ToString());
         }
+        [Test]
+        public void ToCompactNotation_SingleAddress_ReturnsIpWithoutMask()
+        {
+            Assert.AreEqual("10.1.0.1", IpOperations.ToCompactNotation("10.1.0.1/32", "10.1.0.1/32"));
+            Assert.AreEqual("10.1.0.1", IpOperations.ToCompactNotation("10.1.0.1", "10.1.0.1"));
+            Assert.AreEqual("10.1.0.1", IpOperations.ToCompactNotation("10.1.0.1/32", ""));
+        }
+
+        [Test]
+        public void ToCompactNotation_Subnet_ReturnsCidr()
+        {
+            Assert.AreEqual("10.2.0.0/24", IpOperations.ToCompactNotation("10.2.0.0/24", "10.2.0.255/24"));
+            Assert.AreEqual("10.2.0.0/31", IpOperations.ToCompactNotation("10.2.0.0", "10.2.0.1"));
+            Assert.AreEqual("0.0.0.0/0", IpOperations.ToCompactNotation("0.0.0.0", "255.255.255.255"));
+        }
+
+        [Test]
+        public void ToCompactNotation_Range_ReturnsStartAndEndWithoutMask()
+        {
+            Assert.AreEqual("10.3.0.1-10.3.0.9", IpOperations.ToCompactNotation("10.3.0.1/32", "10.3.0.9/32"));
+            Assert.AreEqual("10.3.0.1-10.3.1.0", IpOperations.ToCompactNotation("10.3.0.1", "10.3.1.0"));
+        }
+
+        [Test]
+        public void ToCompactNotation_IPv6_ReturnsCompactNotation()
+        {
+            Assert.AreEqual("2001:db8::1", IpOperations.ToCompactNotation("2001:db8::1/128", "2001:db8::1/128"));
+            Assert.AreEqual("2001:db8::/120", IpOperations.ToCompactNotation("2001:db8::", "2001:db8::ff"));
+            Assert.AreEqual("2001:db8::1-2001:db8::9", IpOperations.ToCompactNotation("2001:db8::1", "2001:db8::9"));
+        }
+
+        [Test]
+        public void ToCompactNotation_InvalidOrMixedInput_ReturnsStartUnchanged()
+        {
+            Assert.AreEqual("not-an-ip", IpOperations.ToCompactNotation("not-an-ip", "10.0.0.1"));
+            Assert.AreEqual("10.0.0.1", IpOperations.ToCompactNotation("10.0.0.1", "2001:db8::1"));
+        }
     }
 }

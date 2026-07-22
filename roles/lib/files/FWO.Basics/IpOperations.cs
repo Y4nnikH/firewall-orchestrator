@@ -304,6 +304,56 @@ namespace FWO.Basics
         }
 
         /// <summary>
+        /// Converts start and end addresses to the shortest matching notation: a plain IP for a single address,
+        /// CIDR notation when the range spans exactly one network, and <c>start-end</c> for any other range.
+        /// </summary>
+        /// <param name="startIp">The first address of the range, with or without netmask.</param>
+        /// <param name="endIp">The last address of the range, with or without netmask. May be empty for a single address.</param>
+        /// <returns>The compact notation, or the unchanged <paramref name="startIp"/> when the input is not parsable.</returns>
+        public static string ToCompactNotation(string startIp, string endIp)
+        {
+            string start = startIp.StripOffNetmask();
+            string end = string.IsNullOrEmpty(endIp) ? start : endIp.StripOffNetmask();
+
+            if (!IPAddress.TryParse(start, out IPAddress? startAddress)
+                || !IPAddress.TryParse(end, out IPAddress? endAddress)
+                || startAddress.AddressFamily != endAddress.AddressFamily)
+            {
+                return startIp;
+            }
+
+            if (startAddress.Equals(endAddress))
+            {
+                return startAddress.ToString();
+            }
+
+            return TryGetPrefixLength(startAddress, endAddress, out int prefixLength)
+                ? $"{startAddress}/{prefixLength}"
+                : $"{startAddress}-{endAddress}";
+        }
+
+        // Determines the prefix length of the network spanned by start and end, if any.
+        private static bool TryGetPrefixLength(IPAddress start, IPAddress end, out int prefixLength)
+        {
+            byte[] addressBytes = start.GetAddressBytes();
+            int maxPrefixLength = addressBytes.Length * 8;
+
+            for (int currentLength = 0; currentLength <= maxPrefixLength; currentLength++)
+            {
+                byte[] bitMask = Bits.GetBitMask(addressBytes.Length, currentLength);
+                if (new IPAddress(Bits.And(addressBytes, bitMask)).Equals(start)
+                    && new IPAddress(Bits.Or(addressBytes, Bits.Not(bitMask))).Equals(end))
+                {
+                    prefixLength = currentLength;
+                    return true;
+                }
+            }
+
+            prefixLength = 0;
+            return false;
+        }
+
+        /// <summary>
         /// Converts start and end addresses to dotted mask notation for the matching network.
         /// </summary>
         public static string ToDotNotation(string startIp, string endIp)

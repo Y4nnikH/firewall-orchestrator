@@ -75,10 +75,17 @@ public sealed class ApplicationZoneAddressResponse
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the first IP address or network range value.
+    /// Gets or sets the compact notation of the address: a plain IP when start and end are equal, CIDR notation
+    /// when start and end span exactly one network, and <c>ipStart-ipEnd</c> for any other range.
     /// </summary>
     [JsonPropertyName("ip")]
     public string Ip { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the first IP address or network range value.
+    /// </summary>
+    [JsonPropertyName("ipStart")]
+    public string IpStart { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the optional last IP address of an IP range.
