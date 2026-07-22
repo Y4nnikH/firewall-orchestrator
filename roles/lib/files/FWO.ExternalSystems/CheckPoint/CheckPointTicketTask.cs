@@ -16,6 +16,9 @@ namespace FWO.ExternalSystems.CheckPoint
         public CheckPointTicketTask(WfReqTask reqTask, List<IpProtocol> ipProtos, ModellingNamingConvention? namingConvention) : base(reqTask, ipProtos, namingConvention)
         { }
 
+        private const string kCheckPointNameSlash = "/";
+        private const string kCheckPointNameSlashReplacement = "_";
+
         public override void FillTaskText(ExternalTicketTemplate template)
         {
             ExtMgtData extMgt = new();
@@ -184,7 +187,7 @@ namespace FWO.ExternalSystems.CheckPoint
 
         private static string ToCheckPointObjectName(string? name)
         {
-            return (name ?? "").Replace("/", "_");
+            return (name ?? "").Replace(kCheckPointNameSlash, kCheckPointNameSlashReplacement);
         }
 
         private static bool IsNetworkMember(WfReqElement element)

@@ -227,7 +227,6 @@ namespace FWO.ExternalSystems.CheckPoint
             {
                 EnsureExecutionPlanLoaded();
                 RestResponse<int> response = await ExecuteAllSteps();
-                TicketId = checkPointClient.CurrentSessionId;
 
                 if (!IsSynchronousSuccess(response))
                 {

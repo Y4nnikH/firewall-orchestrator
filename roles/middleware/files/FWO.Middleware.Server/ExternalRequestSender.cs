@@ -223,7 +223,7 @@ namespace FWO.Middleware.Server
 
             if (response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Created)
             {
-                request.ExtTicketId = ticket.TicketId;
+                request.ExtTicketId = BuildInternalCheckPointTicketNumber(request);
                 request.ExtRequestState = ExtStates.ExtReqDone.ToString();
                 await UpdateRequestCreation(request);
 
@@ -259,6 +259,11 @@ namespace FWO.Middleware.Server
             throw new ProcessingFailedException(
                 $"CheckPoint external request failed for {RequestInfo(request)} with status {(int)response.StatusCode} " +
                 $"{response.StatusCode}: {response.Content}");
+        }
+
+        private string BuildInternalCheckPointTicketNumber(ExternalRequest request)
+        {
+            return $"{userConfig.GetText("Internal")} (Ticket ID: {request.TicketId}, Task No.: {request.TaskNumber})";
         }
 
         private async Task<ExternalTicket> ConstructTicket(ExternalRequest request)
