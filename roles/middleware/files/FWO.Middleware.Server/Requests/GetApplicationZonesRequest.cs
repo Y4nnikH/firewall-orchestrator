@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace FWO.Middleware.Server.Requests;
 
 /// <summary>
-/// Represents a request for application-zone objects.
+/// Represents a request for application addresses.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed class GetApplicationZonesRequest
@@ -16,24 +16,16 @@ public sealed class GetApplicationZonesRequest
 }
 
 /// <summary>
-/// Represents optional application-zone response options.
+/// Represents optional application-address response options.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed class GetApplicationZonesOptions
 {
     /// <summary>
-    /// Gets or sets the level of detail returned for every application. This defaults to <c>full</c>, which returns
-    /// the complete application-zone response. Set it to <c>ip-only</c> to return only the external application id
-    /// and compact IP addresses for each application. A null value has the same behavior as the default.
-    /// </summary>
-    [JsonPropertyName("details-level")]
-    public string? DetailsLevel { get; set; } = "full";
-
-    /// <summary>
     /// Gets or sets the optional response filter. Null or omitted filter fields do not restrict the result.
     /// </summary>
     [JsonPropertyName("filter")]
-    public ApplicationZoneFilter? Filter { get; set; }
+    public ApplicationAddressFilter? Filter { get; set; }
 
     /// <summary>
     /// Gets or sets whether applications with an inactive lifecycle state are excluded. This defaults to
@@ -59,58 +51,29 @@ public sealed class GetApplicationZonesOptions
 }
 
 /// <summary>
-/// Represents nullable filters for every top-level application-zone response field. Application fields select
-/// applications before zones are loaded. Zone fields apply only to concrete zones, so they exclude placeholders for
-/// applications without a zone. Deleted zones and member addresses are excluded by default. String filters are
-/// case-insensitive and support <c>*</c> for any character sequence and <c>?</c> for one character; plain text
-/// without wildcards is matched as a contains search, matching the owner endpoint.
+/// Represents nullable multi-value filters for every top-level application response field. Values of the same field
+/// are OR-connected; filters for different fields are AND-connected. Empty or omitted lists do not restrict the
+/// result. String filters are case-insensitive and support <c>*</c> for any character sequence and <c>?</c> for one
+/// character; plain text without wildcards is matched as a contains search, matching the owner endpoint.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed class ApplicationZoneFilter
+public sealed class ApplicationAddressFilter
 {
     /// <summary>
-    /// Gets or sets the optional application id filter. This selects the matching visible application, including one
-    /// without an application-zone.
+    /// Gets or sets the optional application id filters.
     /// </summary>
     [JsonPropertyName("applicationId")]
-    public int? ApplicationId { get; set; }
+    public List<int>? ApplicationId { get; set; }
 
     /// <summary>
-    /// Gets or sets the optional case-insensitive application name filter with <c>*</c> and <c>?</c> wildcards.
-    /// This selects matching visible applications, including applications without an application-zone.
+    /// Gets or sets the optional case-insensitive application name filters with <c>*</c> and <c>?</c> wildcards.
     /// </summary>
     [JsonPropertyName("applicationName")]
-    public string? ApplicationName { get; set; }
+    public List<string>? ApplicationName { get; set; }
 
     /// <summary>
-    /// Gets or sets the optional case-insensitive external application-id filter with <c>*</c> and <c>?</c> wildcards.
-    /// This selects matching visible applications, including applications without an application-zone.
+    /// Gets or sets the optional case-insensitive external application-id filters with <c>*</c> and <c>?</c> wildcards.
     /// </summary>
     [JsonPropertyName("appIdExternal")]
-    public string? AppIdExternal { get; set; }
-
-    /// <summary>
-    /// Gets or sets the optional application-zone database id filter.
-    /// </summary>
-    [JsonPropertyName("id")]
-    public long? Id { get; set; }
-
-    /// <summary>
-    /// Gets or sets the optional case-insensitive application-zone name filter with <c>*</c> and <c>?</c> wildcards.
-    /// </summary>
-    [JsonPropertyName("name")]
-    public string? Name { get; set; }
-
-    /// <summary>
-    /// Gets or sets the optional case-insensitive application-zone identifier filter with <c>*</c> and <c>?</c> wildcards.
-    /// </summary>
-    [JsonPropertyName("idString")]
-    public string? IdString { get; set; }
-
-    /// <summary>
-    /// Gets or sets the optional deleted-state filter for concrete zones. Deleted zones are excluded from this
-    /// endpoint, so <c>true</c> returns no results and <c>false</c> excludes applications without a zone.
-    /// </summary>
-    [JsonPropertyName("isDeleted")]
-    public bool? IsDeleted { get; set; }
+    public List<string>? AppIdExternal { get; set; }
 }
