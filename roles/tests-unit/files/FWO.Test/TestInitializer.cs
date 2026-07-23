@@ -25,7 +25,6 @@ namespace FWO.Test
 
         private FakeLocalTimeZone? fakeLocalTimeZone;
         private string? testConfigFilePath;
-        private bool mainKeyFileSet;
         private bool logLockDirSet;
 
         [OneTimeSetUp]
@@ -33,7 +32,6 @@ namespace FWO.Test
         {
             SetLogLockDirectory();
             SetConfigFilePath();
-            SetMainKeyFile();
             SetGermanCultureOnAllUnitTest();
             SetGermanTimeZoneOnAllUnitTest();
             SetQueryBasePath();
@@ -47,15 +45,6 @@ namespace FWO.Test
             if (testConfigFilePath != null)
             {
                 Environment.SetEnvironmentVariable(kConfigFilePathEnvVar, null);
-                if (File.Exists(testConfigFilePath))
-                {
-                    File.Delete(testConfigFilePath);
-                }
-            }
-
-            if (mainKeyFileSet && File.Exists(GlobalConst.kMainKeyFile))
-            {
-                File.Delete(GlobalConst.kMainKeyFile);
             }
 
             if (logLockDirSet)
@@ -96,19 +85,6 @@ namespace FWO.Test
             File.WriteAllText(testConfigFilePath, kTestConfigFileContent);
             Environment.SetEnvironmentVariable(kConfigFilePathEnvVar, testConfigFilePath);
         }
-
-        private void SetMainKeyFile()
-        {
-            if (File.Exists(GlobalConst.kMainKeyFile))
-            {
-                return;
-            }
-
-            Directory.CreateDirectory(Path.GetDirectoryName(GlobalConst.kMainKeyFile)!);
-            File.WriteAllText(GlobalConst.kMainKeyFile, "0123456789ABCDEF0123456789ABCDEF");
-            mainKeyFileSet = true;
-        }
-
 
         public static void SetGermanCultureOnAllUnitTest()
         {

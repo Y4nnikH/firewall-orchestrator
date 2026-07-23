@@ -239,9 +239,17 @@ namespace FWO.Test
                 SearchUserPwd = kSearchPassword
             };
 
-            List<string> groups = await ldap.GetGroups(kSingleResolvedUserDns);
+            List<string> groups = [];
+            bool collected = await InvokePrivateAsync<bool>(
+                ldap,
+                "SearchAndCollectMemberships",
+                client,
+                kGroupSearchPath,
+                kSingleResolvedUserDns,
+                groups);
 
             Assert.That(groups, Is.EqualTo(kAppOwnerCn));
+            Assert.That(collected, Is.True);
             Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
         }
 
@@ -263,9 +271,17 @@ namespace FWO.Test
                 SearchUserPwd = kSearchPassword
             };
 
-            List<string> groups = await ldap.GetGroups(kEscapedCommaUserDnsList);
+            List<string> groups = [];
+            bool collected = await InvokePrivateAsync<bool>(
+                ldap,
+                "SearchAndCollectMemberships",
+                client,
+                kGroupSearchPath,
+                kEscapedCommaUserDnsList,
+                groups);
 
             Assert.That(groups, Is.EqualTo(kEscapedGroupCn));
+            Assert.That(collected, Is.True);
             Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
         }
 
@@ -287,9 +303,17 @@ namespace FWO.Test
                 SearchUserPwd = kSearchPassword
             };
 
-            List<string> roles = await ldap.GetRoles(kSingleResolvedUserDns);
+            List<string> roles = [];
+            bool collected = await InvokePrivateAsync<bool>(
+                ldap,
+                "SearchAndCollectMemberships",
+                client,
+                "ou=roles,dc=example,dc=com",
+                kSingleResolvedUserDns,
+                roles);
 
             Assert.That(roles, Is.EqualTo(kAppOwnerCn));
+            Assert.That(collected, Is.True);
             Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
         }
 
@@ -307,9 +331,17 @@ namespace FWO.Test
                 SearchUserPwd = kSearchPassword
             };
 
-            List<string> roles = await ldap.GetRoles(kSingleResolvedUserDns);
+            List<string> roles = [];
+            bool collected = await InvokePrivateAsync<bool>(
+                ldap,
+                "SearchAndCollectMemberships",
+                client,
+                "ou=roles,dc=example,dc=com",
+                kSingleResolvedUserDns,
+                roles);
 
             Assert.That(roles, Is.Empty);
+            Assert.That(collected, Is.True);
             Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
         }
 
@@ -327,7 +359,16 @@ namespace FWO.Test
                 SearchUserPwd = kSearchPassword
             };
 
-            List<string> groups = await ldap.GetGroups(kSingleResolvedUserDns);
+            List<string> groups = [];
+
+            Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await InvokePrivateAsync<bool>(
+                    ldap,
+                    "SearchAndCollectMemberships",
+                    client,
+                    kGroupSearchPath,
+                    kSingleResolvedUserDns,
+                    groups));
 
             Assert.That(groups, Is.Empty);
             Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
@@ -494,9 +535,36 @@ namespace FWO.Test
 
         private static T InvokePrivate<T>(object instance, string methodName, params object?[] parameters)
         {
-            MethodInfo method = instance.GetType().GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance)
+            MethodInfo method = FindPrivateInstanceMethod(instance.GetType(), methodName)
                 ?? throw new MissingMethodException(instance.GetType().FullName, methodName);
             return (T)method.Invoke(instance, parameters)!;
+        }
+
+        private static async Task<T> InvokePrivateAsync<T>(object instance, string methodName, params object?[] parameters)
+        {
+            MethodInfo method = FindPrivateInstanceMethod(instance.GetType(), methodName)
+                ?? throw new MissingMethodException(instance.GetType().FullName, methodName);
+            object? result = method.Invoke(instance, parameters);
+            if (result is Task<T> typedTask)
+            {
+                return await typedTask;
+            }
+
+            throw new InvalidOperationException($"Unexpected task type for {methodName}.");
+        }
+
+        private static MethodInfo? FindPrivateInstanceMethod(Type type, string methodName)
+        {
+            for (Type? currentType = type; currentType != null; currentType = currentType.BaseType)
+            {
+                MethodInfo? method = currentType.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                if (method != null)
+                {
+                    return method;
+                }
+            }
+
+            return null;
         }
     }
 }

@@ -12,9 +12,11 @@ namespace FWO.Test
 {
     internal static class LdapTestSupport
     {
+        private const string kTestMainKey = "0123456789ABCDEF0123456789ABCDEF";
+
         public static string CreateEncryptedSecret(string secret)
         {
-            return AesEnc.Encrypt(secret, AesEnc.GetMainKey());
+            return AesEnc.Encrypt(secret, kTestMainKey);
         }
 
         public static LdapEntry CreateEntry(string dn, params LdapAttribute[] attributes)
