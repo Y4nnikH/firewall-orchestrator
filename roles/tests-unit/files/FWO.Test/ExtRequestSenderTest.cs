@@ -190,6 +190,49 @@ namespace FWO.Test
             ClassicAssert.AreEqual(expected, rejected);
         }
 
+        [TestCase("{\"ticket\": {\"id\": 4711, \"status\": \"In Progress\" } }", "4711")]
+        [TestCase("{\"id\": 4712}", "4712")]
+        [TestCase(null, null)]
+        [TestCase("", null)]
+        [TestCase("{}", null)]
+        [TestCase("not-json", null)]
+        public void ExtractExternalTicketIdFromBody_ReturnsTicketIdWhenPresent(string? content, string? expectedId)
+        {
+            string? ticketId = InvokePrivateStatic<string?>("ExtractExternalTicketIdFromBody", content);
+
+            ClassicAssert.AreEqual(expectedId, ticketId);
+        }
+
+        [Test]
+        public void ExtractExternalTicketId_FallsBackToLocationHeader()
+        {
+            RestResponse<int> response = new(new())
+            {
+                Content = "{}",
+                Headers =
+                [
+                    new HeaderParameter("location", "https://tufin.example/securechangeworkflow/api/securechange/tickets/4713")
+                ]
+            };
+
+            string? ticketId = InvokePrivateStatic<string?>("ExtractExternalTicketId", response);
+
+            ClassicAssert.AreEqual("4713", ticketId);
+        }
+
+        [Test]
+        public void ExtractExternalTicketId_ReturnsNullWithoutBodyTicketIdOrLocationHeader()
+        {
+            RestResponse<int> response = new(new())
+            {
+                Content = "{}"
+            };
+
+            string? ticketId = InvokePrivateStatic<string?>("ExtractExternalTicketId", response);
+
+            ClassicAssert.IsNull(ticketId);
+        }
+
         [Test]
         public void GetManagementId_RejectsMalformedJson()
         {
