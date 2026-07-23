@@ -20,7 +20,7 @@ namespace FWO.Middleware.Server.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/modelling")]
-public class ApplicationZonesController(ApiConnection apiConnection) : ControllerBase
+public class ApplicationAddressesController(ApiConnection apiConnection) : ControllerBase
 {
     internal const int kMaxFilterTextLength = 256;
     internal const int kMaxLimit = 1000;
@@ -37,7 +37,10 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     /// is matched as a contains search, matching the owner endpoint. Applications with an inactive lifecycle state
     /// are excluded unless <c>options.showOnlyActiveState</c> is set to <c>false</c>. Applications are ordered by
     /// name, so <c>options.limit</c> and <c>options.offset</c> page the result deterministically; without a limit
-    /// every matching application is returned.
+    /// every matching application is returned. Every matching application is returned even when it owns no address;
+    /// its <c>addresses</c> list is then empty. Each address uses compact notation: a plain IP when start and end
+    /// are equal, CIDR notation when start and end span exactly one network, and <c>ipStart-ipEnd</c> for any other
+    /// range. Addresses that appear more than once for an application are returned only once.
     /// </remarks>
     [HttpPost("getIpDataForOwners")]
     [Consumes("application/json")]
@@ -48,9 +51,9 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     [Authorize(Roles = $"{Roles.Admin}, {Roles.Auditor}, {Roles.Modeller}")]
     public async Task<ActionResult<List<ApplicationAddressResponse>>> Get(
-        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] GetApplicationZonesRequest? request)
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] GetApplicationAddressesRequest? request)
     {
-        GetApplicationZonesRequest effectiveRequest = request ?? new GetApplicationZonesRequest();
+        GetApplicationAddressesRequest effectiveRequest = request ?? new GetApplicationAddressesRequest();
         Dictionary<string, string[]> validationErrors = ValidateRequest(effectiveRequest);
         if (validationErrors.Count > 0)
         {
@@ -62,14 +65,14 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
 
         try
         {
-            GetApplicationZonesOptions options = effectiveRequest.Options!;
+            GetApplicationAddressesOptions options = effectiveRequest.Options!;
             List<FwoOwner> applications = await GetApplicationsAsync(options);
             List<ModellingAppServer> appServers = await GetApplicationAddressesAsync(applications);
             return Ok(BuildResponses(applications, appServers));
         }
         catch (Exception exception)
         {
-            Log.WriteError("Get Application Zones", "Error while fetching application addresses.", exception);
+            Log.WriteError("Get Application Addresses", "Error while fetching application addresses.", exception);
             return StatusCode(StatusCodes.Status500InternalServerError, "Internal server error");
         }
     }
@@ -77,7 +80,7 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     /// <summary>
     /// Validates the request and returns all detected field errors.
     /// </summary>
-    internal static Dictionary<string, string[]> ValidateRequest(GetApplicationZonesRequest request)
+    internal static Dictionary<string, string[]> ValidateRequest(GetApplicationAddressesRequest request)
     {
         Dictionary<string, string[]> errors = [];
         if (request.Options is null)
@@ -93,7 +96,8 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
     }
 
     /// <summary>
-    /// Maps one application and its app-server records to the public response shape.
+    /// Maps one application and its app-server records to the public response shape. Addresses that resolve to the
+    /// same compact notation are returned only once, in the order the API delivered them.
     /// </summary>
     internal static ApplicationAddressResponse ToResponse(FwoOwner application, List<ModellingAppServer> appServers)
     {
@@ -102,7 +106,10 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
             ApplicationId = application.Id,
             ApplicationName = application.Name,
             AppIdExternal = application.ExtAppId,
-            Addresses = appServers.Select(appServer => IpOperations.ToCompactNotation(appServer.Ip, appServer.IpEnd)).ToList()
+            Addresses = appServers
+                .Select(appServer => IpOperations.ToCompactNotation(appServer.Ip, appServer.IpEnd))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList()
         };
     }
 
@@ -177,11 +184,11 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         }
     }
 
-    private async Task<List<FwoOwner>> GetApplicationsAsync(GetApplicationZonesOptions options)
+    private async Task<List<FwoOwner>> GetApplicationsAsync(GetApplicationAddressesOptions options)
     {
         return await apiConnection.SendQueryAsync<List<FwoOwner>>(
-            OwnerQueries.getOwnersFiltered,
-            ApplicationZoneQueryBuilder.BuildApplicationVariables(options, User)) ?? [];
+            OwnerQueries.getApplicationIdentifiers,
+            ApplicationAddressQueryBuilder.BuildApplicationVariables(options, User)) ?? [];
     }
 
     private async Task<List<ModellingAppServer>> GetApplicationAddressesAsync(List<FwoOwner> applications)
@@ -194,7 +201,7 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
         List<int> applicationIds = applications.Select(application => application.Id).ToList();
         return await apiConnection.SendQueryAsync<List<ModellingAppServer>>(
             ModellingQueries.getApplicationIpAddresses,
-            ApplicationZoneQueryBuilder.BuildApplicationAddressVariables(applicationIds)) ?? [];
+            ApplicationAddressQueryBuilder.BuildApplicationAddressVariables(applicationIds)) ?? [];
     }
 
     private static List<ApplicationAddressResponse> BuildResponses(

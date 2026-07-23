@@ -6,20 +6,20 @@ namespace FWO.Middleware.Server.Requests;
 /// Represents a request for application addresses.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed class GetApplicationZonesRequest
+public sealed class GetApplicationAddressesRequest
 {
     /// <summary>
     /// Gets or sets the optional response options. When omitted, this defaults to an empty object.
     /// </summary>
     [JsonPropertyName("options")]
-    public GetApplicationZonesOptions? Options { get; set; } = new();
+    public GetApplicationAddressesOptions? Options { get; set; } = new();
 }
 
 /// <summary>
 /// Represents optional application-address response options.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed class GetApplicationZonesOptions
+public sealed class GetApplicationAddressesOptions
 {
     /// <summary>
     /// Gets or sets the optional response filter. Null or omitted filter fields do not restrict the result.

@@ -19,16 +19,16 @@ using NUnit.Framework;
 namespace FWO.Test;
 
 [TestFixture]
-internal class ApplicationZonesControllerTest
+internal class ApplicationAddressesControllerTest
 {
     private static readonly List<string> kControllerRoutes = new() { "api/modelling" };
     private static readonly List<string> kModellerRole = new() { Roles.Modeller };
 
     [Test]
-    public void GetUsesApplicationZonesRoute()
+    public void GetUsesApplicationAddressesRoute()
     {
-        RouteAttribute[] controllerRoutes = typeof(ApplicationZonesController).GetCustomAttributes<RouteAttribute>().ToArray();
-        MethodInfo getMethod = typeof(ApplicationZonesController).GetMethod(nameof(ApplicationZonesController.Get))!;
+        RouteAttribute[] controllerRoutes = typeof(ApplicationAddressesController).GetCustomAttributes<RouteAttribute>().ToArray();
+        MethodInfo getMethod = typeof(ApplicationAddressesController).GetMethod(nameof(ApplicationAddressesController.Get))!;
         HttpPostAttribute? httpPost = getMethod.GetCustomAttribute<HttpPostAttribute>();
 
         Assert.Multiple(() =>
@@ -41,7 +41,7 @@ internal class ApplicationZonesControllerTest
     [Test]
     public void GetAllowsEmptyRequestBodyAndRequiredRoles()
     {
-        MethodInfo getMethod = typeof(ApplicationZonesController).GetMethod(nameof(ApplicationZonesController.Get))!;
+        MethodInfo getMethod = typeof(ApplicationAddressesController).GetMethod(nameof(ApplicationAddressesController.Get))!;
         ParameterInfo requestParameter = getMethod.GetParameters().Single();
         FromBodyAttribute? fromBody = requestParameter.GetCustomAttribute<FromBodyAttribute>();
         AuthorizeAttribute? authorize = getMethod.GetCustomAttribute<AuthorizeAttribute>();
@@ -68,7 +68,22 @@ internal class ApplicationZonesControllerTest
     }
 
     [Test]
-    public async Task GetReturnsUndeletedAppServerAddressesWithoutAnApplicationZone()
+    public void ApplicationQueryReadsOnlyTheIdentifyingOwnerFields()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Contain("query getApplicationIdentifiers"));
+            Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Contain("$where: owner_bool_exp"));
+            Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Contain("limit: $limit, offset: $offset"));
+            Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Contain("app_id_external"));
+            Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Not.Contain("fragment"));
+            Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Not.Contain("owner_responsibles"));
+            Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Not.Contain("owner_lifecycle_state {"));
+        });
+    }
+
+    [Test]
+    public async Task GetReturnsAppServerAddressesOfEveryVisibleApplication()
     {
         ApplicationAddressesApiConnection apiConnection = new()
         {
@@ -79,16 +94,16 @@ internal class ApplicationZonesControllerTest
                 (8, "10.8.0.1", "10.8.0.9"),
                 (9, "10.9.0.1", ""))
         };
-        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        ApplicationAddressesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
 
-        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(new GetApplicationZonesRequest());
+        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(new GetApplicationAddressesRequest());
 
         List<ApplicationAddressResponse> response = (List<ApplicationAddressResponse>)((OkObjectResult)result.Result!).Value!;
         Assert.Multiple(() =>
         {
             Assert.That(apiConnection.Queries, Is.EqualTo(new List<string>
             {
-                OwnerQueries.getOwnersFiltered,
+                OwnerQueries.getApplicationIdentifiers,
                 ModellingQueries.getApplicationIpAddresses
             }));
             Assert.That(SerializeVariables(apiConnection.LastApplicationAddressVariables),
@@ -109,9 +124,9 @@ internal class ApplicationZonesControllerTest
         {
             Owners = CreateOwners((7, "Application 07", "APP-7"))
         };
-        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        ApplicationAddressesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
 
-        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(new GetApplicationZonesRequest());
+        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(new GetApplicationAddressesRequest());
 
         List<ApplicationAddressResponse> response = (List<ApplicationAddressResponse>)((OkObjectResult)result.Result!).Value!;
         Assert.Multiple(() =>
@@ -123,39 +138,37 @@ internal class ApplicationZonesControllerTest
     }
 
     [Test]
-    public async Task GetExcludesDeletedAppServerAddresses()
+    public async Task GetReturnsEveryAddressOfAnApplicationOnlyOnce()
     {
         ApplicationAddressesApiConnection apiConnection = new()
         {
             Owners = CreateOwners((7, "Application 07", "APP-7")),
-            AppServers = CreateAppServers((7, "10.7.0.1", ""), (7, "10.7.0.2", ""))
+            AppServers = CreateAppServers(
+                (7, "10.7.0.1/32", "10.7.0.1/32"),
+                (7, "10.7.0.1", ""),
+                (7, "10.7.0.2", ""))
         };
-        apiConnection.AppServers[1].IsDeleted = true;
-        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        ApplicationAddressesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
 
-        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(new GetApplicationZonesRequest());
+        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(new GetApplicationAddressesRequest());
 
         List<ApplicationAddressResponse> response = (List<ApplicationAddressResponse>)((OkObjectResult)result.Result!).Value!;
-        Assert.Multiple(() =>
-        {
-            Assert.That(response[0].Addresses, Is.EqualTo(new List<string> { "10.7.0.1" }));
-            Assert.That(response[0].Addresses, Does.Not.Contain("10.7.0.2"));
-        });
+        Assert.That(response[0].Addresses, Is.EqualTo(new List<string> { "10.7.0.1", "10.7.0.2" }));
     }
 
     [Test]
     public async Task GetDoesNotReadAddressesWhenNoApplicationsMatch()
     {
         ApplicationAddressesApiConnection apiConnection = new();
-        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        ApplicationAddressesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
 
-        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(new GetApplicationZonesRequest());
+        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(new GetApplicationAddressesRequest());
 
         List<ApplicationAddressResponse> response = (List<ApplicationAddressResponse>)((OkObjectResult)result.Result!).Value!;
         Assert.Multiple(() =>
         {
             Assert.That(response, Is.Empty);
-            Assert.That(apiConnection.Queries, Is.EqualTo(new List<string> { OwnerQueries.getOwnersFiltered }));
+            Assert.That(apiConnection.Queries, Is.EqualTo(new List<string> { OwnerQueries.getApplicationIdentifiers }));
         });
     }
 
@@ -169,22 +182,52 @@ internal class ApplicationZonesControllerTest
         };
         ClaimsPrincipal modeller = PrincipalWithRolesAndClaims(
             kModellerRole, new Claim("x-hasura-editable-owners", "{7}"));
-        ApplicationZonesController controller = CreateController(apiConnection, modeller);
+        ApplicationAddressesController controller = CreateController(apiConnection, modeller);
 
-        await controller.Get(new GetApplicationZonesRequest());
+        await controller.Get(new GetApplicationAddressesRequest());
 
         Assert.That(SerializeVariables(apiConnection.LastApplicationVariables), Does.Contain("\"id\":{\"_in\":[7]}"));
     }
 
     [Test]
-    public async Task GetPassesApplicationFiltersAndPagingToTheOwnerQuery()
+    public async Task GetSelectsNoApplicationForModellerWithoutEditableApplications()
+    {
+        ApplicationAddressesApiConnection apiConnection = new();
+        ApplicationAddressesController controller = CreateController(apiConnection, PrincipalWithRolesAndClaims(kModellerRole));
+
+        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(new GetApplicationAddressesRequest());
+
+        List<ApplicationAddressResponse> response = (List<ApplicationAddressResponse>)((OkObjectResult)result.Result!).Value!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(SerializeVariables(apiConnection.LastApplicationVariables), Does.Contain("\"id\":{\"_in\":[]}"));
+            Assert.That(response, Is.Empty);
+        });
+    }
+
+    [Test]
+    public async Task GetExcludesTheDefaultSuperOwnerFromTheApplicationQuery()
     {
         ApplicationAddressesApiConnection apiConnection = new()
         {
             Owners = CreateOwners((7, "Application 07", "APP-7"))
         };
-        ApplicationZonesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
-        GetApplicationZonesRequest request = new()
+        ApplicationAddressesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+
+        await controller.Get(new GetApplicationAddressesRequest());
+
+        Assert.That(SerializeVariables(apiConnection.LastApplicationVariables), Does.Contain("\"is_default\":{\"_eq\":false}"));
+    }
+
+    [Test]
+    public async Task GetPassesApplicationFiltersAndPagingToTheApplicationQuery()
+    {
+        ApplicationAddressesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((7, "Application 07", "APP-7"))
+        };
+        ApplicationAddressesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationAddressesRequest request = new()
         {
             Options = new()
             {
@@ -192,7 +235,7 @@ internal class ApplicationZonesControllerTest
                 {
                     ApplicationId = new() { 7, 8 },
                     ApplicationName = new() { "application *", "second application" },
-                    AppIdExternal = new() { "app-*", "second-app" }
+                    AppIdExternal = new() { "app-*" }
                 },
                 Limit = 20,
                 Offset = 5
@@ -205,12 +248,38 @@ internal class ApplicationZonesControllerTest
         Assert.Multiple(() =>
         {
             Assert.That(variables, Does.Contain("\"id\":{\"_in\":[7,8]}"));
-            Assert.That(variables, Does.Contain("\"name\":{\"_ilike\":\"application %\"}"));
-            Assert.That(variables, Does.Contain("\"name\":{\"_ilike\":\"%second application%\"}"));
-            Assert.That(variables, Does.Contain("\"app_id_external\":{\"_ilike\":\"app-%\"}"));
-            Assert.That(variables, Does.Contain("\"app_id_external\":{\"_ilike\":\"%second-app%\"}"));
+            Assert.That(variables, Does.Contain(
+                "\"_or\":[{\"name\":{\"_ilike\":\"application %\"}},{\"name\":{\"_ilike\":\"%second application%\"}}]"));
+            Assert.That(variables, Does.Contain("{\"app_id_external\":{\"_ilike\":\"app-%\"}}"));
+            Assert.That(variables, Does.Not.Contain("\"_or\":[{\"app_id_external\""));
             Assert.That(variables, Does.Contain("\"limit\":20"));
             Assert.That(variables, Does.Contain("\"offset\":5"));
+        });
+    }
+
+    [Test]
+    public async Task GetAddsEveryCaseInsensitivelyDistinctFilterValueOnlyOnce()
+    {
+        ApplicationAddressesApiConnection apiConnection = new()
+        {
+            Owners = CreateOwners((7, "Application 07", "APP-7"))
+        };
+        ApplicationAddressesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationAddressesRequest request = new()
+        {
+            Options = new()
+            {
+                Filter = new() { AppIdExternal = new() { "APP-7", "app-7", " app-7 ", "" } }
+            }
+        };
+
+        await controller.Get(request);
+
+        string variables = SerializeVariables(apiConnection.LastApplicationVariables);
+        Assert.Multiple(() =>
+        {
+            Assert.That(variables, Does.Contain("{\"app_id_external\":{\"_ilike\":\"%APP-7%\"}}"));
+            Assert.That(variables, Does.Not.Contain("\"_or\":[{\"app_id_external\""));
         });
     }
 
@@ -219,7 +288,7 @@ internal class ApplicationZonesControllerTest
     {
         List<int> applicationIds = new() { 7, 8 };
 
-        string variables = SerializeVariables(ApplicationZoneQueryBuilder.BuildApplicationAddressVariables(applicationIds));
+        string variables = SerializeVariables(ApplicationAddressQueryBuilder.BuildApplicationAddressVariables(applicationIds));
 
         Assert.Multiple(() =>
         {
@@ -232,7 +301,7 @@ internal class ApplicationZonesControllerTest
     [Test]
     public void RequestDefaultsOptionsToAnEmptyObject()
     {
-        GetApplicationZonesRequest request = new();
+        GetApplicationAddressesRequest request = new();
 
         Assert.Multiple(() =>
         {
@@ -250,22 +319,22 @@ internal class ApplicationZonesControllerTest
         const string ValidJson = """{"options":{"filter":{"applicationId":[7,8],"applicationName":["App 7","App 8"],"appIdExternal":["APP-7","APP-8"]}}}""";
         const string InvalidJson = """{"options":{"details-level":"ip-only","filter":{"id":7}}}""";
 
-        GetApplicationZonesRequest? request = JsonSerializer.Deserialize<GetApplicationZonesRequest>(ValidJson);
+        GetApplicationAddressesRequest? request = JsonSerializer.Deserialize<GetApplicationAddressesRequest>(ValidJson);
 
         Assert.Multiple(() =>
         {
             Assert.That(request?.Options?.Filter?.ApplicationId, Is.EqualTo(new List<int> { 7, 8 }));
             Assert.That(request?.Options?.Filter?.ApplicationName, Is.EqualTo(new List<string> { "App 7", "App 8" }));
             Assert.That(request?.Options?.Filter?.AppIdExternal, Is.EqualTo(new List<string> { "APP-7", "APP-8" }));
-            Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<GetApplicationZonesRequest>(InvalidJson));
+            Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<GetApplicationAddressesRequest>(InvalidJson));
         });
     }
 
     [Test]
     public async Task GetAggregatesAllKnownValidationErrors()
     {
-        ApplicationZonesController controller = CreateController(new ApplicationAddressesApiConnection(), PrincipalWithRoles(Roles.Admin));
-        GetApplicationZonesRequest request = new()
+        ApplicationAddressesController controller = CreateController(new ApplicationAddressesApiConnection(), PrincipalWithRoles(Roles.Admin));
+        GetApplicationAddressesRequest request = new()
         {
             Options = new()
             {
@@ -294,10 +363,25 @@ internal class ApplicationZonesControllerTest
     }
 
     [Test]
+    public async Task GetRejectsLimitAboveTheAllowedMaximum()
+    {
+        ApplicationAddressesController controller = CreateController(new ApplicationAddressesApiConnection(), PrincipalWithRoles(Roles.Admin));
+        GetApplicationAddressesRequest request = new()
+        {
+            Options = new() { Limit = GetMaxLimit() + 1 }
+        };
+
+        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(request);
+
+        ValidationProblemDetails validationProblem = (ValidationProblemDetails)((ObjectResult)result.Result!).Value!;
+        Assert.That(validationProblem.Errors.Keys, Does.Contain("options.limit"));
+    }
+
+    [Test]
     public async Task GetRejectsNullOptions()
     {
-        ApplicationZonesController controller = CreateController(new ApplicationAddressesApiConnection(), PrincipalWithRoles(Roles.Admin));
-        GetApplicationZonesRequest request = new() { Options = null };
+        ApplicationAddressesController controller = CreateController(new ApplicationAddressesApiConnection(), PrincipalWithRoles(Roles.Admin));
+        GetApplicationAddressesRequest request = new() { Options = null };
 
         ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(request);
 
@@ -309,8 +393,8 @@ internal class ApplicationZonesControllerTest
     public async Task GetRejectsNullTextFilterValues()
     {
         const string RequestJson = """{"options":{"filter":{"applicationName":[null]}}}""";
-        ApplicationZonesController controller = CreateController(new ApplicationAddressesApiConnection(), PrincipalWithRoles(Roles.Admin));
-        GetApplicationZonesRequest request = JsonSerializer.Deserialize<GetApplicationZonesRequest>(RequestJson)!;
+        ApplicationAddressesController controller = CreateController(new ApplicationAddressesApiConnection(), PrincipalWithRoles(Roles.Admin));
+        GetApplicationAddressesRequest request = JsonSerializer.Deserialize<GetApplicationAddressesRequest>(RequestJson)!;
 
         ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(request);
 
@@ -339,9 +423,9 @@ internal class ApplicationZonesControllerTest
         }).ToList();
     }
 
-    private static ApplicationZonesController CreateController(ApiConnection apiConnection, ClaimsPrincipal user)
+    private static ApplicationAddressesController CreateController(ApiConnection apiConnection, ClaimsPrincipal user)
     {
-        return new ApplicationZonesController(apiConnection)
+        return new ApplicationAddressesController(apiConnection)
         {
             ControllerContext = new ControllerContext
             {
@@ -369,8 +453,18 @@ internal class ApplicationZonesControllerTest
 
     private static int GetMaxFilterTextLength()
     {
-        FieldInfo constant = typeof(ApplicationZonesController).GetField(
-            "kMaxFilterTextLength", BindingFlags.NonPublic | BindingFlags.Static)!;
+        return GetControllerConstant("kMaxFilterTextLength");
+    }
+
+    private static int GetMaxLimit()
+    {
+        return GetControllerConstant("kMaxLimit");
+    }
+
+    private static int GetControllerConstant(string fieldName)
+    {
+        FieldInfo constant = typeof(ApplicationAddressesController).GetField(
+            fieldName, BindingFlags.NonPublic | BindingFlags.Static)!;
         return (int)constant.GetRawConstantValue()!;
     }
 
@@ -389,7 +483,7 @@ internal class ApplicationZonesControllerTest
             QueryChunkingOptions? chunkingOptions = null)
         {
             Queries.Add(query);
-            if (query == OwnerQueries.getOwnersFiltered)
+            if (query == OwnerQueries.getApplicationIdentifiers)
             {
                 LastApplicationVariables = variables;
                 return Task.FromResult((QueryResponseType)(object)Owners);
@@ -397,7 +491,7 @@ internal class ApplicationZonesControllerTest
             if (query == ModellingQueries.getApplicationIpAddresses)
             {
                 LastApplicationAddressVariables = variables;
-                return Task.FromResult((QueryResponseType)(object)AppServers.Where(appServer => !appServer.IsDeleted).ToList());
+                return Task.FromResult((QueryResponseType)(object)AppServers);
             }
 
             return Task.FromResult((QueryResponseType)(object)new List<ModellingAppServer>());

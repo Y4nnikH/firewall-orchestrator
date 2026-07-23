@@ -9,7 +9,7 @@ namespace FWO.Middleware.Server.Services;
 /// Builds the GraphQL variables of the application-address lookup so that every filter is applied by the API
 /// instead of the middleware.
 /// </summary>
-public static class ApplicationZoneQueryBuilder
+public static class ApplicationAddressQueryBuilder
 {
     private const string kEditableOwnersClaim = "x-hasura-editable-owners";
 
@@ -17,7 +17,7 @@ public static class ApplicationZoneQueryBuilder
     /// Builds the variables selecting the applications visible to the caller, including optional paging.
     /// </summary>
     public static Dictionary<string, object> BuildApplicationVariables(
-        GetApplicationZonesOptions options, ClaimsPrincipal user)
+        GetApplicationAddressesOptions options, ClaimsPrincipal user)
     {
         ApplicationAddressFilter? filter = options.Filter;
         List<Dictionary<string, object>> predicates = [];

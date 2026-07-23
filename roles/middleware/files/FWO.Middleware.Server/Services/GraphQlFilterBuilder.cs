@@ -31,6 +31,7 @@ public static class GraphQlFilterBuilder
 
     /// <summary>
     /// Adds an OR-connected set of case-insensitive text predicates for non-blank values in the supplied list.
+    /// Values that differ only in casing produce the same case-insensitive match and are therefore added once.
     /// </summary>
     public static void AddWildcardPredicates(List<Dictionary<string, object>> predicates, string fieldName, List<string>? values)
     {
@@ -40,7 +41,10 @@ public static class GraphQlFilterBuilder
         }
 
         List<Dictionary<string, object>> alternatives = [];
-        foreach (string value in values.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal))
+        foreach (string value in values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase))
         {
             alternatives.Add(new Dictionary<string, object>
             {
