@@ -64,9 +64,9 @@ pip install -r scripts/requirements.txt
 
 Do not use `sudo pip` for these controller-side dependencies; it installs packages into the system Python instead of the Ansible environment used by the installer.
 
-Note that if your server is behind a proxy, you will have to set the proxy for pip as follows (to allow for ansible venv download):
+Note that if your server is behind a proxy, export its address before creating the Ansible venv (to allow downloading Ansible). This does not modify pip configuration:
 
-         pip config set global.proxy http://YOUR-PROXY-NAME:YOUR-PROXY-PORT
+         export https_proxy=http://YOUR-PROXY-NAME:YOUR-PROXY-PORT
 
 4) Firewall Orchestrator installation
 
