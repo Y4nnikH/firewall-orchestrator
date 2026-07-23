@@ -21,6 +21,9 @@ namespace FWO.Test
     {
         private static readonly string kUpcomingText = "upcoming for " + Placeholder.APPNAME;
         private static readonly string kOverdueText = "overdue for " + Placeholder.APPNAME;
+        private static readonly string[] kDummyEmailAddresses = ["dummy@example.test"];
+        private static readonly string[] kResolvedEmailAddresses = ["alpha@example.test", "beta@example.test"];
+        private static readonly string[] kResolvedOwnerDns = ["cn=alpha,dc=test", "cn=beta,dc=test"];
         private static readonly string[] kExpectedQueries =
         [
             AuthQueries.getLdapConnections,
@@ -273,7 +276,7 @@ namespace FWO.Test
 
             List<string> result = await InvokePrivateAsync<List<string>>(recertCheck, "CollectEmailAddresses", new FwoOwner());
 
-            Assert.That(result, Is.EquivalentTo(new[] { "dummy@example.test" }));
+            Assert.That(result, Is.EquivalentTo(kDummyEmailAddresses));
         }
 
         [Test]
@@ -303,7 +306,7 @@ namespace FWO.Test
 
             List<string> result = await InvokePrivateAsync<List<string>>(recertCheck, "CollectEmailAddresses", owner);
 
-            Assert.That(result, Is.EquivalentTo(new[] { "alpha@example.test", "beta@example.test" }));
+            Assert.That(result, Is.EquivalentTo(kResolvedEmailAddresses));
         }
 
         [Test]
@@ -325,7 +328,7 @@ namespace FWO.Test
 
             List<string> result = await InvokePrivateAsync<List<string>>(recertCheck, "ResolveOwnerUserDns", owner);
 
-            Assert.That(result, Is.EquivalentTo(new[] { "cn=alpha,dc=test", "cn=beta,dc=test" }));
+            Assert.That(result, Is.EquivalentTo(kResolvedOwnerDns));
         }
 
         [Test]
@@ -416,7 +419,7 @@ namespace FWO.Test
             Assert.Multiple(() =>
             {
                 Assert.That(mailData.Subject, Is.EqualTo("Recertification check Owner A"));
-                Assert.That(mailData.To, Is.EquivalentTo(new[] { "dummy@example.test" }));
+                Assert.That(mailData.To, Is.EquivalentTo(kDummyEmailAddresses));
                 Assert.That(mailData.Body, Does.Contain("Upcoming Rule"));
                 Assert.That(mailData.Body, Does.Contain("Owner A"));
             });

@@ -12,7 +12,7 @@ namespace FWO.Test
     {
         private static readonly string kUserDn = "uid=user,ou=users,dc=example,dc=com";
         private static readonly string kSearchUser = "cn=search,dc=example,dc=com";
-        private static readonly string kSearchPassword = "searchpwd";
+        private static readonly string kSearchPassword = LdapTestSupport.CreateEncryptedSecret("searchpwd");
         private static readonly string kRoleDn = "cn=AppOwners,ou=roles,dc=example,dc=com";
         private static readonly string kGroupDn = "cn=AppOwners,ou=groups,dc=example,dc=com";
         private static readonly string kGroupMemberDn = "uid=groupmember,ou=users,dc=example,dc=com";
@@ -383,7 +383,7 @@ namespace FWO.Test
                 Address = "127.0.0.1",
                 Port = 1,
                 SearchUser = "cn=search,dc=example,dc=com",
-                SearchUserPwd = "searchpwd",
+                SearchUserPwd = kSearchPassword,
                 WriteUser = "cn=write,dc=example,dc=com",
                 WriteUserPwd = "writepwd",
                 UserSearchPath = "ou=users,dc=example,dc=com",

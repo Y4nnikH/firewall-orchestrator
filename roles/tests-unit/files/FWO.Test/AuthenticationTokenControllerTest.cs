@@ -19,13 +19,14 @@ using System.Reflection;
 
 namespace FWO.Test
 {
-    [TestFixture]
-    [Parallelizable]
-    internal class AuthenticationTokenControllerTest
-    {
-        private static readonly string[] kLoginUserCn = new string[] { "login-user" };
-        private static readonly string[] kLoginUserDn = new string[] { "uid=login-user,ou=users,dc=fworch,dc=internal" };
-        private static readonly string[] kReporterRoleValues = new string[] { Roles.Reporter };
+        [TestFixture]
+        [Parallelizable]
+        internal class AuthenticationTokenControllerTest
+        {
+            private static readonly string[] kLoginUserCn = new string[] { "login-user" };
+            private static readonly string[] kLoginUserDn = new string[] { "uid=login-user,ou=users,dc=fworch,dc=internal" };
+            private static readonly string[] kReporterRoleValues = new string[] { Roles.Reporter };
+            private static readonly string kSearchPassword = LdapTestSupport.CreateEncryptedSecret("searchpwd");
 
         [Test]
         public async Task GetAsync_ReturnsAnonymousJwt_WhenCredentialsAreMissing()
@@ -486,7 +487,7 @@ namespace FWO.Test
                 Address = "ldap.example.test",
                 Port = 389,
                 SearchUser = "cn=search,dc=fworch,dc=internal",
-                SearchUserPwd = "searchpwd",
+                SearchUserPwd = kSearchPassword,
                 RoleSearchPath = "ou=roles,dc=fworch,dc=internal",
                 UserSearchPath = "ou=users,dc=fworch,dc=internal",
                 TenantId = 7

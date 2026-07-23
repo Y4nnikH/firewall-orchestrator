@@ -65,6 +65,8 @@ namespace FWO.Test
             ];
         }
 
+        private static readonly string[] kZoneCDestination = ["zone-c"];
+
         [Test]
         public async Task Run_ReturnsErrorWhenMatrixNameMissing()
         {
@@ -204,7 +206,7 @@ namespace FWO.Test
                 "matrix-b.json",
                 CreateImportJson(
                     "Matrix B",
-                    CreateZone("zone-a", "Zone A updated", "192.0.2.0/24", commTargets: new[] { "zone-c" }),
+                    CreateZone("zone-a", "Zone A updated", "192.0.2.0/24", commTargets: kZoneCDestination),
                     CreateZone("zone-c", "Zone C", "203.0.113.10", "203.0.113.20")),
                 "tester",
                 "cn=tester");

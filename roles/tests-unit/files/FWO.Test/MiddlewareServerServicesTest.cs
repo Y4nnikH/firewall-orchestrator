@@ -16,11 +16,11 @@ namespace FWO.Test
         private static readonly string kInternalUserSearchPath = "ou=users,dc=fworch,dc=internal";
         private static readonly string kGroupSearchPath = "ou=groups,dc=fworch,dc=internal";
         private static readonly string kSearchUser = "cn=search,dc=fworch,dc=internal";
-        private static readonly string kSearchPassword = "searchpwd";
+        private static readonly string kSearchPassword = LdapTestSupport.CreateEncryptedSecret("searchpwd");
         private static readonly string kGroupDn = "cn=AppOwners,ou=groups,dc=fworch,dc=internal";
         private static readonly string kMemberDn = "uid=user1,ou=users,dc=fworch,dc=internal";
-        private static readonly string[] kOwnerGroupValues = new string[] { "ownergroup" };
-        private static readonly string[] kMemberValues = new string[] { kMemberDn };
+        private static readonly string[] kOwnerGroupValues = ["ownergroup"];
+        private static readonly string[] kMemberValues = [kMemberDn];
 
         [Test]
         public async Task GetInternalGroups_ReturnsOwnerGroupsFromInternalLdap()
@@ -63,7 +63,7 @@ namespace FWO.Test
             Assert.That(exception?.Message, Is.EqualTo("No internal Ldap with group handling found."));
         }
 
-        private static Ldap CreateInternalGroupLdap()
+        private static TestableLdap CreateInternalGroupLdap()
         {
             RecordingLdapClient client = new()
             {

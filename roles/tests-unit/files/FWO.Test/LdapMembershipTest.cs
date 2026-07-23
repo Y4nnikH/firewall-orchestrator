@@ -25,6 +25,14 @@ namespace FWO.Test
         private static readonly string kRootGroupDn = "cn=Root,ou=groups,dc=example,dc=com";
         private static readonly string kResolvedUserDn = "uid=resolved,ou=users,dc=example,dc=com";
         private static readonly string kAnotherResolvedUserDn = "uid=other,ou=users,dc=example,dc=com";
+        private static readonly string kEscapedCommaUserDn = "uid=last\\,first,ou=users,dc=example,dc=com";
+        private static readonly string kEscapedCommaMemberDn = "uid=last\\2cfirst,ou=users,dc=example,dc=com";
+        private static readonly string kSearchPassword = LdapTestSupport.CreateEncryptedSecret("searchpwd");
+        private static readonly List<string> kSingleResolvedUserDns = [kResolvedUserDn];
+        private static readonly string[] kAppOwnerCn = ["AppOwners"];
+        private static readonly List<string> kEscapedCommaUserDnsList = [kEscapedCommaUserDn];
+        private static readonly string[] kEscapedCommaMemberValues = [kEscapedCommaMemberDn];
+        private static readonly string[] kEscapedGroupCn = ["Escaped"];
         private static readonly string[] kRootGroupDns = [kRootGroupDn, kResolvedUserDn];
         private static readonly string[] kResolvedUserValues = [kNestedGroupDn, kResolvedUserDn];
         private static readonly string[] kAnotherResolvedUserValues = [kAnotherResolvedUserDn];
@@ -155,6 +163,38 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task GetGroups_ReturnsEmptyWhenSearchPathIsMissing()
+        {
+            TestableLdap ldap = new(new RecordingLdapClient())
+            {
+                GroupSearchPath = "",
+                SearchUser = "cn=search,dc=example,dc=com",
+                SearchUserPwd = kSearchPassword
+            };
+
+            List<string> groups = await ldap.GetGroups(kSingleResolvedUserDns);
+
+            Assert.That(groups, Is.Empty);
+        }
+
+        [Test]
+        public async Task GetGroups_ReturnsEmptyWhenSearchPasswordCannotBeDecrypted()
+        {
+            RecordingLdapClient client = new();
+            TestableLdap ldap = new(client)
+            {
+                GroupSearchPath = kGroupSearchPath,
+                SearchUser = "cn=search,dc=example,dc=com",
+                SearchUserPwd = string.Empty
+            };
+
+            List<string> groups = await ldap.GetGroups(kSingleResolvedUserDns);
+
+            Assert.That(groups, Is.Empty);
+            Assert.That(client.SearchCalls, Is.Empty);
+        }
+
+        [Test]
         public async Task ResolveUsersFromDns_ExpandsNestedGroupsAndKeepsDirectUsers()
         {
             RecordingLdapClient client = new()
@@ -182,6 +222,118 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task GetGroups_ReturnsMatchingMembershipsFromSearchResults()
+        {
+            RecordingLdapClient client = new()
+            {
+                SearchResults = LdapTestSupport.CreateSearchResults(
+                    LdapTestSupport.CreateEntry(
+                        "cn=AppOwners,ou=groups,dc=example,dc=com",
+                        new LdapAttribute("cn", kAppOwnerCn),
+                        new LdapAttribute("uniqueMember", kMemberWithBlankValues)))
+            };
+            TestableLdap ldap = new(client)
+            {
+                GroupSearchPath = kGroupSearchPath,
+                SearchUser = "cn=search,dc=example,dc=com",
+                SearchUserPwd = kSearchPassword
+            };
+
+            List<string> groups = await ldap.GetGroups(kSingleResolvedUserDns);
+
+            Assert.That(groups, Is.EqualTo(kAppOwnerCn));
+            Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public async Task GetGroups_MatchesEscapedCommasInMemberDns()
+        {
+            RecordingLdapClient client = new()
+            {
+                SearchResults = LdapTestSupport.CreateSearchResults(
+                    LdapTestSupport.CreateEntry(
+                        "cn=Escaped,ou=groups,dc=example,dc=com",
+                        new LdapAttribute("cn", kEscapedGroupCn),
+                        new LdapAttribute("uniqueMember", kEscapedCommaMemberValues)))
+            };
+            TestableLdap ldap = new(client)
+            {
+                GroupSearchPath = kGroupSearchPath,
+                SearchUser = "cn=search,dc=example,dc=com",
+                SearchUserPwd = kSearchPassword
+            };
+
+            List<string> groups = await ldap.GetGroups(kEscapedCommaUserDnsList);
+
+            Assert.That(groups, Is.EqualTo(kEscapedGroupCn));
+            Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public async Task GetRoles_ReturnsMatchingMembershipsFromSearchResults()
+        {
+            RecordingLdapClient client = new()
+            {
+                SearchResults = LdapTestSupport.CreateSearchResults(
+                    LdapTestSupport.CreateEntry(
+                        "cn=AppOwners,ou=roles,dc=example,dc=com",
+                        new LdapAttribute("cn", kAppOwnerCn),
+                        new LdapAttribute("uniqueMember", kMemberWithBlankValues)))
+            };
+            TestableLdap ldap = new(client)
+            {
+                RoleSearchPath = "ou=roles,dc=example,dc=com",
+                SearchUser = "cn=search,dc=example,dc=com",
+                SearchUserPwd = kSearchPassword
+            };
+
+            List<string> roles = await ldap.GetRoles(kSingleResolvedUserDns);
+
+            Assert.That(roles, Is.EqualTo(kAppOwnerCn));
+            Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public async Task GetRoles_ReturnsEmptyWhenSearchResultsAreNull()
+        {
+            RecordingLdapClient client = new()
+            {
+                SearchResults = null
+            };
+            TestableLdap ldap = new(client)
+            {
+                RoleSearchPath = "ou=roles,dc=example,dc=com",
+                SearchUser = "cn=search,dc=example,dc=com",
+                SearchUserPwd = kSearchPassword
+            };
+
+            List<string> roles = await ldap.GetRoles(kSingleResolvedUserDns);
+
+            Assert.That(roles, Is.Empty);
+            Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public async Task GetGroups_ReturnsEmptyWhenSearchThrows()
+        {
+            RecordingLdapClient client = new()
+            {
+                SearchResponder = (_, _, _, _, _) => throw new InvalidOperationException("boom")
+            };
+            TestableLdap ldap = new(client)
+            {
+                GroupSearchPath = kGroupSearchPath,
+                SearchUser = "cn=search,dc=example,dc=com",
+                SearchUserPwd = kSearchPassword
+            };
+
+            List<string> groups = await ldap.GetGroups(kSingleResolvedUserDns);
+
+            Assert.That(groups, Is.Empty);
+            Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
+        }
+
+        [Test]
         public async Task GetGroupsOfUser_ReturnsMemberOfDns()
         {
             RecordingLdapClient client = new()
@@ -194,7 +346,7 @@ namespace FWO.Test
             TestableLdap ldap = new(client)
             {
                 SearchUser = "cn=search,dc=example,dc=com",
-                SearchUserPwd = "searchpwd",
+                SearchUserPwd = kSearchPassword,
                 UserSearchPath = kUserSearchPath
             };
 
@@ -219,7 +371,7 @@ namespace FWO.Test
             {
                 Type = (int)LdapType.ActiveDirectory,
                 SearchUser = "cn=search,dc=example,dc=com",
-                SearchUserPwd = "searchpwd",
+                SearchUserPwd = kSearchPassword,
                 GroupSearchPath = kGroupSearchPath
             };
 
@@ -243,7 +395,7 @@ namespace FWO.Test
             TestableLdap ldap = new(client)
             {
                 SearchUser = "cn=search,dc=example,dc=com",
-                SearchUserPwd = "searchpwd",
+                SearchUserPwd = kSearchPassword,
                 GroupSearchPath = kGroupSearchPath
             };
 
@@ -314,7 +466,7 @@ namespace FWO.Test
             TestableLdap ldap = new(client)
             {
                 SearchUser = "cn=search,dc=example,dc=com",
-                SearchUserPwd = "searchpwd",
+                SearchUserPwd = kSearchPassword,
                 RoleSearchPath = "ou=roles,dc=example,dc=com"
             };
 

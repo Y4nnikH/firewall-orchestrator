@@ -15,7 +15,7 @@ namespace FWO.Test
         private static readonly string kGroupSearchPath = "ou=groups,dc=fworch,dc=internal";
         private static readonly string kGroupWritePath = "ou=groups,dc=fworch,dc=internal";
         private static readonly string kSearchUser = "cn=search,dc=fworch,dc=internal";
-        private static readonly string kSearchPassword = "searchpwd";
+        private static readonly string kSearchPassword = LdapTestSupport.CreateEncryptedSecret("searchpwd");
         private static readonly string kWriteUser = "cn=write,dc=fworch,dc=internal";
         private static readonly string kGroupDn = "cn=AppOwners,ou=groups,dc=fworch,dc=internal";
         private static readonly string kOtherGroupDn = "cn=OtherGroup,ou=groups,dc=fworch,dc=internal";

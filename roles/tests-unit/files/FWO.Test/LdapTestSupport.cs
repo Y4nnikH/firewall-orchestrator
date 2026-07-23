@@ -5,12 +5,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using FWO.Encryption;
 using FWO.Middleware.Server;
 
 namespace FWO.Test
 {
     internal static class LdapTestSupport
     {
+        public static string CreateEncryptedSecret(string secret)
+        {
+            return AesEnc.Encrypt(secret, AesEnc.GetMainKey());
+        }
+
         public static LdapEntry CreateEntry(string dn, params LdapAttribute[] attributes)
         {
             LdapAttributeSet attributeSet = new();
