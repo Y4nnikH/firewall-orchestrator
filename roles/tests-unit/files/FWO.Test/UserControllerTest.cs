@@ -442,6 +442,141 @@ namespace FWO.Test
             Assert.That(apiConnection.ReturnIdQueryCount, Is.Zero);
         }
 
+        [Test]
+        public async Task AddReturnsNewIdWhenWritableLdapAndDatabaseInsertSucceed()
+        {
+            RecordingLdapClient ldapClient = new();
+            UserControllerTestApiConnection apiConnection = new()
+            {
+                AddUserResult = new ReturnIdWrapper
+                {
+                    ReturnIds = new ReturnId[] { new() { NewId = 77 } }
+                }
+            };
+            UserController controller = CreateController(
+                new List<Ldap> { CreateWritableLdap(2, ldapClient) },
+                apiConnection,
+                PrincipalWithRoles(Roles.Admin));
+
+            int result = await controller.Add(new UserAddParameters
+            {
+                LdapId = 2,
+                UserDn = "uid=newuser,ou=users,dc=fworch,dc=internal",
+                Password = "password",
+                Email = "new@test",
+                TenantId = 1
+            });
+
+            Assert.That(result, Is.EqualTo(77));
+            Assert.That(apiConnection.ReturnIdWrapperQueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.Queries, Does.Contain(AuthQueries.upsertUiUser));
+            Assert.That(ldapClient.AddedEntries, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public async Task ChangeReturnsTrueWhenWritableLdapAndDatabaseUpdateSucceed()
+        {
+            RecordingLdapClient ldapClient = new();
+            UserControllerTestApiConnection apiConnection = new()
+            {
+                Users = new UiUser[] { CreateUser(42) }
+            };
+            UserController controller = CreateController(
+                new List<Ldap> { CreateWritableLdap(2, ldapClient) },
+                apiConnection,
+                PrincipalWithRoles(Roles.Admin));
+
+            bool result = await controller.Change(new UserEditParameters
+            {
+                UserId = 42,
+                LdapId = 2,
+                Email = "new@test"
+            });
+
+            Assert.That(result, Is.True);
+            Assert.That(apiConnection.ReturnIdQueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.Queries, Does.Contain(AuthQueries.updateUserEmail));
+            Assert.That(ldapClient.ModifyCalls, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public async Task ChangePasswordReturnsEmptyStringAndUpdatesPasswordChanged()
+        {
+            RecordingLdapClient ldapClient = new();
+            UserControllerTestApiConnection apiConnection = new()
+            {
+                Users = new UiUser[] { CreateUser(42) }
+            };
+            UserController controller = CreateController(
+                new List<Ldap> { CreateWritableLdap(2, ldapClient) },
+                apiConnection,
+                PrincipalWithRoles(Roles.Admin));
+
+            ActionResult<string> result = await controller.ChangePassword(new UserChangePasswordParameters
+            {
+                UserId = 42,
+                LdapId = 2,
+                OldPassword = "old-password",
+                NewPassword = "new-password"
+            });
+
+            Assert.That(result.Value, Is.Empty);
+            Assert.That(apiConnection.ReturnIdQueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.Queries, Does.Contain(AuthQueries.updateUserPasswordChange));
+            Assert.That(ldapClient.ModifyCalls, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public async Task ResetPasswordReturnsOkAndUpdatesPasswordChanged()
+        {
+            RecordingLdapClient ldapClient = new();
+            UserControllerTestApiConnection apiConnection = new()
+            {
+                Users = new UiUser[] { CreateUser(42) }
+            };
+            UserController controller = CreateController(
+                new List<Ldap> { CreateWritableLdap(2, ldapClient) },
+                apiConnection,
+                PrincipalWithRoles(Roles.Admin));
+
+            ActionResult<string> result = await controller.ResetPassword(new UserResetPasswordParameters
+            {
+                UserId = 42,
+                LdapId = 2,
+                NewPassword = "new-password"
+            });
+
+            Assert.That(result.Result, Is.TypeOf<OkResult>());
+            Assert.That(apiConnection.ReturnIdQueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.Queries, Does.Contain(AuthQueries.updateUserPasswordChange));
+            Assert.That(ldapClient.ModifyCalls, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public async Task DeleteReturnsTrueWhenWritableLdapAndDatabaseDeleteSucceed()
+        {
+            RecordingLdapClient ldapClient = new();
+            UserControllerTestApiConnection apiConnection = new()
+            {
+                Users = new UiUser[] { CreateUser(42) }
+            };
+            UserController controller = CreateController(
+                new List<Ldap> { CreateWritableLdap(2, ldapClient) },
+                apiConnection,
+                PrincipalWithRoles(Roles.Admin));
+
+            bool result = await controller.Delete(new UserDeleteParameters
+            {
+                LdapId = 2,
+                UserId = 42
+            });
+
+            Assert.That(result, Is.True);
+            Assert.That(apiConnection.ReturnIdQueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.Queries, Does.Contain(AuthQueries.deleteUser));
+            Assert.That(ldapClient.DeletedDns, Has.Count.EqualTo(1));
+        }
+
         private static UserController CreateController(ApiConnection apiConnection, ClaimsPrincipal user)
         {
             return CreateController([], apiConnection, user);
@@ -474,6 +609,18 @@ namespace FWO.Test
                 ClaimTypes.Name,
                 ClaimTypes.Role));
         }
+
+        private static Ldap CreateWritableLdap(int id, RecordingLdapClient client)
+        {
+            return new TestableLdap(client)
+            {
+                Id = id,
+                Address = "ldap.example.test",
+                Port = 389,
+                WriteUser = "cn=write,dc=fworch,dc=internal",
+                WriteUserPwd = "writepwd"
+            };
+        }
     }
 
     internal sealed class UserControllerTestApiConnection : SimulatedApiConnection
@@ -481,11 +628,14 @@ namespace FWO.Test
         public int UserQueryCount { get; private set; }
         public int ReturnIdQueryCount { get; private set; }
         public int ReturnIdWrapperQueryCount { get; private set; }
+        public List<string> Queries { get; } = new();
         public string LastVariablesText { get; private set; } = "";
         public UiUser[] Users { get; set; } = [];
+        public ReturnIdWrapper AddUserResult { get; set; } = new();
 
         public override Task<QueryResponseType> SendQueryAsync<QueryResponseType>(string query, object? variables = null, string? operationName = null, QueryChunkingOptions? chunkingOptions = null)
         {
+            Queries.Add(query);
             if (typeof(QueryResponseType) == typeof(UiUser[]))
             {
                 UserQueryCount++;
@@ -501,7 +651,7 @@ namespace FWO.Test
             {
                 ReturnIdWrapperQueryCount++;
                 LastVariablesText = variables?.ToString() ?? "";
-                return Task.FromResult((QueryResponseType)(object)new ReturnIdWrapper());
+                return Task.FromResult((QueryResponseType)(object)AddUserResult);
             }
 
             throw new NotImplementedException();

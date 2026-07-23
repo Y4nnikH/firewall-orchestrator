@@ -18,6 +18,13 @@ namespace FWO.Test
         private static readonly string[] kSingleGroupName = ["AppOwners"];
         private static readonly string[] kResolvedDns = ["uid=user,ou=users,dc=example,dc=com", "cn=group,ou=groups,dc=example,dc=com"];
         private static readonly string[] kDirectUserDns = ["uid=user,ou=users,dc=example,dc=com", "UID=USER,ou=users,dc=example,dc=com", "", "cn=group,ou=groups,dc=example,dc=com"];
+        private static readonly string[] kMemberOfDns = ["cn=AppOwners,ou=groups,dc=example,dc=com", "cn=SecTeam,ou=groups,dc=example,dc=com"];
+        private static readonly string kGroupSearchPath = "ou=groups,dc=example,dc=com";
+        private static readonly string kUserSearchPath = "ou=users,dc=example,dc=com";
+        private static readonly string kNestedGroupDn = "cn=Nested,ou=groups,dc=example,dc=com";
+        private static readonly string kRootGroupDn = "cn=Root,ou=groups,dc=example,dc=com";
+        private static readonly string kResolvedUserDn = "uid=resolved,ou=users,dc=example,dc=com";
+        private static readonly string kAnotherResolvedUserDn = "uid=other,ou=users,dc=example,dc=com";
 
         [Test]
         public void GetGroupsIncludesWritePathMemberships()
@@ -140,6 +147,106 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task ResolveUsersFromDns_ExpandsNestedGroupsAndKeepsDirectUsers()
+        {
+            RecordingLdapClient client = new()
+            {
+                ReadResultsByDn =
+                {
+                    [kRootGroupDn] = LdapTestSupport.CreateEntry(
+                        kRootGroupDn,
+                        new LdapAttribute("uniqueMember", new[] { kNestedGroupDn, kResolvedUserDn })),
+                    [kNestedGroupDn] = LdapTestSupport.CreateEntry(
+                        kNestedGroupDn,
+                        new LdapAttribute("uniqueMember", new[] { kAnotherResolvedUserDn }))
+                }
+            };
+            TestableLdap ldap = new(client)
+            {
+                UserSearchPath = kUserSearchPath,
+                GroupSearchPath = kGroupSearchPath
+            };
+
+            List<string> resolved = await ldap.ResolveUsersFromDns(new[] { kRootGroupDn, kResolvedUserDn });
+
+            Assert.That(resolved, Is.EquivalentTo(new[] { kResolvedUserDn, kAnotherResolvedUserDn }));
+            Assert.That(client.ReadCalls, Is.EqualTo(new List<string> { kRootGroupDn, kNestedGroupDn }));
+        }
+
+        [Test]
+        public async Task GetGroupsOfUser_ReturnsMemberOfDns()
+        {
+            RecordingLdapClient client = new()
+            {
+                SearchResults = LdapTestSupport.CreateSearchResults(
+                    LdapTestSupport.CreateEntry(
+                        "uid=user,ou=users,dc=example,dc=com",
+                        new LdapAttribute("memberOf", kMemberOfDns)))
+            };
+            TestableLdap ldap = new(client)
+            {
+                SearchUser = "cn=search,dc=example,dc=com",
+                SearchUserPwd = "searchpwd",
+                UserSearchPath = kUserSearchPath
+            };
+
+            List<string> groups = await ldap.GetGroupsOfUser("user");
+
+            Assert.That(groups, Is.EqualTo(new List<string> { kMemberOfDns[0], kMemberOfDns[1] }));
+            Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public async Task GetAllGroupObjects_UsesActiveDirectoryMemberAttribute()
+        {
+            RecordingLdapClient client = new()
+            {
+                SearchResults = LdapTestSupport.CreateSearchResults(
+                    LdapTestSupport.CreateEntry(
+                        "cn=ad-group,ou=groups,dc=example,dc=com",
+                        new LdapAttribute("member", new[] { kResolvedUserDn, "" }),
+                        new LdapAttribute("businessCategory", new[] { "ownergroup" })))
+            };
+            TestableLdap ldap = new(client)
+            {
+                Type = (int)LdapType.ActiveDirectory,
+                SearchUser = "cn=search,dc=example,dc=com",
+                SearchUserPwd = "searchpwd",
+                GroupSearchPath = kGroupSearchPath
+            };
+
+            List<GroupGetReturnParameters> groups = await ldap.GetAllGroupObjects("ad-group");
+
+            Assert.That(groups, Has.Count.EqualTo(1));
+            Assert.That(groups[0].Members, Is.EqualTo(new List<string> { kResolvedUserDn }));
+            Assert.That(groups[0].OwnerGroup, Is.True);
+        }
+
+        [Test]
+        public async Task GetAllGroupObjects_ReturnsEmptyMembersWhenNoMemberAttributeExists()
+        {
+            RecordingLdapClient client = new()
+            {
+                SearchResults = LdapTestSupport.CreateSearchResults(
+                    LdapTestSupport.CreateEntry(
+                        "cn=plain-group,ou=groups,dc=example,dc=com",
+                        new LdapAttribute("description", new[] { "plain" })))
+            };
+            TestableLdap ldap = new(client)
+            {
+                SearchUser = "cn=search,dc=example,dc=com",
+                SearchUserPwd = "searchpwd",
+                GroupSearchPath = kGroupSearchPath
+            };
+
+            List<GroupGetReturnParameters> groups = await ldap.GetAllGroupObjects("plain");
+
+            Assert.That(groups, Has.Count.EqualTo(1));
+            Assert.That(groups[0].Members, Is.Empty);
+            Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
+        }
+
+        [Test]
         public void GetMemberKey_ReturnsMemberForActiveDirectoryAndUniqueMemberOtherwise()
         {
             Ldap ldap = new()
@@ -183,6 +290,31 @@ namespace FWO.Test
             List<RoleGetReturnParameters> roles = await ldap.GetAllRoles();
 
             Assert.That(roles, Is.Empty);
+        }
+
+        [Test]
+        public async Task GetAllRoles_ReturnsRoleWithMembersAndDescription()
+        {
+            RecordingLdapClient client = new()
+            {
+                SearchResults = LdapTestSupport.CreateSearchResults(
+                    LdapTestSupport.CreateEntry(
+                        "cn=AppOwners,ou=roles,dc=example,dc=com",
+                        new LdapAttribute("description", new[] { "Application owners" }),
+                        new LdapAttribute("uniqueMember", new[] { kResolvedUserDn, "" })))
+            };
+            TestableLdap ldap = new(client)
+            {
+                SearchUser = "cn=search,dc=example,dc=com",
+                SearchUserPwd = "searchpwd",
+                RoleSearchPath = "ou=roles,dc=example,dc=com"
+            };
+
+            List<RoleGetReturnParameters> roles = await ldap.GetAllRoles();
+
+            Assert.That(roles, Has.Count.EqualTo(1));
+            Assert.That(roles[0].Attributes, Has.Count.EqualTo(2));
+            Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
         }
 
         [Test]

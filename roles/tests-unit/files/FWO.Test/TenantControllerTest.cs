@@ -12,6 +12,11 @@ namespace FWO.Test
     [TestFixture]
     internal class TenantControllerTest
     {
+        private static readonly string kInternalUserSearchPath = "ou=users,dc=fworch,dc=internal";
+        private static readonly string kSearchUser = "cn=search,dc=fworch,dc=internal";
+        private static readonly string kSearchPassword = "searchpwd";
+        private static readonly string kWriteUser = "cn=write,dc=fworch,dc=internal";
+
         [Test]
         public async Task Get_ReturnsConvertedTenants()
         {
@@ -60,6 +65,56 @@ namespace FWO.Test
         }
 
         [Test]
+        public async Task Post_ReturnsTenantIdWhenWritableInternalLdapAndDatabaseSucceed()
+        {
+            RecordingLdapClient client = new();
+            MiddlewareLdap ldap = CreateWritableInternalTenantLdap(client);
+            TenantControllerTestApiConnection apiConnection = new()
+            {
+                AddTenantResult = new ReturnIdWrapper
+                {
+                    ReturnIds = new ReturnId[] { new() { NewId = 77 } }
+                }
+            };
+            TenantController controller = new(new List<MiddlewareLdap> { ldap }, apiConnection);
+
+            int result = await controller.Post(new TenantAddParameters
+            {
+                Name = "tenant-1",
+                Comment = "comment",
+                Project = "project",
+                ViewAllDevices = true
+            });
+
+            Assert.That(result, Is.EqualTo(77));
+            Assert.That(client.AddedEntries, Has.Count.EqualTo(1));
+            Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
+            Assert.That(apiConnection.LastQuery, Is.EqualTo(AuthQueries.addTenant));
+        }
+
+        [Test]
+        public async Task Post_ReturnsZeroWhenDatabaseInsertFailsAfterLdapSuccess()
+        {
+            RecordingLdapClient client = new();
+            MiddlewareLdap ldap = CreateWritableInternalTenantLdap(client);
+            TenantControllerTestApiConnection apiConnection = new()
+            {
+                ThrowOnAddTenant = true
+            };
+            TenantController controller = new(new List<MiddlewareLdap> { ldap }, apiConnection);
+
+            int result = await controller.Post(new TenantAddParameters
+            {
+                Name = "tenant-1",
+                ViewAllDevices = true
+            });
+
+            Assert.That(result, Is.Zero);
+            Assert.That(client.AddedEntries, Has.Count.EqualTo(1));
+            Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public async Task Change_ReturnsTrueWhenDatabaseUpdateMatchesTenantId()
         {
             TenantControllerTestApiConnection apiConnection = new()
@@ -78,6 +133,27 @@ namespace FWO.Test
 
             Assert.That(result, Is.True);
             Assert.That(apiConnection.LastQuery, Is.EqualTo(AuthQueries.updateTenant));
+            Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public async Task Change_ReturnsFalseWhenDatabaseUpdateDoesNotMatchTenantId()
+        {
+            TenantControllerTestApiConnection apiConnection = new()
+            {
+                UpdateResult = new ReturnId { UpdatedId = 6 }
+            };
+            TenantController controller = new(new List<MiddlewareLdap>(), apiConnection);
+
+            bool result = await controller.Change(new TenantEditParameters
+            {
+                Id = 7,
+                Comment = "updated",
+                Project = "project",
+                ViewAllDevices = true
+            });
+
+            Assert.That(result, Is.False);
             Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
         }
 
@@ -101,11 +177,47 @@ namespace FWO.Test
             Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
         }
 
+        [Test]
+        public async Task Delete_ReturnsFalseWhenDatabaseDeleteDoesNotMatchTenantId()
+        {
+            TenantControllerTestApiConnection apiConnection = new()
+            {
+                DeleteResult = new ReturnId { DeletedId = 6 }
+            };
+            TenantController controller = new(new List<MiddlewareLdap>(), apiConnection);
+
+            bool result = await controller.Delete(new TenantDeleteParameters
+            {
+                Id = 7,
+                Name = "tenant-1"
+            });
+
+            Assert.That(result, Is.False);
+            Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
+        }
+
+        private static MiddlewareLdap CreateWritableInternalTenantLdap(RecordingLdapClient client)
+        {
+            return new TestableLdap(client)
+            {
+                Id = 1,
+                Address = "ldap.example.test",
+                Port = 389,
+                SearchUser = kSearchUser,
+                SearchUserPwd = kSearchPassword,
+                WriteUser = kWriteUser,
+                WriteUserPwd = "writepwd",
+                UserSearchPath = kInternalUserSearchPath
+            };
+        }
+
         private sealed class TenantControllerTestApiConnection : SimulatedApiConnection
         {
             public Tenant[] Tenants { get; set; } = [];
             public ReturnId UpdateResult { get; set; } = new();
             public ReturnId DeleteResult { get; set; } = new();
+            public ReturnIdWrapper AddTenantResult { get; set; } = new();
+            public bool ThrowOnAddTenant { get; set; }
             public string? LastQuery { get; private set; }
             public object? LastVariables { get; private set; }
             public int QueryCount { get; private set; }
@@ -133,7 +245,11 @@ namespace FWO.Test
 
                 if (typeof(QueryResponseType) == typeof(ReturnIdWrapper) && query == AuthQueries.addTenant)
                 {
-                    return Task.FromResult((QueryResponseType)(object)new ReturnIdWrapper());
+                    if (ThrowOnAddTenant)
+                    {
+                        throw new InvalidOperationException("add tenant failed");
+                    }
+                    return Task.FromResult((QueryResponseType)(object)AddTenantResult);
                 }
 
                 throw new AssertionException($"Unexpected query: {query} for type {typeof(QueryResponseType).Name}");
