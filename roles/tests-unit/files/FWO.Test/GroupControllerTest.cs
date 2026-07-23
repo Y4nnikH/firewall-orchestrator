@@ -212,7 +212,7 @@ namespace FWO.Test
             Assert.That(client.DeletedDns, Is.EqualTo(new List<string> { kGroupDn }));
         }
 
-        private static MiddlewareLdap CreateInternalGroupLdap(RecordingLdapClient client)
+        private static TestableLdap CreateInternalGroupLdap(RecordingLdapClient client)
         {
             return new TestableLdap(client)
             {
@@ -227,7 +227,7 @@ namespace FWO.Test
             };
         }
 
-        private static MiddlewareLdap CreateInternalWritableGroupLdap(RecordingLdapClient client)
+        private static TestableLdap CreateInternalWritableGroupLdap(RecordingLdapClient client)
         {
             return new TestableLdap(client)
             {

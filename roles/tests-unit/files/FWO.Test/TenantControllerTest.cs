@@ -196,7 +196,7 @@ namespace FWO.Test
             Assert.That(apiConnection.QueryCount, Is.EqualTo(1));
         }
 
-        private static MiddlewareLdap CreateWritableInternalTenantLdap(RecordingLdapClient client)
+        private static TestableLdap CreateWritableInternalTenantLdap(RecordingLdapClient client)
         {
             return new TestableLdap(client)
             {

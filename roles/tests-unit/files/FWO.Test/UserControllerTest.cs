@@ -610,7 +610,7 @@ namespace FWO.Test
                 ClaimTypes.Role));
         }
 
-        private static Ldap CreateWritableLdap(int id, RecordingLdapClient client)
+        private static TestableLdap CreateWritableLdap(int id, RecordingLdapClient client)
         {
             return new TestableLdap(client)
             {

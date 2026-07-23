@@ -84,7 +84,7 @@ namespace FWO.Test
             Assert.That(client.ModifyCalls, Has.Count.EqualTo(1));
         }
 
-        private static MiddlewareLdap CreateRoleLdap(RecordingLdapClient client)
+        private static TestableLdap CreateRoleLdap(RecordingLdapClient client)
         {
             return new TestableLdap(client)
             {
@@ -98,7 +98,7 @@ namespace FWO.Test
             };
         }
 
-        private static MiddlewareLdap CreateWritableRoleLdap(RecordingLdapClient client)
+        private static TestableLdap CreateWritableRoleLdap(RecordingLdapClient client)
         {
             return new TestableLdap(client)
             {

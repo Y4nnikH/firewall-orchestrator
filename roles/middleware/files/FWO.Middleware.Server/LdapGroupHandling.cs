@@ -84,55 +84,14 @@ namespace FWO.Middleware.Server
         {
             List<string> userMemberships = [];
 
-            // If this Ldap is containing roles / groups
-            if (searchPath != null && searchPath != "")
+            if (IsMembershipSearchEnabled(searchPath))
             {
                 try
                 {
                     using ILdapClient connection = await Connect();
-                    // Authenticate as search user
-                    string mainKey = AesEnc.GetMainKey();
-                    if (!AesEnc.TryDecrypt(SearchUserPwd, mainKey, out string decryptedSearchUserPwd))
+                    if (await TryBindSearchUser(connection) && await SearchAndCollectMemberships(connection, searchPath!, dnList, userMemberships))
                     {
-                        Log.WriteError($"LDAP decrypt {Address}:{Port}", "Failed to decrypt LDAP search user password.");
                         return userMemberships;
-                    }
-                    await TryBind(connection, SearchUser, decryptedSearchUserPwd);
-
-                    // Search for Ldap roles / groups in given directory          
-                    int searchScope = Novell.Directory.Ldap.LdapConnection.ScopeSub; // TODO: Correct search scope?
-                    string searchFilter = $"(&(objectClass=groupOfUniqueNames)(cn=*))";
-                    ILdapSearchResults? allExistingGroupsAndRoles = await connection.SearchAsync(searchPath, searchScope, searchFilter, null, false);
-
-                    HashSet<string> searchableDns = new(DistName.DnComparer);
-                    searchableDns.UnionWith(dnList.Where(dn => !string.IsNullOrWhiteSpace(dn)));
-
-                    Log.WriteDebug("Ldap Roles/Groups", $"Try to get roles / groups from ldap");
-
-                    // Iterate found role / group
-                    if (allExistingGroupsAndRoles != null)
-                    {
-                        while (await allExistingGroupsAndRoles.HasMoreAsync())
-                        {
-                            LdapEntry? entry = await allExistingGroupsAndRoles.NextAsync();
-
-                            // Get dn of users having current role / group
-                            LdapAttribute members = entry.Get(UniqueMember);
-                            string[] memberDn = members.StringValueArray;
-
-                            // Foreach user (member) of the current role/group:
-                            foreach (string currentDn in memberDn.Where(dn => dn != "")) // ignore empty dn (could be caused by empty lines in LDAP)
-                            {
-                                // Check if current user dn is matching with given user dn => Given user has current role / group
-                                if (searchableDns.Contains(ConvertHexCommaToComma(currentDn)))
-                                {
-                                    // Get name and add it to list of roles / groups of given user
-                                    string name = entry.Get("cn").StringValue;
-                                    userMemberships.Add(name);
-                                    break;
-                                }
-                            }
-                        }
                     }
                 }
                 catch (Exception exception)
@@ -143,6 +102,61 @@ namespace FWO.Middleware.Server
 
             Log.WriteDebug($"Found the following roles / groups for user {dnList.FirstOrDefault()} in {Address}:{Port}:", string.Join("\n", userMemberships));
             return userMemberships;
+        }
+
+        private static bool IsMembershipSearchEnabled(string? searchPath)
+        {
+            return !string.IsNullOrWhiteSpace(searchPath);
+        }
+
+        private async Task<bool> TryBindSearchUser(ILdapClient connection)
+        {
+            string mainKey = AesEnc.GetMainKey();
+            if (!AesEnc.TryDecrypt(SearchUserPwd, mainKey, out string decryptedSearchUserPwd))
+            {
+                Log.WriteError($"LDAP decrypt {Address}:{Port}", "Failed to decrypt LDAP search user password.");
+                return false;
+            }
+
+            return await TryBind(connection, SearchUser, decryptedSearchUserPwd);
+        }
+
+        private async Task<bool> SearchAndCollectMemberships(ILdapClient connection, string searchPath, List<string> dnList, List<string> userMemberships)
+        {
+            int searchScope = Novell.Directory.Ldap.LdapConnection.ScopeSub; // TODO: Correct search scope?
+            string searchFilter = $"(&(objectClass=groupOfUniqueNames)(cn=*))";
+            ILdapSearchResults? allExistingGroupsAndRoles = await connection.SearchAsync(searchPath, searchScope, searchFilter, null, false);
+
+            HashSet<string> searchableDns = new(DistName.DnComparer);
+            searchableDns.UnionWith(dnList.Where(dn => !string.IsNullOrWhiteSpace(dn)));
+
+            Log.WriteDebug("Ldap Roles/Groups", $"Try to get roles / groups from ldap");
+
+            if (allExistingGroupsAndRoles == null)
+            {
+                return true;
+            }
+
+            while (await allExistingGroupsAndRoles.HasMoreAsync())
+            {
+                LdapEntry? entry = await allExistingGroupsAndRoles.NextAsync();
+                CollectMatchingMemberships(entry, searchableDns, userMemberships, UniqueMember);
+            }
+
+            return true;
+        }
+
+        private static void CollectMatchingMemberships(LdapEntry entry, HashSet<string> searchableDns, List<string> userMemberships, string uniqueMemberKey)
+        {
+            LdapAttribute members = entry.Get(uniqueMemberKey);
+            foreach (string currentDn in members.StringValueArray.Where(dn => dn != ""))
+            {
+                if (searchableDns.Contains(ConvertHexCommaToComma(currentDn)))
+                {
+                    userMemberships.Add(entry.Get("cn").StringValue);
+                    return;
+                }
+            }
         }
 
         /// <summary>

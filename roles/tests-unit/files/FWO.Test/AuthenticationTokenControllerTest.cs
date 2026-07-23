@@ -478,7 +478,7 @@ namespace FWO.Test
             return CreateController([], apiConnection);
         }
 
-        private static Ldap CreateAuthLdap(RecordingLdapClient client)
+        private static TestableLdap CreateAuthLdap(RecordingLdapClient client)
         {
             return new TestableLdap(client)
             {

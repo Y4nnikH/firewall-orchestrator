@@ -25,6 +25,14 @@ namespace FWO.Test
         private static readonly string kRootGroupDn = "cn=Root,ou=groups,dc=example,dc=com";
         private static readonly string kResolvedUserDn = "uid=resolved,ou=users,dc=example,dc=com";
         private static readonly string kAnotherResolvedUserDn = "uid=other,ou=users,dc=example,dc=com";
+        private static readonly string[] kRootGroupDns = [kRootGroupDn, kResolvedUserDn];
+        private static readonly string[] kResolvedUserValues = [kNestedGroupDn, kResolvedUserDn];
+        private static readonly string[] kAnotherResolvedUserValues = [kAnotherResolvedUserDn];
+        private static readonly string[] kMemberWithBlankValues = [kResolvedUserDn, ""];
+        private static readonly string[] kOwnerGroupValues = ["ownergroup"];
+        private static readonly string[] kPlainDescriptionValues = ["plain"];
+        private static readonly string[] kRoleDescriptionValues = ["Application owners"];
+        private static readonly string[] kResolvedUsersExpected = [kResolvedUserDn, kAnotherResolvedUserDn];
 
         [Test]
         public void GetGroupsIncludesWritePathMemberships()
@@ -155,10 +163,10 @@ namespace FWO.Test
                 {
                     [kRootGroupDn] = LdapTestSupport.CreateEntry(
                         kRootGroupDn,
-                        new LdapAttribute("uniqueMember", new[] { kNestedGroupDn, kResolvedUserDn })),
+                        new LdapAttribute("uniqueMember", kResolvedUserValues)),
                     [kNestedGroupDn] = LdapTestSupport.CreateEntry(
                         kNestedGroupDn,
-                        new LdapAttribute("uniqueMember", new[] { kAnotherResolvedUserDn }))
+                        new LdapAttribute("uniqueMember", kAnotherResolvedUserValues))
                 }
             };
             TestableLdap ldap = new(client)
@@ -167,9 +175,9 @@ namespace FWO.Test
                 GroupSearchPath = kGroupSearchPath
             };
 
-            List<string> resolved = await ldap.ResolveUsersFromDns(new[] { kRootGroupDn, kResolvedUserDn });
+            List<string> resolved = await ldap.ResolveUsersFromDns(kRootGroupDns);
 
-            Assert.That(resolved, Is.EquivalentTo(new[] { kResolvedUserDn, kAnotherResolvedUserDn }));
+            Assert.That(resolved, Is.EquivalentTo(kResolvedUsersExpected));
             Assert.That(client.ReadCalls, Is.EqualTo(new List<string> { kRootGroupDn, kNestedGroupDn }));
         }
 
@@ -204,8 +212,8 @@ namespace FWO.Test
                 SearchResults = LdapTestSupport.CreateSearchResults(
                     LdapTestSupport.CreateEntry(
                         "cn=ad-group,ou=groups,dc=example,dc=com",
-                        new LdapAttribute("member", new[] { kResolvedUserDn, "" }),
-                        new LdapAttribute("businessCategory", new[] { "ownergroup" })))
+                        new LdapAttribute("member", kMemberWithBlankValues),
+                        new LdapAttribute("businessCategory", kOwnerGroupValues)))
             };
             TestableLdap ldap = new(client)
             {
@@ -230,7 +238,7 @@ namespace FWO.Test
                 SearchResults = LdapTestSupport.CreateSearchResults(
                     LdapTestSupport.CreateEntry(
                         "cn=plain-group,ou=groups,dc=example,dc=com",
-                        new LdapAttribute("description", new[] { "plain" })))
+                        new LdapAttribute("description", kPlainDescriptionValues)))
             };
             TestableLdap ldap = new(client)
             {
@@ -300,8 +308,8 @@ namespace FWO.Test
                 SearchResults = LdapTestSupport.CreateSearchResults(
                     LdapTestSupport.CreateEntry(
                         "cn=AppOwners,ou=roles,dc=example,dc=com",
-                        new LdapAttribute("description", new[] { "Application owners" }),
-                        new LdapAttribute("uniqueMember", new[] { kResolvedUserDn, "" })))
+                        new LdapAttribute("description", kRoleDescriptionValues),
+                        new LdapAttribute("uniqueMember", kMemberWithBlankValues)))
             };
             TestableLdap ldap = new(client)
             {
