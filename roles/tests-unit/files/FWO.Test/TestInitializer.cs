@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using FWO.Basics;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 
@@ -24,6 +25,7 @@ namespace FWO.Test
 
         private FakeLocalTimeZone? fakeLocalTimeZone;
         private string? testConfigFilePath;
+        private bool mainKeyFileSet;
         private bool logLockDirSet;
 
         [OneTimeSetUp]
@@ -31,6 +33,7 @@ namespace FWO.Test
         {
             SetLogLockDirectory();
             SetConfigFilePath();
+            SetMainKeyFile();
             SetGermanCultureOnAllUnitTest();
             SetGermanTimeZoneOnAllUnitTest();
             SetQueryBasePath();
@@ -48,6 +51,11 @@ namespace FWO.Test
                 {
                     File.Delete(testConfigFilePath);
                 }
+            }
+
+            if (mainKeyFileSet && File.Exists(GlobalConst.kMainKeyFile))
+            {
+                File.Delete(GlobalConst.kMainKeyFile);
             }
 
             if (logLockDirSet)
@@ -87,6 +95,18 @@ namespace FWO.Test
             testConfigFilePath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "fworch.test.json");
             File.WriteAllText(testConfigFilePath, kTestConfigFileContent);
             Environment.SetEnvironmentVariable(kConfigFilePathEnvVar, testConfigFilePath);
+        }
+
+        private void SetMainKeyFile()
+        {
+            if (File.Exists(GlobalConst.kMainKeyFile))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(GlobalConst.kMainKeyFile)!);
+            File.WriteAllText(GlobalConst.kMainKeyFile, "0123456789ABCDEF0123456789ABCDEF");
+            mainKeyFileSet = true;
         }
 
 
