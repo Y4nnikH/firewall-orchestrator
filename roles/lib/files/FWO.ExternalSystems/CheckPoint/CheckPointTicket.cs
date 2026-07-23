@@ -214,7 +214,6 @@ namespace FWO.ExternalSystems.CheckPoint
         }
 
         #endregion
-
         #region External Processing
 
         public override async Task<RestResponse<int>> CreateExternalTicket()
