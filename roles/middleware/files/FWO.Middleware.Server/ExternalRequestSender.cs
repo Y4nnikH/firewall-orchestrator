@@ -1,6 +1,5 @@
 using FWO.Api.Client;
 using FWO.Api.Client.Queries;
-using FWO.Basics;
 using FWO.Basics.Exceptions;
 using FWO.Config.Api;
 using FWO.Data;
