@@ -141,7 +141,7 @@ namespace FWO.Test
 
             string result = InvokePrivateStatic<string>("BuildInternalCheckPointTicketNumber", userConfig, request);
 
-            ClassicAssert.AreEqual("Internal (Ticket ID: 123, Task No.: 4)", result);
+            ClassicAssert.AreEqual("Internal (Ticket Id: 123, Task Number: 4)", result);
         }
 
         [Test]
@@ -196,6 +196,14 @@ namespace FWO.Test
         [TestCase("", null)]
         [TestCase("{}", null)]
         [TestCase("not-json", null)]
+        [TestCase("[1]", null)]
+        [TestCase("123", null)]
+        [TestCase("\"ok\"", null)]
+        [TestCase("true", null)]
+        [TestCase("null", null)]
+        [TestCase("{\"ticket\": 123}", null)]
+        [TestCase("{\"ticket\": [1]}", null)]
+        [TestCase("{\"ticket\": \"ok\"}", null)]
         public void ExtractExternalTicketIdFromBody_ReturnsTicketIdWhenPresent(string? content, string? expectedId)
         {
             string? ticketId = InvokePrivateStatic<string?>("ExtractExternalTicketIdFromBody", content);

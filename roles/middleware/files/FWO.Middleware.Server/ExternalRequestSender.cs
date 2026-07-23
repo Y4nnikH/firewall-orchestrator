@@ -257,9 +257,12 @@ namespace FWO.Middleware.Server
                 $"{response.StatusCode}: {response.Content}");
         }
 
+        /// <summary>
+        /// Builds the internal Check Point ticket reference shown as external ticket number.
+        /// </summary>
         private static string BuildInternalCheckPointTicketNumber(UserConfig userConfig, ExternalRequest request)
         {
-            return $"{userConfig.GetText("Internal")} (Ticket ID: {request.TicketId}, Task No.: {request.TaskNumber})";
+            return $"{userConfig.GetText("Internal")} ({userConfig.GetText("ticket_id")}: {request.TicketId}, {userConfig.GetText("task_number")}: {request.TaskNumber})";
         }
 
         private async Task<ExternalTicket> ConstructTicket(ExternalRequest request)
@@ -448,7 +451,7 @@ namespace FWO.Middleware.Server
         }
 
         /// <summary>
-        /// Extracts the created external ticket id from ticket.id or id in the JSON response body.
+        /// Extracts the created external ticket id from the response body or Location header.
         /// </summary>
         private static string? ExtractExternalTicketId(RestResponse<int> response)
         {
@@ -475,6 +478,9 @@ namespace FWO.Middleware.Server
             return locationHeader.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
         }
 
+        /// <summary>
+        /// Extracts the created external ticket id from ticket.id or id in the JSON response body.
+        /// </summary>
         private static string? ExtractExternalTicketIdFromBody(string? content)
         {
             if (string.IsNullOrWhiteSpace(content))
@@ -486,8 +492,12 @@ namespace FWO.Middleware.Server
             {
                 using JsonDocument document = JsonDocument.Parse(content);
 
-                if (document.RootElement.TryGetProperty("ticket", out JsonElement ticket)
-                    && ticket.TryGetProperty("id", out JsonElement ticketId))
+                if (document.RootElement.ValueKind != JsonValueKind.Object)
+                {
+                    return null;
+                }
+
+                if (document.RootElement.TryGetProperty("ticket", out JsonElement ticket) && ticket.ValueKind == JsonValueKind.Object && ticket.TryGetProperty("id", out JsonElement ticketId))
                 {
                     return ticketId.ToString();
                 }
