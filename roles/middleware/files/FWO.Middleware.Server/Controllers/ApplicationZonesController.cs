@@ -159,8 +159,13 @@ public class ApplicationZonesController(ApiConnection apiConnection) : Controlle
 
         for (int index = 0; index < values.Count; index++)
         {
-            string value = values[index];
+            string? value = values[index];
             string indexedFieldName = $"{fieldName}[{index}]";
+            if (value is null)
+            {
+                AddError(errors, indexedFieldName, $"{indexedFieldName} must not be null when supplied.");
+                continue;
+            }
             if (value.Length > kMaxFilterTextLength)
             {
                 AddError(errors, indexedFieldName, $"{indexedFieldName} must not exceed {kMaxFilterTextLength} characters.");

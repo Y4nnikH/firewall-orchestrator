@@ -305,6 +305,19 @@ internal class ApplicationZonesControllerTest
         Assert.That(validationProblem.Errors.Keys, Does.Contain("options"));
     }
 
+    [Test]
+    public async Task GetRejectsNullTextFilterValues()
+    {
+        const string RequestJson = """{"options":{"filter":{"applicationName":[null]}}}""";
+        ApplicationZonesController controller = CreateController(new ApplicationAddressesApiConnection(), PrincipalWithRoles(Roles.Admin));
+        GetApplicationZonesRequest request = JsonSerializer.Deserialize<GetApplicationZonesRequest>(RequestJson)!;
+
+        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(request);
+
+        ValidationProblemDetails validationProblem = (ValidationProblemDetails)((ObjectResult)result.Result!).Value!;
+        Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.applicationName[0]"));
+    }
+
     private static List<FwoOwner> CreateOwners(params (int Id, string Name, string? AppIdExternal)[] owners)
     {
         return owners.Select(owner => new FwoOwner
