@@ -51,10 +51,11 @@ public sealed class GetApplicationAddressesOptions
 }
 
 /// <summary>
-/// Represents nullable multi-value filters for every top-level application response field. Values of the same field
-/// are OR-connected; filters for different fields are AND-connected. Empty or omitted lists do not restrict the
-/// result. String filters are case-insensitive and support <c>*</c> for any character sequence and <c>?</c> for one
-/// character; plain text without wildcards is matched as a contains search, matching the owner endpoint.
+/// Represents nullable multi-value filters for application identity fields. Values of the same field are OR-connected;
+/// filters for different fields are AND-connected. Empty or omitted lists do not restrict the result. String filters
+/// are case-insensitive and support <c>*</c> for any character sequence and <c>?</c> for one character; plain text
+/// without wildcards is matched as a contains search, matching the owner endpoint. Each filter list can contain at
+/// most 100 values.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed class ApplicationAddressFilter

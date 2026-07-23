@@ -23,6 +23,7 @@ namespace FWO.Middleware.Server.Controllers;
 public class ApplicationAddressesController(ApiConnection apiConnection) : ControllerBase
 {
     internal const int kMaxFilterTextLength = 256;
+    internal const int kMaxFilterValues = 100;
     internal const int kMaxLimit = 1000;
 
     /// <summary>
@@ -120,9 +121,20 @@ public class ApplicationAddressesController(ApiConnection apiConnection) : Contr
             return;
         }
 
+        ValidateFilterValueCount(filter.ApplicationId, "options.filter.applicationId", errors);
+        ValidateFilterValueCount(filter.ApplicationName, "options.filter.applicationName", errors);
+        ValidateFilterValueCount(filter.AppIdExternal, "options.filter.appIdExternal", errors);
         ValidatePositiveValues(filter.ApplicationId, "options.filter.applicationId", errors);
         ValidateFilterTextValues(filter.ApplicationName, "options.filter.applicationName", errors);
         ValidateFilterTextValues(filter.AppIdExternal, "options.filter.appIdExternal", errors);
+    }
+
+    private static void ValidateFilterValueCount<T>(List<T>? values, string fieldName, Dictionary<string, string[]> errors)
+    {
+        if (values?.Count > kMaxFilterValues)
+        {
+            AddError(errors, fieldName, $"{fieldName} must not contain more than {kMaxFilterValues} values.");
+        }
     }
 
     private static void ValidatePositiveValues(List<int>? values, string fieldName, Dictionary<string, string[]> errors)

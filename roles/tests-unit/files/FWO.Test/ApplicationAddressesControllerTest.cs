@@ -75,6 +75,8 @@ internal class ApplicationAddressesControllerTest
             Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Contain("query getApplicationIdentifiers"));
             Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Contain("$where: owner_bool_exp"));
             Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Contain("limit: $limit, offset: $offset"));
+            Assert.That(OwnerQueries.getApplicationIdentifiers,
+                Does.Contain("order_by: [{ name: asc }, { app_id_external: asc }]"));
             Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Contain("app_id_external"));
             Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Not.Contain("fragment"));
             Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Not.Contain("owner_responsibles"));
@@ -378,6 +380,58 @@ internal class ApplicationAddressesControllerTest
     }
 
     [Test]
+    public async Task GetAcceptsFilterListsAtTheAllowedMaximum()
+    {
+        int maxFilterValues = GetMaxFilterValues();
+        GetApplicationAddressesRequest request = new()
+        {
+            Options = new()
+            {
+                Filter = new()
+                {
+                    ApplicationId = Enumerable.Range(1, maxFilterValues).ToList(),
+                    ApplicationName = CreateFilterValues("Application", maxFilterValues),
+                    AppIdExternal = CreateFilterValues("APP", maxFilterValues)
+                }
+            }
+        };
+        ApplicationAddressesController controller = CreateController(new ApplicationAddressesApiConnection(), PrincipalWithRoles(Roles.Admin));
+
+        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(request);
+
+        Assert.That(result.Result, Is.TypeOf<OkObjectResult>());
+    }
+
+    [Test]
+    public async Task GetAggregatesErrorsForFilterListsAboveTheAllowedMaximum()
+    {
+        int maximumFilterValues = GetMaxFilterValues();
+        GetApplicationAddressesRequest request = new()
+        {
+            Options = new()
+            {
+                Filter = new()
+                {
+                    ApplicationId = Enumerable.Range(1, maximumFilterValues + 1).ToList(),
+                    ApplicationName = CreateFilterValues("Application", maximumFilterValues + 1),
+                    AppIdExternal = CreateFilterValues("APP", maximumFilterValues + 1)
+                }
+            }
+        };
+        ApplicationAddressesController controller = CreateController(new ApplicationAddressesApiConnection(), PrincipalWithRoles(Roles.Admin));
+
+        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(request);
+
+        ValidationProblemDetails validationProblem = (ValidationProblemDetails)((ObjectResult)result.Result!).Value!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.applicationId"));
+            Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.applicationName"));
+            Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.appIdExternal"));
+        });
+    }
+
+    [Test]
     public async Task GetRejectsNullOptions()
     {
         ApplicationAddressesController controller = CreateController(new ApplicationAddressesApiConnection(), PrincipalWithRoles(Roles.Admin));
@@ -459,6 +513,16 @@ internal class ApplicationAddressesControllerTest
     private static int GetMaxLimit()
     {
         return GetControllerConstant("kMaxLimit");
+    }
+
+    private static int GetMaxFilterValues()
+    {
+        return GetControllerConstant("kMaxFilterValues");
+    }
+
+    private static List<string> CreateFilterValues(string prefix, int count)
+    {
+        return Enumerable.Range(1, count).Select(index => $"{prefix}-{index}").ToList();
     }
 
     private static int GetControllerConstant(string fieldName)
