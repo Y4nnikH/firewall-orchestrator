@@ -55,7 +55,7 @@ public sealed class GetApplicationAddressesOptions
 /// filters for different fields are AND-connected. Empty or omitted lists do not restrict the result. String filters
 /// are case-insensitive and support <c>*</c> for any character sequence and <c>?</c> for one character; plain text
 /// without wildcards is matched as a contains search, matching the owner endpoint. Each filter list can contain at
-/// most 100 values.
+/// most 100 values. String filter values must not be blank.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed class ApplicationAddressFilter

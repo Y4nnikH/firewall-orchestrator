@@ -185,6 +185,11 @@ public class ApplicationAddressesController(ApiConnection apiConnection) : Contr
                 AddError(errors, indexedFieldName, $"{indexedFieldName} must not be null when supplied.");
                 continue;
             }
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                AddError(errors, indexedFieldName, $"{indexedFieldName} must not be blank when supplied.");
+                continue;
+            }
             if (value.Length > kMaxFilterTextLength)
             {
                 AddError(errors, indexedFieldName, $"{indexedFieldName} must not exceed {kMaxFilterTextLength} characters.");

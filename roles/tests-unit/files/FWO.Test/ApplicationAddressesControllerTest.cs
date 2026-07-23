@@ -222,6 +222,37 @@ internal class ApplicationAddressesControllerTest
     }
 
     [Test]
+    public async Task GetAddsActiveStateFilterByDefault()
+    {
+        ApplicationAddressesApiConnection apiConnection = new();
+        ApplicationAddressesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+
+        await controller.Get(new GetApplicationAddressesRequest());
+
+        string variables = SerializeVariables(apiConnection.LastApplicationVariables);
+        Assert.Multiple(() =>
+        {
+            Assert.That(variables, Does.Contain("\"owner_lifecycle_state\":{\"active_state\":{\"_eq\":true}}"));
+            Assert.That(variables, Does.Contain("\"owner_lifecycle_state_id\":{\"_is_null\":true}"));
+        });
+    }
+
+    [Test]
+    public async Task GetOmitsActiveStateFilterWhenInactiveStatesAreRequested()
+    {
+        ApplicationAddressesApiConnection apiConnection = new();
+        ApplicationAddressesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationAddressesRequest request = new()
+        {
+            Options = new() { ShowOnlyActiveState = false }
+        };
+
+        await controller.Get(request);
+
+        Assert.That(SerializeVariables(apiConnection.LastApplicationVariables), Does.Not.Contain("owner_lifecycle_state"));
+    }
+
+    [Test]
     public async Task GetPassesApplicationFiltersAndPagingToTheApplicationQuery()
     {
         ApplicationAddressesApiConnection apiConnection = new()
@@ -271,7 +302,7 @@ internal class ApplicationAddressesControllerTest
         {
             Options = new()
             {
-                Filter = new() { AppIdExternal = new() { "APP-7", "app-7", " app-7 ", "" } }
+                Filter = new() { AppIdExternal = new() { "APP-7", "app-7", " app-7 " } }
             }
         };
 
@@ -454,6 +485,34 @@ internal class ApplicationAddressesControllerTest
 
         ValidationProblemDetails validationProblem = (ValidationProblemDetails)((ObjectResult)result.Result!).Value!;
         Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.applicationName[0]"));
+    }
+
+    [Test]
+    public async Task GetRejectsBlankTextFilterValues()
+    {
+        ApplicationAddressesApiConnection apiConnection = new();
+        ApplicationAddressesController controller = CreateController(apiConnection, PrincipalWithRoles(Roles.Admin));
+        GetApplicationAddressesRequest request = new()
+        {
+            Options = new()
+            {
+                Filter = new()
+                {
+                    ApplicationName = new() { string.Empty },
+                    AppIdExternal = new() { " " }
+                }
+            }
+        };
+
+        ActionResult<List<ApplicationAddressResponse>> result = await controller.Get(request);
+
+        ValidationProblemDetails validationProblem = (ValidationProblemDetails)((ObjectResult)result.Result!).Value!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.applicationName[0]"));
+            Assert.That(validationProblem.Errors.Keys, Does.Contain("options.filter.appIdExternal[0]"));
+            Assert.That(apiConnection.Queries, Is.Empty);
+        });
     }
 
     private static List<FwoOwner> CreateOwners(params (int Id, string Name, string? AppIdExternal)[] owners)
