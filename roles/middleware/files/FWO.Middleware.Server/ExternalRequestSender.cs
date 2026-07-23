@@ -169,13 +169,10 @@ namespace FWO.Middleware.Server
 
             if (ticketIdResponse.StatusCode == HttpStatusCode.OK || ticketIdResponse.StatusCode == HttpStatusCode.Created)
             {
-                var locationHeader = ticketIdResponse.Headers?.FirstOrDefault(h => h.Name.Equals("location", StringComparison.OrdinalIgnoreCase))?.Value
-                    ?.ToString();
-
-                if (!string.IsNullOrEmpty(locationHeader))
+                string? externalTicketId = ExtractExternalTicketId(ticketIdResponse);
+                if (!string.IsNullOrWhiteSpace(externalTicketId))
                 {
-                    Uri locationUri = new(locationHeader);
-                    request.ExtTicketId = locationUri.Segments[^1];
+                    request.ExtTicketId = externalTicketId;
                 }
 
                 request.ExtRequestState = ExtStates.ExtReqRequested.ToString();
@@ -449,6 +446,64 @@ namespace FWO.Middleware.Server
                 waitCycles = --request.WaitCycles
             };
             await apiConnection.SendQueryAsync<ReturnId>(ExtRequestQueries.updateExternalRequestWaitCycles, Variables);
+        }
+
+        /// <summary>
+        /// Extracts the created external ticket id from ticket.id or id in the JSON response body.
+        /// </summary>
+        private static string? ExtractExternalTicketId(RestResponse<int> response)
+        {
+            string? ticketIdFromBody = ExtractExternalTicketIdFromBody(response.Content);
+            if (!string.IsNullOrWhiteSpace(ticketIdFromBody))
+            {
+                return ticketIdFromBody;
+            }
+
+            string? locationHeader = response.Headers?
+                .FirstOrDefault(h => h.Name.Equals("location", StringComparison.OrdinalIgnoreCase))?
+                .Value?.ToString();
+
+            if (string.IsNullOrWhiteSpace(locationHeader))
+            {
+                return null;
+            }
+
+            if (Uri.TryCreate(locationHeader, UriKind.Absolute, out Uri? locationUri))
+            {
+                return locationUri.Segments.LastOrDefault()?.TrimEnd('/');
+            }
+
+            return locationHeader.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+        }
+
+        private static string? ExtractExternalTicketIdFromBody(string? content)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return null;
+            }
+
+            try
+            {
+                using JsonDocument document = JsonDocument.Parse(content);
+
+                if (document.RootElement.TryGetProperty("ticket", out JsonElement ticket)
+                    && ticket.TryGetProperty("id", out JsonElement ticketId))
+                {
+                    return ticketId.ToString();
+                }
+
+                if (document.RootElement.TryGetProperty("id", out JsonElement id))
+                {
+                    return id.ToString();
+                }
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+
+            return null;
         }
 
         /// <summary>

@@ -96,7 +96,9 @@ namespace FWO.Test
             ClassicAssert.AreEqual(2, apiConnection.UpdateExtRequestCreation.Count);
             ClassicAssert.IsFalse(apiConnection.UpdateExtRequestCreation[0].Contains("id = 1"));
             ClassicAssert.IsTrue(apiConnection.UpdateExtRequestCreation[0].Contains("id = 2"));
+            ClassicAssert.IsTrue(apiConnection.UpdateExtRequestCreation[0].Contains("extTicketId = 1"));
             ClassicAssert.IsTrue(apiConnection.UpdateExtRequestCreation[1].Contains("id = 3"));
+            ClassicAssert.IsTrue(apiConnection.UpdateExtRequestCreation[1].Contains("extTicketId = 2"));
             ClassicAssert.AreEqual(2, apiConnection.UpdateExtRequestProcess.Count);
             ClassicAssert.IsTrue(apiConnection.UpdateExtRequestProcess[0].Contains("id = 4"));
             ClassicAssert.IsTrue(apiConnection.UpdateExtRequestProcess[1].Contains("id = 5"));
