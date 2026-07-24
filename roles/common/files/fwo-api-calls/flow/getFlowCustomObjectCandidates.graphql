@@ -16,6 +16,7 @@ query getFlowCustomObjectCandidates($management_id: [Int!]) {
       where: {
         active: { _eq: true }
         removed: { _is_null: true }
+        flow_nwobj_id: { _is_null: true }
       }
       order_by: [{ obj_name: asc }, { obj_id: asc }]
     ) {

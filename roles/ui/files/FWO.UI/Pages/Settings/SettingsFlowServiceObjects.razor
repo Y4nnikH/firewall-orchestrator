@@ -59,10 +59,30 @@ else
 }
 
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-4 mb-2">
-    <h4 class="mb-0">@(userConfig.GetText("custom_objects"))</h4>
+    <h4 class="mb-0">@(userConfig.GetText("custom_service_objects"))</h4>
     <button type="button" class="btn btn-sm btn-primary" @onclick:stopPropagation="true" @onclick="OpenCreateCustomObject">
-        @(DisplayService.DisplayButton(userConfig, "create_custom_flow_object", Icons.Add))
+        @(DisplayService.DisplayButton(userConfig, "create_custom_service_object", Icons.Add))
     </button>
+</div>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-4 mb-2">
+    <h4 class="mb-0">@(userConfig.GetText("flow_service_objects"))</h4>
+    <div class="btn-group">
+        <button type="button" class="btn btn-sm btn-success" disabled="@workInProgress" @onclick="() => SetShowInRequestModuleForObjects(FilteredFlowSvcObjects, true)">
+            @if (workInProgress)
+            {
+                <Loading CssClass="me-1" />
+            }
+            @(DisplayService.DisplayButton(userConfig, "show_in_request_module", Icons.Check))
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" disabled="@workInProgress" @onclick="() => SetShowInRequestModuleForObjects(FilteredFlowSvcObjects, false)">
+            @if (workInProgress)
+            {
+                <Loading CssClass="me-1" />
+            }
+            @(DisplayService.DisplayButton(userConfig, "disable", Icons.Cancel))
+        </button>
+    </div>
 </div>
 
 <FlowObjectTable TItem="FlowSvcObject"
@@ -134,7 +154,7 @@ else
     </Footer>
 </PopUp>
 
-<PopUp Title="@(userConfig.GetText("create_custom_flow_object"))" Show="@CreateCustomObjectMode" Size=PopupSize.XLarge OnClose="CloseCreateCustomObject">
+<PopUp Title="@(userConfig.GetText("create_custom_service_object"))" Show="@CreateCustomObjectMode" Size=PopupSize.XLarge OnClose="CloseCreateCustomObject">
     <Body>
         @if (CreateCustomObjectMode)
         {
@@ -181,11 +201,6 @@ else
                                 <Column TableItem="NetworkService" Title="@(userConfig.GetText("details"))" Field="@(service => service.Id)" Sortable="false" Filterable="false" Context="service">
                                     <Template>
                                         @FlowAdminHelper.FormatNetworkServiceTechnicalDetails(service)
-                                    </Template>
-                                </Column>
-                                <Column TableItem="NetworkService" Title="@(userConfig.GetText("state"))" Field="@(service => service.FlowActive)" Sortable="true" Filterable="true" Context="service">
-                                    <Template>
-                                        @service.FlowActive.ShowAsHtml()
                                     </Template>
                                 </Column>
                                 <Column TableItem="NetworkService" Title="@(userConfig.GetText("actions"))" Field="@(service => service.Id)" Sortable="false" Filterable="false" Context="service">
@@ -314,8 +329,10 @@ else
                 .. customServiceManagements.Select(management => new CustomObjectManagementSelection
                 {
                     Management = management,
-                    Candidates = [.. (management.Services ?? [])
-                        .Where(service => !string.Equals(service.Type?.Name, ServiceType.Group, StringComparison.OrdinalIgnoreCase))],
+                    Candidates = [.. (management.Services ?? []).Where(service =>
+                        service.FlowServiceObjectId == null &&
+                        service.DestinationPort == null &&
+                        !string.Equals(service.Type?.Name, ServiceType.Group, StringComparison.OrdinalIgnoreCase))],
                     SelectedService = null
                 })
             ];
@@ -323,7 +340,7 @@ else
         }
         catch (Exception exception)
         {
-            DisplayMessageInUi(exception, userConfig.GetText("create_custom_flow_object"), "", true);
+            DisplayMessageInUi(exception, userConfig.GetText("create_custom_service_object"), "", true);
         }
     }
 
@@ -451,14 +468,14 @@ else
         {
             if (string.IsNullOrWhiteSpace(NewCustomFlowSvcObject.Name))
             {
-                DisplayMessageInUi(null, userConfig.GetText("create_custom_flow_object"), userConfig.GetText("E5121"), true);
+                DisplayMessageInUi(null, userConfig.GetText("create_custom_service_object"), userConfig.GetText("E5121"), true);
                 return;
             }
 
             List<CustomObjectManagementSelection> selectedManagements = [.. customServiceObjectSelections.Where(selection => selection.SelectedService != null)];
             if (selectedManagements.Count == 0)
             {
-                DisplayMessageInUi(null, userConfig.GetText("create_custom_flow_object"), userConfig.GetText("E5122"), true);
+                DisplayMessageInUi(null, userConfig.GetText("create_custom_service_object"), userConfig.GetText("E5122"), true);
                 return;
             }
 
@@ -468,7 +485,7 @@ else
                     !TryBuildCustomServiceSignature(selection.SelectedService, out CustomServiceSignature signature) ||
                     signature != firstSignature))
             {
-                DisplayMessageInUi(null, userConfig.GetText("create_custom_flow_object"), userConfig.GetText("E5123"), true);
+                DisplayMessageInUi(null, userConfig.GetText("create_custom_service_object"), userConfig.GetText("E5123"), true);
                 return;
             }
 
@@ -495,29 +512,14 @@ else
         catch (Exception exception)
         {
             workInProgress = false;
-            DisplayMessageInUi(exception, userConfig.GetText("create_custom_flow_object"), "", true);
+            DisplayMessageInUi(exception, userConfig.GetText("create_custom_service_object"), "", true);
         }
 
         StateHasChanged();
     }
 
-    /// <summary>
-    /// Reuses an existing flow service object when the selected service signature already maps to a deterministic hash.
-    /// </summary>
     private async Task<FlowSvcObject> GetOrCreateCustomFlowSvcObject(CustomServiceSignature signature)
     {
-        if (signature.DestinationPortStart.HasValue && signature.DestinationPortEnd.HasValue)
-        {
-            string deterministicHash = FlowHashGenerator.GenerateSvcObjectHash(signature.ProtoId, signature.DestinationPortStart, signature.DestinationPortEnd);
-            FlowSvcObject? existingObject = flowSvcObjects.FirstOrDefault(flowSvcObject => string.Equals(flowSvcObject.Hash, deterministicHash, StringComparison.Ordinal));
-            if (existingObject != null)
-            {
-                return existingObject;
-            }
-
-            return await InsertCustomFlowSvcObject(signature, deterministicHash);
-        }
-
         return await InsertCustomFlowSvcObject(signature, FlowHashGenerator.GenerateRandomHash());
     }
 
@@ -624,6 +626,42 @@ else
         }
     }
 
+    private async Task SetShowInRequestModuleForObjects(IEnumerable<FlowSvcObject> objects, bool showInRequestModule)
+    {
+        try
+        {
+            List<FlowSvcObject> targets = [.. objects];
+            if (targets.Count == 0)
+            {
+                return;
+            }
+
+            workInProgress = true;
+            StateHasChanged();
+
+            foreach (FlowSvcObject svcObject in targets.Where(svcObject =>
+                         svcObject.ShowInRequestModule != showInRequestModule))
+            {
+                FlowSvcObject updatedObject = await apiConnection.SendQueryAsync<FlowSvcObject>(FlowMutations.updateFlowSvcObject, new
+                {
+                    svcobjId = svcObject.Id,
+                    name = svcObject.Name,
+                    showInRequestModule
+                });
+                ReplaceFlowSvcObjectInCatalog(updatedObject);
+            }
+
+            workInProgress = false;
+        }
+        catch (Exception exception)
+        {
+            workInProgress = false;
+            DisplayMessageInUi(exception, userConfig.GetText("flow_service_objects"), "", true);
+        }
+
+        StateHasChanged();
+    }
+
     private void UpdateCustomServiceInCatalog(NetworkService updatedService)
     {
         UpdateCustomServiceInManagements(customServiceManagements, updatedService);
@@ -662,7 +700,7 @@ else
 
     private void SelectCustomService(CustomObjectManagementSelection selection, NetworkService service)
     {
-        selection.SelectedService = service;
+        selection.SelectedService = selection.SelectedService?.Id == service.Id ? null : service;
     }
 
     private static string BuildCustomServiceSearchText(NetworkService service)

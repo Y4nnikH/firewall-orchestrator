@@ -20,8 +20,6 @@ namespace FWO.Test
     [TestFixture]
     internal class UiFlowSettingsPagesTest
     {
-        private static readonly string[] kFilteredCandidateTypes = ["host", "host"];
-
         [SetUp]
         public void SetUp()
         {
@@ -39,7 +37,7 @@ namespace FWO.Test
         }
 
         [Test]
-        public async Task FlowNetworkGroupsPage_ShowsMemberCountFromFlowMembers()
+        public async Task FlowNetworkGroupsPage_ShowsMemberDetailsFromFlowMembers()
         {
             await using BunitContext context = CreateContext();
 
@@ -52,7 +50,8 @@ namespace FWO.Test
                     .QuerySelectorAll("tbody tr")[0]
                     .Children[5];
 
-                Assert.That(objectsCell.TextContent.Trim(), Is.EqualTo("2"));
+                Assert.That(objectsCell.TextContent.Trim(), Does.Contain("10.0.0.1"));
+                Assert.That(objectsCell.TextContent.Trim(), Does.Contain("10.0.0.2"));
             });
         }
 
@@ -89,10 +88,11 @@ namespace FWO.Test
                 Assert.That(apiConnection.Queries, Does.Contain(FlowMutations.upsertFlowSvcObjectMapping));
                 Assert.That(apiConnection.InsertedServiceObject, Is.Not.Null);
                 Assert.That(apiConnection.InsertedServiceObject!.Name, Is.EqualTo("Custom Service"));
-                Assert.That(apiConnection.InsertedServiceObject.PortStart, Is.EqualTo(80));
-                Assert.That(apiConnection.InsertedServiceObject.PortEnd, Is.EqualTo(80));
+                Assert.That(apiConnection.InsertedServiceObject.PortStart, Is.Null);
+                Assert.That(apiConnection.InsertedServiceObject.PortEnd, Is.Null);
                 Assert.That(apiConnection.InsertedServiceObject.IpProtoId, Is.EqualTo(6));
-                Assert.That(apiConnection.InsertedServiceObject.SvcObjHash, Is.EqualTo(FlowHashGenerator.GenerateSvcObjectHash(6, 80, 80)));
+                Assert.That(apiConnection.InsertedServiceObject.SvcObjHash, Is.Not.Null.And.Length.EqualTo(32));
+                Assert.That(apiConnection.InsertedServiceObject.SvcObjHash, Is.Not.EqualTo(FlowHashGenerator.GenerateSvcObjectHash(6, 80, 80)));
                 Assert.That(apiConnection.MappingCalls, Is.EqualTo(new List<(long ServiceId, long FlowSvcobjId, bool ActiveOnMgm)>
                 {
                     (11, 900, true)
@@ -101,7 +101,7 @@ namespace FWO.Test
         }
 
         [Test]
-        public async Task FlowServiceObjectsPage_CreateCustomObject_ReusesExistingMatchingHash()
+        public async Task FlowServiceObjectsPage_CreateCustomObject_AlwaysCreatesNewFlowObject()
         {
             await using BunitContext context = CreateCustomServiceReuseContext(out FlowServiceObjectsCustomCreateApiConn apiConnection);
 
@@ -118,11 +118,13 @@ namespace FWO.Test
 
             component.WaitForAssertion(() =>
             {
-                Assert.That(apiConnection.Queries, Does.Not.Contain(FlowQueries.insertFlowSvcObjects));
-                Assert.That(apiConnection.InsertedServiceObject, Is.Null);
+                Assert.That(apiConnection.Queries, Does.Contain(FlowQueries.insertFlowSvcObjects));
+                Assert.That(apiConnection.InsertedServiceObject, Is.Not.Null);
+                Assert.That(apiConnection.InsertedServiceObject!.SvcObjHash, Has.Length.EqualTo(32));
+                Assert.That(apiConnection.InsertedServiceObject.SvcObjHash, Is.Not.EqualTo(FlowHashGenerator.GenerateSvcObjectHash(6, 80, 80)));
                 Assert.That(apiConnection.MappingCalls, Is.EqualTo(new List<(long ServiceId, long FlowSvcobjId, bool ActiveOnMgm)>
                 {
-                    (11, 777, true)
+                    (11, 900, true)
                 }));
             });
         }
@@ -142,6 +144,42 @@ namespace FWO.Test
                 Assert.That(component.Markup, Does.Not.Contain("Service Group Candidate"));
                 Assert.That(component.Markup, Does.Contain("Service A"));
             });
+        }
+
+        [Test]
+        public async Task FlowServiceObjectsPage_CreateCustomObject_DoesNotOfferMappedOrPortBoundServices()
+        {
+            await using BunitContext context = CreateCustomServiceCreateContext(out _);
+
+            IRenderedComponent<SettingsFlowServiceObjects> component = RenderPage<SettingsFlowServiceObjects>(context);
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-primary"), Is.Not.Empty));
+
+            component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.That(component.Markup, Does.Not.Contain("Mapped Service"));
+                Assert.That(component.Markup, Does.Not.Contain("Port Service"));
+                Assert.That(component.Markup, Does.Contain("Service A"));
+            });
+        }
+
+        [Test]
+        public async Task FlowServiceObjectsPage_CreateCustomObject_AllowsDeselectingSelectedService()
+        {
+            await using BunitContext context = CreateCustomServiceCreateContext(out _);
+
+            IRenderedComponent<SettingsFlowServiceObjects> component = RenderPage<SettingsFlowServiceObjects>(context);
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-primary"), Is.Not.Empty));
+
+            component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-outline-primary"), Is.Not.Empty));
+
+            component.FindAll("button.btn-outline-primary")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("tr.table-warning"), Has.Count.EqualTo(1)));
+            component.FindAll("button.btn-success").Last().Click();
+
+            component.WaitForAssertion(() => Assert.That(component.FindAll("tr.table-warning"), Is.Empty));
         }
 
         [Test]
@@ -317,7 +355,7 @@ namespace FWO.Test
         }
 
         [Test]
-        public async Task FlowServiceObjectsPage_ResolveDuplicateMapping_PreservesCachedServiceSignatureForCreateDialog()
+        public async Task FlowServiceObjectsPage_ResolveDuplicateMapping_ExcludesMappedServicesFromCreateDialog()
         {
             await using BunitContext context = CreateDuplicateResolverContext(out FlowServiceObjectsDuplicateResolverApiConn apiConnection);
 
@@ -341,21 +379,7 @@ namespace FWO.Test
 
             component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
             component.WaitForAssertion(() => Assert.That(component.FindAll("input.form-control.form-control-sm"), Is.Not.Empty));
-
-            component.FindAll("input.form-control.form-control-sm")[0].Change("Merged Service");
-            component.FindAll("button.btn-outline-primary")[0].Click();
-            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-success"), Is.Not.Empty));
-            component.FindAll("button.btn.btn-sm.btn-primary")[^1].Click();
-
-            component.WaitForAssertion(() =>
-            {
-                Assert.That(apiConnection.Queries, Does.Contain(FlowQueries.insertFlowSvcObjects));
-                Assert.That(apiConnection.InsertedServiceObject, Is.Not.Null);
-                Assert.That(apiConnection.InsertedServiceObject!.IpProtoId, Is.EqualTo(6));
-                Assert.That(apiConnection.InsertedServiceObject.PortStart, Is.EqualTo(80));
-                Assert.That(apiConnection.InsertedServiceObject.PortEnd, Is.EqualTo(80));
-                Assert.That(apiConnection.MappingCalls, Does.Contain((11L, 900L, true)));
-            });
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-outline-primary"), Is.Empty));
         }
 
         [Test]
@@ -559,7 +583,7 @@ namespace FWO.Test
         }
 
         [Test]
-        public async Task FlowNetworkObjectsPage_ResolveDuplicateMapping_PreservesTypeForCustomObjectSearch()
+        public async Task FlowNetworkObjectsPage_ResolveDuplicateMapping_ShowsOnlyUnmappedObjectsInCustomObjectDialog()
         {
             await using BunitContext context = CreateNetworkDuplicateResolverContext(out FlowNetworkObjectsDuplicateResolverApiConn apiConnection);
 
@@ -597,8 +621,24 @@ namespace FWO.Test
                 .Cast<NetworkObject>()
                 .ToList();
 
-            Assert.That(filteredCandidates, Has.Count.EqualTo(2));
-            Assert.That(filteredCandidates.Select(candidate => candidate.Type.Name), Is.EqualTo(kFilteredCandidateTypes));
+            Assert.That(filteredCandidates.Select(candidate => candidate.Id), Is.EqualTo(new[] { 13L, 14L }));
+            Assert.That(filteredCandidates.Select(candidate => candidate.Type.Name), Is.EqualTo(new[] { "host", "host" }));
+        }
+
+        [Test]
+        public async Task FlowNetworkObjectsPage_CreateCustomObject_AllowsDeselectingSelectedObject()
+        {
+            await using BunitContext context = CreateNetworkObjectsContext(out _);
+
+            IRenderedComponent<SettingsFlowNetworkObjects> component = RenderPage<SettingsFlowNetworkObjects>(context);
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn.btn-sm.btn-primary"), Is.Not.Empty));
+            component.FindAll("button.btn.btn-sm.btn-primary")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-outline-primary"), Is.Not.Empty));
+            component.FindAll("button.btn-outline-primary")[0].Click();
+            component.WaitForAssertion(() => Assert.That(component.FindAll("tr.table-warning"), Has.Count.EqualTo(1)));
+            component.FindAll("button.btn-success").Last().Click();
+
+            component.WaitForAssertion(() => Assert.That(component.FindAll("tr.table-warning"), Is.Empty));
         }
 
         private static BunitContext CreateContext()
@@ -784,8 +824,17 @@ namespace FWO.Test
                 "uid",
                 "search_name",
                 "custom_objects",
+                "custom_network_objects",
+                "custom_service_objects",
                 "create_custom_flow_object",
+                "create_custom_network_object",
+                "create_custom_service_object",
                 "flow_objects",
+                "flow_network_objects",
+                "flow_service_objects",
+                "flow_network_groups",
+                "flow_service_groups",
+                "flow_time_objects",
                 "edit_flow_object",
                 "save",
                 "cancel",
@@ -875,7 +924,19 @@ namespace FWO.Test
                     IpEnd = "",
                     Uid = "local-1",
                     Active = true,
-                    FlowNetworkObjectId = 100,
+                    FlowNetworkObjectId = null,
+                    FlowActive = false,
+                    Type = new NetworkObjectType { Id = 1, Name = "host" }
+                },
+                new NetworkObject
+                {
+                    Id = 3,
+                    Name = "Second Local Object",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "local-2",
+                    Active = true,
+                    FlowNetworkObjectId = null,
                     FlowActive = false,
                     Type = new NetworkObjectType { Id = 1, Name = "host" }
                 }
@@ -1304,8 +1365,8 @@ namespace FWO.Test
                     Id = 11,
                     Name = "Service A",
                     Uid = "svc-a",
-                    DestinationPort = 80,
-                    DestinationPortEnd = 80,
+                    DestinationPort = null,
+                    DestinationPortEnd = null,
                     ProtoId = 6,
                     FlowServiceObjectId = null,
                     Type = new NetworkServiceType { Name = ServiceType.SimpleService },
@@ -1318,6 +1379,30 @@ namespace FWO.Test
                     Uid = "svc-group",
                     Type = new NetworkServiceType { Name = ServiceType.Group },
                     FlowServiceGroupId = null,
+                    FlowActive = false
+                },
+                new()
+                {
+                    Id = 13,
+                    Name = "Mapped Service",
+                    Uid = "svc-mapped",
+                    DestinationPort = null,
+                    DestinationPortEnd = null,
+                    ProtoId = 6,
+                    FlowServiceObjectId = 123,
+                    Type = new NetworkServiceType { Name = ServiceType.SimpleService },
+                    FlowActive = false
+                },
+                new()
+                {
+                    Id = 14,
+                    Name = "Port Service",
+                    Uid = "svc-port",
+                    DestinationPort = 8080,
+                    DestinationPortEnd = 8080,
+                    ProtoId = 6,
+                    FlowServiceObjectId = null,
+                    Type = new NetworkServiceType { Name = ServiceType.SimpleService },
                     FlowActive = false
                 }
             ]
@@ -1334,9 +1419,9 @@ namespace FWO.Test
                     Id = 21,
                     Name = "Service B",
                     Uid = "svc-b",
-                    DestinationPort = 443,
-                    DestinationPortEnd = 443,
-                    ProtoId = 6,
+                    DestinationPort = null,
+                    DestinationPortEnd = null,
+                    ProtoId = 17,
                     FlowServiceObjectId = null,
                     Type = new NetworkServiceType { Name = ServiceType.SimpleService },
                     FlowActive = false
@@ -1426,8 +1511,9 @@ namespace FWO.Test
                     Id = serviceId,
                     Name = serviceId == 11 ? "Service A" : "Service B",
                     Uid = serviceId == 11 ? "svc-a" : "svc-b",
-                    DestinationPort = serviceId == 11 ? 80 : 443,
-                    DestinationPortEnd = serviceId == 11 ? 80 : 443,
+                    DestinationPort = null,
+                    DestinationPortEnd = null,
+                    ProtoId = serviceId == 11 ? 6 : 17,
                     Active = true,
                     Removed = null,
                     FlowServiceObjectId = flowSvcobjId,
@@ -1957,6 +2043,30 @@ namespace FWO.Test
                     Active = true,
                     Type = new NetworkObjectType { Id = 1, Name = "host" },
                     FlowNetworkObjectId = 100,
+                    FlowActive = false
+                },
+                new NetworkObject
+                {
+                    Id = 13,
+                    Name = "Object C",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "obj-c",
+                    Active = true,
+                    Type = new NetworkObjectType { Id = 1, Name = "host" },
+                    FlowNetworkObjectId = null,
+                    FlowActive = false
+                },
+                new NetworkObject
+                {
+                    Id = 14,
+                    Name = "Object D",
+                    IP = "",
+                    IpEnd = "",
+                    Uid = "obj-d",
+                    Active = true,
+                    Type = new NetworkObjectType { Id = 1, Name = "host" },
+                    FlowNetworkObjectId = null,
                     FlowActive = false
                 }
             ]

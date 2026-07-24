@@ -16,6 +16,10 @@ query getFlowCustomServiceCandidates($management_id: [Int!]) {
       where: {
         active: { _eq: true }
         removed: { _is_null: true }
+        svc_port: { _is_null: true }
+        ip_proto_id: { _is_null: false }
+        flow_svcobj_id: { _is_null: true }
+        svc_typ_id: { _neq: 2 }
       }
       order_by: [{ svc_name: asc }, { svc_id: asc }]
     ) {

@@ -57,6 +57,26 @@ else
     <div class="text-muted small mb-3">@(userConfig.GetText("no_duplicate_conflicts"))</div>
 }
 
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-4 mb-2">
+    <h4 class="mb-0">@(userConfig.GetText("flow_network_groups"))</h4>
+    <div class="btn-group">
+        <button type="button" class="btn btn-sm btn-success" disabled="@workInProgress" @onclick="() => SetShowInRequestModuleForGroups(FilteredFlowNwGroups, true)">
+            @if (workInProgress)
+            {
+                <Loading CssClass="me-1" />
+            }
+            @(DisplayService.DisplayButton(userConfig, "show_in_request_module", Icons.Check))
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" disabled="@workInProgress" @onclick="() => SetShowInRequestModuleForGroups(FilteredFlowNwGroups, false)">
+            @if (workInProgress)
+            {
+                <Loading CssClass="me-1" />
+            }
+            @(DisplayService.DisplayButton(userConfig, "disable", Icons.Cancel))
+        </button>
+    </div>
+</div>
+
 <FlowObjectTable TItem="FlowNwGroup"
                  FilteredItems="FilteredFlowNwGroups"
                  FilteredCount="FilteredFlowNwGroups.Count"
@@ -83,7 +103,7 @@ else
         </Column>
         <Column TableItem="FlowNwGroup" Title="@(userConfig.GetText("objects"))" Field="@(nwGroup => nwGroup.Id)" Sortable="false" Filterable="false" Context="nwGroup">
             <Template>
-                @nwGroup.NwGroupMembers.Count
+                @BuildFlowNwGroupMemberDetails(nwGroup.Id)
             </Template>
         </Column>
         <Pager ShowPageNumber="true" ShowTotalCount="true" />
@@ -311,6 +331,41 @@ else
         {
             workInProgress = false;
             DisplayMessageInUi(exception, userConfig.GetText("edit_flow_object"), "", true);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task SetShowInRequestModuleForGroups(IEnumerable<FlowNwGroup> groups, bool showInRequestModule)
+    {
+        try
+        {
+            List<FlowNwGroup> targets = [.. groups];
+            if (targets.Count == 0)
+            {
+                return;
+            }
+
+            workInProgress = true;
+            StateHasChanged();
+
+            foreach (FlowNwGroup nwGroup in targets.Where(nwGroup => nwGroup.ShowInRequestModule != showInRequestModule))
+            {
+                FlowNwGroup updatedGroup = await apiConnection.SendQueryAsync<FlowNwGroup>(FlowMutations.updateFlowNwGroup, new
+                {
+                    nwgroupId = nwGroup.Id,
+                    name = nwGroup.Name,
+                    showInRequestModule
+                });
+                ReplaceFlowNwGroupInCatalog(updatedGroup);
+            }
+
+            workInProgress = false;
+        }
+        catch (Exception exception)
+        {
+            workInProgress = false;
+            DisplayMessageInUi(exception, userConfig.GetText("flow_network_groups"), "", true);
         }
 
         StateHasChanged();

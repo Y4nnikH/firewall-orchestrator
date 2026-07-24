@@ -57,6 +57,26 @@ else
     <div class="text-muted small mb-3">@(userConfig.GetText("no_duplicate_conflicts"))</div>
 }
 
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-4 mb-2">
+    <h4 class="mb-0">@(userConfig.GetText("flow_service_groups"))</h4>
+    <div class="btn-group">
+        <button type="button" class="btn btn-sm btn-success" disabled="@workInProgress" @onclick="() => SetShowInRequestModuleForGroups(FilteredFlowSvcGroups, true)">
+            @if (workInProgress)
+            {
+                <Loading CssClass="me-1" />
+            }
+            @(DisplayService.DisplayButton(userConfig, "show_in_request_module", Icons.Check))
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" disabled="@workInProgress" @onclick="() => SetShowInRequestModuleForGroups(FilteredFlowSvcGroups, false)">
+            @if (workInProgress)
+            {
+                <Loading CssClass="me-1" />
+            }
+            @(DisplayService.DisplayButton(userConfig, "disable", Icons.Cancel))
+        </button>
+    </div>
+</div>
+
 <FlowObjectTable TItem="FlowSvcGroup"
                  FilteredItems="FilteredFlowSvcGroups"
                  FilteredCount="FilteredFlowSvcGroups.Count"
@@ -83,7 +103,7 @@ else
         </Column>
         <Column TableItem="FlowSvcGroup" Title="@(userConfig.GetText("objects"))" Field="@(svcGroup => svcGroup.Id)" Sortable="false" Filterable="false" Context="svcGroup">
             <Template>
-                @(svcGroup.SvcGroupMembers.Count)
+                @BuildFlowSvcGroupMemberDetails(svcGroup.Id)
             </Template>
         </Column>
         <Pager ShowPageNumber="true" ShowTotalCount="true" />
@@ -313,6 +333,41 @@ else
         {
             workInProgress = false;
             DisplayMessageInUi(exception, userConfig.GetText("edit_flow_object"), "", true);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task SetShowInRequestModuleForGroups(IEnumerable<FlowSvcGroup> groups, bool showInRequestModule)
+    {
+        try
+        {
+            List<FlowSvcGroup> targets = [.. groups];
+            if (targets.Count == 0)
+            {
+                return;
+            }
+
+            workInProgress = true;
+            StateHasChanged();
+
+            foreach (FlowSvcGroup svcGroup in targets.Where(svcGroup => svcGroup.ShowInRequestModule != showInRequestModule))
+            {
+                FlowSvcGroup updatedGroup = await apiConnection.SendQueryAsync<FlowSvcGroup>(FlowMutations.updateFlowSvcGroup, new
+                {
+                    svcgroupId = svcGroup.Id,
+                    name = svcGroup.Name,
+                    showInRequestModule
+                });
+                ReplaceFlowSvcGroupInCatalog(updatedGroup);
+            }
+
+            workInProgress = false;
+        }
+        catch (Exception exception)
+        {
+            workInProgress = false;
+            DisplayMessageInUi(exception, userConfig.GetText("flow_service_groups"), "", true);
         }
 
         StateHasChanged();

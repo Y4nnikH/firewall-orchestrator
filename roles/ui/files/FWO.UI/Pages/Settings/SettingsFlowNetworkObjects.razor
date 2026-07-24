@@ -58,14 +58,14 @@ else
 }
 
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-4 mb-2">
-    <h4 class="mb-0">@(userConfig.GetText("custom_objects"))</h4>
+    <h4 class="mb-0">@(userConfig.GetText("custom_network_objects"))</h4>
     <button type="button" class="btn btn-sm btn-primary" @onclick:stopPropagation="true" @onclick="OpenCreateCustomObject">
-        @(DisplayService.DisplayButton(userConfig, "create_custom_flow_object", Icons.Add))
+        @(DisplayService.DisplayButton(userConfig, "create_custom_network_object", Icons.Add))
     </button>
 </div>
 
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-4 mb-2">
-    <h4 class="mb-0">@(userConfig.GetText("flow_objects"))</h4>
+    <h4 class="mb-0">@(userConfig.GetText("flow_network_objects"))</h4>
     <div class="btn-group">
         <button type="button" class="btn btn-sm btn-success" disabled="@workInProgress" @onclick="() => SetShowInRequestModuleForObjects(FilteredFlowNwObjects, true)">
             @if (workInProgress)
@@ -184,7 +184,7 @@ else
     </ChildContent>
 </FlowDuplicateResolver>
 
-<PopUp Title="@(userConfig.GetText("create_custom_flow_object"))" Show="@CreateCustomObjectMode" Size=PopupSize.XLarge OnClose="CloseCreateCustomObject">
+<PopUp Title="@(userConfig.GetText("create_custom_network_object"))" Show="@CreateCustomObjectMode" Size=PopupSize.XLarge OnClose="CloseCreateCustomObject">
     <Body>
         @if (CreateCustomObjectMode)
         {
@@ -431,7 +431,8 @@ else
                 {
                     Management = management,
                     Candidates = FlowAdminHelper.FilterCustomObjectCandidates(
-                        customObjectManagements.FirstOrDefault(candidateManagement => candidateManagement.Id == management.Id)?.Objects,
+                        customObjectManagements.FirstOrDefault(candidateManagement => candidateManagement.Id == management.Id)?.Objects
+                            ?.Where(nwObject => nwObject.FlowNetworkObjectId == null),
                         null),
                     SelectedObject = null
                 })
@@ -440,7 +441,7 @@ else
         }
         catch (Exception exception)
         {
-            DisplayMessageInUi(exception, userConfig.GetText("create_custom_flow_object"), "", true);
+            DisplayMessageInUi(exception, userConfig.GetText("create_custom_network_object"), "", true);
         }
     }
 
@@ -531,7 +532,7 @@ else
         {
             if (string.IsNullOrWhiteSpace(NewCustomFlowNwObject.Name))
             {
-                DisplayMessageInUi(null, userConfig.GetText("create_custom_flow_object"), userConfig.GetText("E5102"), true);
+                DisplayMessageInUi(null, userConfig.GetText("create_custom_network_object"), userConfig.GetText("E5102"), true);
                 return;
             }
 
@@ -567,7 +568,7 @@ else
         catch (Exception exception)
         {
             workInProgress = false;
-            DisplayMessageInUi(exception, userConfig.GetText("create_custom_flow_object"), "", true);
+            DisplayMessageInUi(exception, userConfig.GetText("create_custom_network_object"), "", true);
         }
 
         StateHasChanged();
@@ -688,7 +689,7 @@ else
 
     private void SelectCustomObject(CustomObjectManagementSelection selection, NetworkObject nwObject)
     {
-        selection.SelectedObject = nwObject;
+        selection.SelectedObject = selection.SelectedObject?.Id == nwObject.Id ? null : nwObject;
     }
 
     private sealed class CustomObjectManagementSelection

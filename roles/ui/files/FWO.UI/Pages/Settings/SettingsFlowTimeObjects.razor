@@ -57,6 +57,26 @@ else
     <div class="text-muted small mb-3">@(userConfig.GetText("no_duplicate_conflicts"))</div>
 }
 
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-4 mb-2">
+    <h4 class="mb-0">@(userConfig.GetText("flow_time_objects"))</h4>
+    <div class="btn-group">
+        <button type="button" class="btn btn-sm btn-success" disabled="@workInProgress" @onclick="() => SetShowInRequestModuleForObjects(FilteredFlowTimeObjects, true)">
+            @if (workInProgress)
+            {
+                <Loading CssClass="me-1" />
+            }
+            @(DisplayService.DisplayButton(userConfig, "show_in_request_module", Icons.Check))
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" disabled="@workInProgress" @onclick="() => SetShowInRequestModuleForObjects(FilteredFlowTimeObjects, false)">
+            @if (workInProgress)
+            {
+                <Loading CssClass="me-1" />
+            }
+            @(DisplayService.DisplayButton(userConfig, "disable", Icons.Cancel))
+        </button>
+    </div>
+</div>
+
 <FlowObjectTable TItem="FlowTimeObject"
                  FilteredItems="FilteredFlowTimeObjects"
                  FilteredCount="FilteredFlowTimeObjects.Count"
@@ -313,6 +333,41 @@ else
         {
             workInProgress = false;
             DisplayMessageInUi(exception, userConfig.GetText("edit_flow_object"), "", true);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task SetShowInRequestModuleForObjects(IEnumerable<FlowTimeObject> objects, bool showInRequestModule)
+    {
+        try
+        {
+            List<FlowTimeObject> targets = [.. objects];
+            if (targets.Count == 0)
+            {
+                return;
+            }
+
+            workInProgress = true;
+            StateHasChanged();
+
+            foreach (FlowTimeObject timeObject in targets.Where(timeObject => timeObject.ShowInRequestModule != showInRequestModule))
+            {
+                FlowTimeObject updatedObject = await apiConnection.SendQueryAsync<FlowTimeObject>(FlowMutations.updateFlowTimeObject, new
+                {
+                    timeobjId = timeObject.Id,
+                    name = timeObject.Name,
+                    showInRequestModule
+                });
+                ReplaceFlowTimeObjectInCatalog(updatedObject);
+            }
+
+            workInProgress = false;
+        }
+        catch (Exception exception)
+        {
+            workInProgress = false;
+            DisplayMessageInUi(exception, userConfig.GetText("flow_time_objects"), "", true);
         }
 
         StateHasChanged();
