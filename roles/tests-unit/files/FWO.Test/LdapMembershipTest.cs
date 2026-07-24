@@ -191,7 +191,7 @@ namespace FWO.Test
             List<string> groups = await ldap.GetGroups(kSingleResolvedUserDns);
 
             Assert.That(groups, Is.Empty);
-            Assert.That(client.SearchCalls, Is.Empty);
+            Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
         }
 
         [Test]
@@ -240,7 +240,7 @@ namespace FWO.Test
             };
 
             List<string> groups = [];
-            bool collected = await InvokePrivateAsync<bool>(
+            await InvokePrivateAsync(
                 ldap,
                 "SearchAndCollectMemberships",
                 client,
@@ -249,7 +249,6 @@ namespace FWO.Test
                 groups);
 
             Assert.That(groups, Is.EqualTo(kAppOwnerCn));
-            Assert.That(collected, Is.True);
             Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
         }
 
@@ -272,7 +271,7 @@ namespace FWO.Test
             };
 
             List<string> groups = [];
-            bool collected = await InvokePrivateAsync<bool>(
+            await InvokePrivateAsync(
                 ldap,
                 "SearchAndCollectMemberships",
                 client,
@@ -281,7 +280,6 @@ namespace FWO.Test
                 groups);
 
             Assert.That(groups, Is.EqualTo(kEscapedGroupCn));
-            Assert.That(collected, Is.True);
             Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
         }
 
@@ -304,7 +302,7 @@ namespace FWO.Test
             };
 
             List<string> roles = [];
-            bool collected = await InvokePrivateAsync<bool>(
+            await InvokePrivateAsync(
                 ldap,
                 "SearchAndCollectMemberships",
                 client,
@@ -313,7 +311,6 @@ namespace FWO.Test
                 roles);
 
             Assert.That(roles, Is.EqualTo(kAppOwnerCn));
-            Assert.That(collected, Is.True);
             Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
         }
 
@@ -332,7 +329,7 @@ namespace FWO.Test
             };
 
             List<string> roles = [];
-            bool collected = await InvokePrivateAsync<bool>(
+            await InvokePrivateAsync(
                 ldap,
                 "SearchAndCollectMemberships",
                 client,
@@ -341,7 +338,6 @@ namespace FWO.Test
                 roles);
 
             Assert.That(roles, Is.Empty);
-            Assert.That(collected, Is.True);
             Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
         }
 
@@ -362,7 +358,7 @@ namespace FWO.Test
             List<string> groups = [];
 
             Assert.ThrowsAsync<InvalidOperationException>(async () =>
-                await InvokePrivateAsync<bool>(
+                await InvokePrivateAsync(
                     ldap,
                     "SearchAndCollectMemberships",
                     client,
@@ -540,14 +536,15 @@ namespace FWO.Test
             return (T)method.Invoke(instance, parameters)!;
         }
 
-        private static async Task<T> InvokePrivateAsync<T>(object instance, string methodName, params object?[] parameters)
+        private static async Task InvokePrivateAsync(object instance, string methodName, params object?[] parameters)
         {
             MethodInfo method = FindPrivateInstanceMethod(instance.GetType(), methodName)
                 ?? throw new MissingMethodException(instance.GetType().FullName, methodName);
             object? result = method.Invoke(instance, parameters);
-            if (result is Task<T> typedTask)
+            if (result is Task task)
             {
-                return await typedTask;
+                await task;
+                return;
             }
 
             throw new InvalidOperationException($"Unexpected task type for {methodName}.");

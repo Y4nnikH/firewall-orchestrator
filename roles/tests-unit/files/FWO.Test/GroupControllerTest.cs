@@ -23,11 +23,11 @@ namespace FWO.Test
         private static readonly string kDirectUserDn = "uid=direct,ou=users,dc=fworch,dc=internal";
         private static readonly string kUserDn = "uid=user,ou=users,dc=fworch,dc=internal";
         private static readonly string kUserName = "user";
-        private static readonly string[] kUserValues = new string[] { kUserName };
-        private static readonly string[] kUniqueMemberValues = new string[] { kUserDn };
-        private static readonly string[] kGroupMemberValues = new string[] { kGroupMemberDn };
-        private static readonly string[] kOwnerGroupValues = new string[] { "ownergroup" };
-        private static readonly string[] kMembersValues = new string[] { kUserDn, "", kOtherGroupDn };
+        private static readonly string[] kUserValues = { kUserName };
+        private static readonly string[] kUniqueMemberValues = { kUserDn };
+        private static readonly string[] kGroupMemberValues = { kGroupMemberDn };
+        private static readonly string[] kOwnerGroupValues = { "ownergroup" };
+        private static readonly string[] kMembersValues = { kUserDn, "", kOtherGroupDn };
 
         [Test]
         public async Task Get_ReturnsInternalGroupObjectsFromLdap()

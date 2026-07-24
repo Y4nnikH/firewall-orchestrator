@@ -19,14 +19,25 @@ using System.Reflection;
 
 namespace FWO.Test
 {
-        [TestFixture]
-        [Parallelizable]
-        internal class AuthenticationTokenControllerTest
+    [TestFixture]
+    [Parallelizable]
+    internal class AuthenticationTokenControllerTest
+    {
+        private static readonly string[] kLoginUserCn = { "login-user" };
+        private static readonly string[] kLoginUserDn = { "uid=login-user,ou=users,dc=fworch,dc=internal" };
+        private static readonly string[] kReporterRoleValues = { Roles.Reporter };
+        private static readonly RefreshTokenInfo[] kRefreshTokenUserId7 = { new() { UserId = 7 } };
+        private static readonly UiUser[] kTokenUser = { new() { DbId = 7, Name = "token-user" } };
+        private static readonly UiUser[] kLoginUserResult =
         {
-            private static readonly string[] kLoginUserCn = new string[] { "login-user" };
-            private static readonly string[] kLoginUserDn = new string[] { "uid=login-user,ou=users,dc=fworch,dc=internal" };
-            private static readonly string[] kReporterRoleValues = new string[] { Roles.Reporter };
-            private static readonly string kSearchPassword = LdapTestSupport.CreateEncryptedSecret("searchpwd");
+            new()
+            {
+                DbId = 7,
+                Name = "login-user",
+                Dn = "uid=login-user,ou=users,dc=fworch,dc=internal"
+            }
+        };
+        private static readonly string kSearchPassword = LdapTestSupport.CreateEncryptedSecret("searchpwd");
 
         [Test]
         public async Task GetAsync_ReturnsAnonymousJwt_WhenCredentialsAreMissing()
@@ -212,7 +223,7 @@ namespace FWO.Test
         public async Task RefreshToken_ReturnsUnauthorizedWhenUserCannotBeFound()
         {
             RecordingApiConnection apiConnection = new();
-            apiConnection.QueueResult(new[] { new RefreshTokenInfo { UserId = 7 } });
+            apiConnection.QueueResult(kRefreshTokenUserId7);
             apiConnection.QueueResult(Array.Empty<UiUser>());
             AuthenticationTokenController controller = CreateController(apiConnection);
 
@@ -240,8 +251,8 @@ namespace FWO.Test
         public async Task RevokeToken_ReturnsUnauthorizedWhenRevocationAffectsNoRows()
         {
             RecordingApiConnection apiConnection = new();
-            apiConnection.QueueResult(new[] { new RefreshTokenInfo { UserId = 7 } });
-            apiConnection.QueueResult(new[] { new UiUser { DbId = 7, Name = "token-user" } });
+            apiConnection.QueueResult(kRefreshTokenUserId7);
+            apiConnection.QueueResult(kTokenUser);
             apiConnection.QueueResult(new ReturnId { AffectedRows = 0 });
             AuthenticationTokenController controller = CreateController(apiConnection);
 
@@ -313,7 +324,8 @@ namespace FWO.Test
                 CreatedAt = DateTime.UtcNow.AddMinutes(-1),
                 ExpiresAt = DateTime.UtcNow.AddMinutes(30)
             };
-            apiConnection.NextResult = new[] { expectedTokenInfo };
+            RefreshTokenInfo[] nextResult = { expectedTokenInfo };
+            apiConnection.NextResult = nextResult;
 
             object authManager = CreateAuthManager(apiConnection);
 
@@ -603,28 +615,12 @@ namespace FWO.Test
             {
                 if (query == AuthQueries.getUserByDbId)
                 {
-                    return new UiUser[]
-                    {
-                        new()
-                        {
-                            DbId = 7,
-                            Name = "login-user",
-                            Dn = "uid=login-user,ou=users,dc=fworch,dc=internal"
-                        }
-                    };
+                    return kLoginUserResult;
                 }
 
                 if (query == AuthQueries.getUserByDn)
                 {
-                    return new UiUser[]
-                    {
-                        new()
-                        {
-                            DbId = 7,
-                            Name = "login-user",
-                            Dn = "uid=login-user,ou=users,dc=fworch,dc=internal"
-                        }
-                    };
+                    return kLoginUserResult;
                 }
             }
 

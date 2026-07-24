@@ -84,15 +84,13 @@ namespace FWO.Middleware.Server
         {
             List<string> userMemberships = [];
 
-            if (IsMembershipSearchEnabled(searchPath))
+            if (!string.IsNullOrEmpty(searchPath))
             {
                 try
                 {
                     using ILdapClient connection = await Connect();
-                    if (await TryBindSearchUser(connection) && await SearchAndCollectMemberships(connection, searchPath!, dnList, userMemberships))
-                    {
-                        return userMemberships;
-                    }
+                    await TryBindSearchUser(connection);
+                    await SearchAndCollectMemberships(connection, searchPath, dnList, userMemberships);
                 }
                 catch (Exception exception)
                 {
@@ -102,11 +100,6 @@ namespace FWO.Middleware.Server
 
             Log.WriteDebug($"Found the following roles / groups for user {dnList.FirstOrDefault()} in {Address}:{Port}:", string.Join("\n", userMemberships));
             return userMemberships;
-        }
-
-        private static bool IsMembershipSearchEnabled(string? searchPath)
-        {
-            return !string.IsNullOrWhiteSpace(searchPath);
         }
 
         private async Task<bool> TryBindSearchUser(ILdapClient connection)
@@ -121,7 +114,7 @@ namespace FWO.Middleware.Server
             return await TryBind(connection, SearchUser, decryptedSearchUserPwd);
         }
 
-        private async Task<bool> SearchAndCollectMemberships(ILdapClient connection, string searchPath, List<string> dnList, List<string> userMemberships)
+        private async Task SearchAndCollectMemberships(ILdapClient connection, string searchPath, List<string> dnList, List<string> userMemberships)
         {
             int searchScope = Novell.Directory.Ldap.LdapConnection.ScopeSub; // TODO: Correct search scope?
             string searchFilter = $"(&(objectClass=groupOfUniqueNames)(cn=*))";
@@ -134,7 +127,7 @@ namespace FWO.Middleware.Server
 
             if (allExistingGroupsAndRoles == null)
             {
-                return true;
+                return;
             }
 
             while (await allExistingGroupsAndRoles.HasMoreAsync())
@@ -142,8 +135,6 @@ namespace FWO.Middleware.Server
                 LdapEntry? entry = await allExistingGroupsAndRoles.NextAsync();
                 CollectMatchingMemberships(entry, searchableDns, userMemberships, UniqueMember);
             }
-
-            return true;
         }
 
         private static void CollectMatchingMemberships(LdapEntry entry, HashSet<string> searchableDns, List<string> userMemberships, string uniqueMemberKey)

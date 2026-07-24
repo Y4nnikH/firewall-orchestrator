@@ -18,12 +18,12 @@ namespace FWO.Test
         private static readonly string kGroupMemberDn = "uid=groupmember,ou=users,dc=example,dc=com";
         private static readonly string kMail = "user@example.test";
         private static readonly string kDescription = "Application owners";
-        private static readonly string[] kOwnerGroupValues = new string[] { "ownergroup" };
-        private static readonly string[] kUidValues = new string[] { "user" };
-        private static readonly string[] kMailValues = new string[] { kMail };
-        private static readonly string[] kDescriptionValues = new string[] { kDescription };
-        private static readonly string[] kUniqueMemberValues = new string[] { kUserDn };
-        private static readonly string[] kGroupMemberValues = new string[] { kGroupMemberDn };
+        private static readonly string[] kOwnerGroupValues = { "ownergroup" };
+        private static readonly string[] kUidValues = { "user" };
+        private static readonly string[] kMailValues = { kMail };
+        private static readonly string[] kDescriptionValues = { kDescription };
+        private static readonly string[] kUniqueMemberValues = { kUserDn };
+        private static readonly string[] kGroupMemberValues = { kGroupMemberDn };
 
         [TestCase(true, LdapModification.Add, false)]
         [TestCase(false, LdapModification.Add, true)]

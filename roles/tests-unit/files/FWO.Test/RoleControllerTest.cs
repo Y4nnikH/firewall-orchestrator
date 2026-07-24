@@ -17,8 +17,8 @@ namespace FWO.Test
         private static readonly string kSearchPassword = LdapTestSupport.CreateEncryptedSecret("searchpwd");
         private static readonly string kRoleDn = "cn=AppOwners,ou=roles,dc=fworch,dc=internal";
         private static readonly string kRoleMemberDn = "uid=user1,ou=users,dc=fworch,dc=internal";
-        private static readonly string[] kRoleDescription = new string[] { "Application owners" };
-        private static readonly string[] kRoleMembers = new string[] { kRoleMemberDn };
+        private static readonly string[] kRoleDescription = { "Application owners" };
+        private static readonly string[] kRoleMembers = { kRoleMemberDn };
 
         [Test]
         public async Task Get_ReturnsRolesFromLdap()
