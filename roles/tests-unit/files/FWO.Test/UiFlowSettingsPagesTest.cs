@@ -20,6 +20,9 @@ namespace FWO.Test
     [TestFixture]
     internal class UiFlowSettingsPagesTest
     {
+        private static readonly long[] kUnmappedNetworkCandidateIds = [13, 14];
+        private static readonly string[] kUnmappedNetworkCandidateTypes = ["host", "host"];
+
         [SetUp]
         public void SetUp()
         {
@@ -177,7 +180,8 @@ namespace FWO.Test
 
             component.FindAll("button.btn-outline-primary")[0].Click();
             component.WaitForAssertion(() => Assert.That(component.FindAll("tr.table-warning"), Has.Count.EqualTo(1)));
-            component.FindAll("button.btn-success").Last().Click();
+            var successButtons = component.FindAll("button.btn-success");
+            successButtons[successButtons.Count - 1].Click();
 
             component.WaitForAssertion(() => Assert.That(component.FindAll("tr.table-warning"), Is.Empty));
         }
@@ -621,8 +625,8 @@ namespace FWO.Test
                 .Cast<NetworkObject>()
                 .ToList();
 
-            Assert.That(filteredCandidates.Select(candidate => candidate.Id), Is.EqualTo(new[] { 13L, 14L }));
-            Assert.That(filteredCandidates.Select(candidate => candidate.Type.Name), Is.EqualTo(new[] { "host", "host" }));
+            Assert.That(filteredCandidates.Select(candidate => candidate.Id), Is.EqualTo(kUnmappedNetworkCandidateIds));
+            Assert.That(filteredCandidates.Select(candidate => candidate.Type.Name), Is.EqualTo(kUnmappedNetworkCandidateTypes));
         }
 
         [Test]
@@ -636,7 +640,8 @@ namespace FWO.Test
             component.WaitForAssertion(() => Assert.That(component.FindAll("button.btn-outline-primary"), Is.Not.Empty));
             component.FindAll("button.btn-outline-primary")[0].Click();
             component.WaitForAssertion(() => Assert.That(component.FindAll("tr.table-warning"), Has.Count.EqualTo(1)));
-            component.FindAll("button.btn-success").Last().Click();
+            var successButtons = component.FindAll("button.btn-success");
+            successButtons[successButtons.Count - 1].Click();
 
             component.WaitForAssertion(() => Assert.That(component.FindAll("tr.table-warning"), Is.Empty));
         }
