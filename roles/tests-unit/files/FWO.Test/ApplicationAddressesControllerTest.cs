@@ -76,7 +76,7 @@ internal class ApplicationAddressesControllerTest
             Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Contain("$where: owner_bool_exp"));
             Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Contain("limit: $limit, offset: $offset"));
             Assert.That(OwnerQueries.getApplicationIdentifiers,
-                Does.Contain("order_by: [{ name: asc }, { app_id_external: asc }]"));
+                Does.Contain("order_by: [{ name: asc }, { app_id_external: asc }, { id: asc }]"));
             Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Contain("app_id_external"));
             Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Not.Contain("fragment"));
             Assert.That(OwnerQueries.getApplicationIdentifiers, Does.Not.Contain("owner_responsibles"));
