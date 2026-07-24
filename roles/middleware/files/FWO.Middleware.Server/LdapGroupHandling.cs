@@ -89,8 +89,10 @@ namespace FWO.Middleware.Server
                 try
                 {
                     using ILdapClient connection = await Connect();
-                    await TryBindSearchUser(connection);
-                    await SearchAndCollectMemberships(connection, searchPath, dnList, userMemberships);
+                    if (await TryBindSearchUser(connection))
+                    {
+                        await SearchAndCollectMemberships(connection, searchPath, dnList, userMemberships);
+                    }
                 }
                 catch (Exception exception)
                 {

@@ -191,7 +191,7 @@ namespace FWO.Test
             List<string> groups = await ldap.GetGroups(kSingleResolvedUserDns);
 
             Assert.That(groups, Is.Empty);
-            Assert.That(client.SearchCalls, Has.Count.EqualTo(1));
+            Assert.That(client.SearchCalls, Is.Empty);
         }
 
         [Test]
