@@ -297,31 +297,7 @@ namespace FWO.Data.Flow
         {
             string ipStart = candidate.IpStart ?? "";
             string ipEnd = candidate.IpEnd ?? "";
-            if (ShouldDisplayExplicitFlowIpRange(ipStart, ipEnd))
-            {
-                return $"{ipStart.StripOffUnnecessaryNetmask()}-{ipEnd.StripOffUnnecessaryNetmask()}";
-            }
-
             return DisplayBase.DisplayIp(ipStart, ipEnd);
-        }
-
-        private static bool ShouldDisplayExplicitFlowIpRange(string ipStart, string ipEnd)
-        {
-            if (string.IsNullOrWhiteSpace(ipStart) || string.IsNullOrWhiteSpace(ipEnd))
-            {
-                return false;
-            }
-
-            string displayStart = ipStart.StripOffUnnecessaryNetmask();
-            string displayEnd = ipEnd.StripOffUnnecessaryNetmask();
-            bool hasHostNetmask = ipStart.EndsWith("/32", StringComparison.Ordinal) ||
-                                  ipEnd.EndsWith("/32", StringComparison.Ordinal) ||
-                                  ipStart.EndsWith("/128", StringComparison.Ordinal) ||
-                                  ipEnd.EndsWith("/128", StringComparison.Ordinal);
-            return hasHostNetmask &&
-                   !string.Equals(displayStart, displayEnd, StringComparison.Ordinal) &&
-                   !displayStart.Contains('/') &&
-                   !displayEnd.Contains('/');
         }
 
         /// <summary>

@@ -700,20 +700,20 @@ namespace FWO.Test
         }
 
         [Test]
-        public void FormatFlowNwObjectTechnicalDetails_PreservesExplicitIpRange()
+        public void FormatFlowNwObjectTechnicalDetails_UsesDisplayIpFormattingForNetworks()
         {
             FlowNwObject candidate = new()
             {
                 Id = 42,
                 Name = "flow-candidate",
-                IpStart = "192.0.2.10/32",
-                IpEnd = "192.0.2.20/32",
+                IpStart = "0.0.0.0/0",
+                IpEnd = "255.255.255.255/0",
                 Hash = "hash-42"
             };
 
             string details = FlowAdminHelper.FormatFlowNwObjectTechnicalDetails(candidate);
 
-            Assert.That(details, Is.EqualTo("192.0.2.10-192.0.2.20"));
+            Assert.That(details, Is.EqualTo("0.0.0.0/0"));
         }
 
         [Test]
