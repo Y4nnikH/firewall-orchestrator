@@ -647,3 +647,6 @@ Not supported any longer are:
 - The new "Version tag guard" GitHub action reports version tags created on a commit carrying a different `product_version` and merges that landed on an already sealed version
 
 ## 9.4.7 - 03.09.2026
+
+## 9.5.0 - 01.01.2028
+- new feat
