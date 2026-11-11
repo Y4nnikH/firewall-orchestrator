@@ -2,7 +2,16 @@
 
 ## 9.9.2 - 11.11.2026
 - dependencies: update the graphql-core Python package of the importer and customizing scripts to 3.3.1 (security fix, FWO not exploitable).
-
+- CI: the version gate no longer loses its result when a pull request is pushed while the version gate refresh runs (#5674)
+  - version-gate.yml has no concurrency group anymore, so a refresh re-run of an older head cannot cancel the gate of the current head
+  - the refresh skips a pull request whose head moved since it read the pull request list
+- CI: shorter pull request checks and less queueing on the shared runners (#5674)
+  - the install runs of the integration flow skip running the unit tests (new tag `unittests_run`); C# and importer unit tests run in parallel jobs instead
+  - removed the PDF test step of the install job, which only rebuilt the test project to skip the test on GitHub Actions
+  - importer unit tests: the autouse service provider fixture builds its test doubles on first use only (about 7 times faster)
+  - the full install matrix runs at most 5 jobs at once and is no longer cancelled by later pushes to develop or main
+  - Python dependency updates get a Python 3.10-3.14 unit test matrix instead of the full install matrix
+  - Dependabot groups minor and patch updates per directory into one pull request
 
 ## 9.9.1 - 05.11.2026
 - request workflow: access-task elements reference their ticket-local object-create task, so updates to the defining task remain consistent

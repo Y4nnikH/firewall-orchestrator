@@ -17,9 +17,13 @@ on:
       - develop
   pull_request:
 
+# A newer push to a pull request cancels its running checks. On main and develop a running full
+# matrix is allowed to finish instead: with max-parallel below it takes long enough that frequent
+# merges would otherwise cancel every run before it completes. GitHub keeps at most one pending
+# run per group and replaces it with the newest, so only the latest commit waits.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   setup:
@@ -27,6 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      max_parallel: ${{ steps.set-matrix.outputs.max_parallel }}
+      python_versions: ${{ steps.set-matrix.outputs.python_versions }}
     steps:
       - name: Select matrix based on event
         id: set-matrix
@@ -38,13 +44,23 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Runners are shared by every workflow and pull request, and GitHub has no job
+          # priority. Capping the full matrix leaves the rest of the pool to pull requests.
+          kFullMatrixMaxParallel=5
+
           full=false
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             full="$INPUT_FULL"
           elif [ "$EVENT_NAME" = "push" ] && [[ "$REF" =~ ^refs/heads/(main|develop)$ ]]; then
             full=true
-          elif [ "$EVENT_NAME" = "pull_request" ] && [[ "$HEAD_REF" == dependabot/pip/* ]]; then
-            full=true
+          fi
+
+          # Python dependency updates get the Python version matrix of the unit tests instead of
+          # the 15 job install matrix; the install itself is covered by the minimal matrix here
+          # and by the full matrix once the update is merged.
+          python_versions="$full"
+          if [ "$EVENT_NAME" = "pull_request" ] && [[ "$HEAD_REF" == dependabot/pip/* ]]; then
+            python_versions=true
           fi
 
           if [ "$full" = "true" ]; then
@@ -90,9 +106,17 @@ jobs:
           fi
 
           combos=$(echo "$matrix" | jq '.include | length')
-          echo "::notice::full=$full, selected $combos matrix combo(s)"
+          max_parallel="$combos"
+          if [ "$full" = "true" ]; then
+            max_parallel="$kFullMatrixMaxParallel"
+          fi
+          echo "::notice::full=$full, selected $combos matrix combo(s), at most $max_parallel at once, python_versions=$python_versions"
 
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          {
+            echo "matrix=$matrix"
+            echo "max_parallel=$max_parallel"
+            echo "python_versions=$python_versions"
+          } >> "$GITHUB_OUTPUT"
 
   test-install:
     needs: setup
@@ -105,6 +129,7 @@ jobs:
       FWO_TEST_PASSWORD: "testpassword"
     strategy:
       fail-fast: false
+      max-parallel: ${{ fromJSON(needs.setup.outputs.max_parallel) }}
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -134,25 +159,22 @@ jobs:
       # Demo data is off by default since GHSA-3v53-q5h9-pvfh, but the tests rely on it: sample-auth-data
       # creates the LDAP user of the JWT integration tests (integration_user_jwt_refresh_test), and the
       # integration tests use the sample devices, tenants and users. So every run requests it explicitly.
+      #
+      # unittests_run is skipped in the integration flow: the csharp-unit-tests and python-code-check
+      # jobs run the same suites in parallel, and running them inside both playbook runs below cost
+      # about 8 minutes per job. The test project is still deployed, the JWT step runs from it. The
+      # plain installs of the full matrix keep running the unit tests on the installed system.
       - name: Run Ansible test install without integration cleanup
         if: ${{ matrix.integration }}
         run: |
           cd ${{ github.workspace }}
-          ./scripts/run-playbook-with-sudo.sh site.yml -e force_install=true -e add_demo_data=yes --skip-tags integrationtests
+          ./scripts/run-playbook-with-sudo.sh site.yml -e force_install=true -e add_demo_data=yes --skip-tags integrationtests,unittests_run
 
       - name: Run Ansible test install
         if: ${{ !matrix.integration }}
         run: |
           cd ${{ github.workspace }}
           ./scripts/run-playbook-with-sudo.sh site.yml -e force_install=true -e add_demo_data=yes -e "ansible_python_interpreter=$(which python)"
-
-      - name: Running in GitHub actions requires testing puppeteer pdf creation separately
-        if: ${{ env.RUNNING_ON_GITHUB_ACTIONS == 'true' }}
-        run: |
-          cd ${{ github.workspace }}/roles/tests-unit/files/FWO.Test
-          dotnet restore
-          dotnet build
-          dotnet test --filter "Name=HtmlToPdfTest" --blame-hang-timeout 5m --blame-hang-dump-type none
 
       - name: Run JWT refresh integration tests
         if: ${{ matrix.integration }}
@@ -184,7 +206,7 @@ jobs:
       # only inside the invocation that performed the rotation. This is also the only run
       # that exercises the force-regeneration paths in create-ca.yml and
       # issue-certificates.yml, and that proves every service still comes up against a CA
-      # anchor that changed underneath it.
+      # anchor that changed underneath it. Only unittests_run is skipped, see the first install step.
       - name: Run Ansible certificate reset upgrade with integration tests
         if: ${{ matrix.integration && success() }}
         run: |
@@ -192,7 +214,8 @@ jobs:
           ./scripts/run-playbook-with-sudo.sh site.yml \
             -e force_install=true \
             -e add_demo_data=yes \
-            -e "installation_mode=upgrade internalca_reset_certificates=true"
+            -e "installation_mode=upgrade internalca_reset_certificates=true" \
+            --skip-tags unittests_run
 
       - name: Collect certificate diagnostics after a failed reset upgrade
         if: ${{ matrix.integration && failure() }}
@@ -212,6 +235,55 @@ jobs:
       # Stubbed ansible/ansible-galaxy, so no real Ansible install is needed.
       - name: Run run-playbook-with-sudo.sh guard tests
         run: ./scripts/tests/test-run-playbook-with-sudo.sh
+
+  # The C# unit tests on the runner itself, in parallel with the installs. They need no
+  # installation; the default runsettings turn the integration tests off, and HtmlToPdfTest skips
+  # itself on GitHub Actions. They stay in Debug: in Release, ConfigFile exits the process on an
+  # unreadable config file (#if RELEASE), which ends the test host in IncorrectSyntaxConfigFile.
+  csharp-unit-tests:
+    name: C# unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Run C# unit tests
+        run: dotnet test roles/tests-unit/files/FWO.Test/FWO.Test.csproj --configuration Debug --settings FWO.default.runsettings
+
+  # Python dependency updates and the full matrix only: the importer and customizing code
+  # supports Python 3.10 and newer, the PR set tests 3.11 in python-code-check.
+  python-unit-tests:
+    needs: setup
+    if: ${{ needs.setup.outputs.python_versions == 'true' }}
+    name: Python unit tests on Python ${{ matrix.python }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Each requirements file goes into an environment of its own, as on an installed system:
+      # the installer requirements run Ansible, the importer ones the importer venv.
+      - name: Install the installer requirements
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libldap2-dev libsasl2-dev
+          python -m venv "$RUNNER_TEMP/installer-venv"
+          "$RUNNER_TEMP/installer-venv/bin/python" -m pip install -r requirements.txt
+
+      - name: Install the importer and scripts requirements
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --only-binary=cryptography --prefer-binary -r roles/importer/files/importer/requirements.txt -r scripts/requirements.txt
+
+      - name: Run importer and customizing unit tests
+        run: .venv/bin/python -m pytest -q roles/importer/files/importer/test scripts/customizing
 
   release-build:
     name: Release build
@@ -255,5 +327,7 @@ jobs:
 
       - run: ruff format --exit-non-zero-on-format
 
-      - name: Version gate unit tests
-        run: ".venv/bin/python -m pytest -q scripts/ci"
+      # The importer tests ran inside the install before; the scripts tests include the version
+      # gate and workflow policy tests in scripts/ci.
+      - name: Python unit tests
+        run: ".venv/bin/python -m pytest -q roles/importer/files/importer/test scripts"

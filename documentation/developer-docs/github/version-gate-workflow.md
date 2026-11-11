@@ -190,6 +190,19 @@ has since changed. If a pull request cannot be refreshed at all — the run quer
 was found, or the re-run was rejected — the loop counts it and moves on to the next pull request,
 and the job then fails loudly, because that pull request would otherwise keep a stale green gate.
 
+Right before a re-run, the loop reads the pull request's head again. If it moved since the
+pull request list was read, the push started a gate run of its own after this refresh began,
+and that run already sees the current base, so the run of the older head is not re-run. If the
+lookup fails, the run is re-run anyway.
+
+`version-gate.yml` has no concurrency group on purpose. A gate run takes about a minute and
+reports only on its own head commit, so cancelling an older run saves next to nothing. With the
+former per pull request group, a refresh that re-ran the run of an older head cancelled the
+gate run of a head pushed moments later, and the pull request was left without a result
+("Canceling since a higher priority waiting request ... exists"). The head SHA cannot be part of
+the group instead, because a `pull_request_target` workflow must not reference the pull request
+head (`scripts/ci/test_workflow_security_policy.py`).
+
 This workflow lives in its own file on purpose: a second job inside `version-gate.yml` would add
 a permanently skipped entry to every pull request.
 

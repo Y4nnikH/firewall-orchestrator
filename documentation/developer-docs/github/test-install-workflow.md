@@ -23,18 +23,44 @@ The full matrix is selected when any of the following is true:
 
 - the event is `workflow_dispatch` and the `full` input was checked
 - the event is `push` to `main` or `develop`
-- the event is `pull_request` from a `dependabot/pip/*` branch
 
 Otherwise the minimal matrix is used. This covers `workflow_dispatch`
-with `full` unchecked (the default), and any `pull_request` that isn't
-from a `dependabot/pip/*` branch — including dependabot PRs for the
-`nuget` and `github-actions` ecosystems, which intentionally only get
-the minimal matrix.
+with `full` unchecked (the default), and every `pull_request`,
+including Dependabot pull requests.
 
 | Matrix  | Combinations | Notes |
 |---------|--------------|-------|
-| Full    | `ubuntu-26.04`, `ubuntu-24.04`, `ubuntu-22.04` x Python `3.10`-`3.14` (15 combos) | `fail-fast: false`, so one failing combo does not cancel the rest |
-| Minimal | `ubuntu-24.04` / Python `3.11` (1 combo) | matches the pre-merge `test-install.yml` behavior |
+| Full    | `ubuntu-26.04`, `ubuntu-24.04`, `ubuntu-22.04` x Python `3.10`-`3.14` (15 combos) | `fail-fast: false`, so one failing combo does not cancel the rest; at most 5 run at once |
+| Minimal | `ubuntu-24.04` / Python `3.10` and `3.11` (2 combos) | one per pinned Ansible generation, see below |
+
+### Sharing the runner pool
+
+GitHub-hosted runners are shared by every workflow and pull request of
+the organization, and GitHub has no job priority. Two settings keep the
+full matrix from occupying the whole pool:
+
+- `max-parallel` caps the full matrix at 5 concurrent jobs
+  (`kFullMatrixMaxParallel` in the `setup` job), so pull request checks
+  still find free runners while it runs.
+- `cancel-in-progress` applies to pull requests only. On `main` and
+  `develop` a running full matrix finishes, because with the cap it
+  takes long enough that frequent merges would otherwise cancel every
+  run. GitHub keeps one pending run per branch and replaces it with the
+  newest push, so only the latest commit waits.
+
+Dependabot pull requests are grouped (see `.github/dependabot.yml`):
+minor and patch updates of one directory arrive as one pull request,
+major updates keep a pull request of their own.
+
+### Python version matrix
+
+The `python-unit-tests` job runs the importer and customizing unit
+tests on Python `3.10`-`3.14`, and installs the installer's
+`requirements.txt` on each version. It runs with the full matrix and on
+pull requests from a `dependabot/pip/*` branch. Such a pull request
+used to get the full 15 job install matrix; the version matrix covers
+what a Python dependency update can break at a fraction of the cost,
+and the full matrix after the merge covers the rest.
 
 Both matrices pin an explicit Ubuntu version (`ubuntu-24.04`) rather
 than `ubuntu-latest`, so a future change to what `ubuntu-latest` points
@@ -62,11 +88,20 @@ The flagged entries run, in order:
 1. the sample LDAP seeding regression tests
    (`scripts/tests/test-sample-auth-data.sh`), which stub `ldapmodify`
    and therefore need neither an installation nor an LDAP server
-2. an install with `--skip-tags integrationtests`
+2. an install with `--skip-tags integrationtests,unittests_run`
 3. the JWT refresh integration test
 4. the Ansible `--tags integrationtests` cleanup step
 5. a certificate reset upgrade,
-   `-e "installation_mode=upgrade internalca_reset_certificates=true"`
+   `-e "installation_mode=upgrade internalca_reset_certificates=true"`,
+   with `--skip-tags unittests_run`
+
+`unittests_run` tags only the tasks of `roles/tests-unit` that run the
+C# and importer unit tests. Skipping it still deploys the test project,
+which the JWT step runs from. The unit tests themselves run in the
+parallel `csharp-unit-tests` and `python-code-check` jobs instead;
+inside both playbook runs they cost about 8 minutes per job. The plain
+installs of the full matrix do not skip the tag, so running the unit
+tests on an installed system stays covered there.
 
 Step 5 is a full run rather than a tag-limited one on purpose:
 `roles/tests-integration` asserts on facts the reset itself produces —
@@ -76,6 +111,27 @@ the invocation that performed the rotation. It is also what exercises
 the force-regeneration paths in `roles/internalCA`, and it proves every
 service still comes up against a CA anchor that changed underneath it.
 A failure there is followed by a certificate diagnostics step.
+
+## Unit tests
+
+- `csharp-unit-tests` runs `FWO.Test` on the runner with
+  `FWO.default.runsettings`, which turns the integration tests off.
+  It builds in `Debug`: in `Release`, `ConfigFile` exits the process on
+  an unreadable config file (`#if RELEASE`), which ends the test host in
+  `ConfigFileTest.IncorrectSyntaxConfigFile`.
+- `python-code-check` runs the importer tests and the tests under
+  `scripts` (including the version gate and workflow policy tests in
+  `scripts/ci`) on Python `3.11`.
+
+`HtmlToPdfTest` skips itself whenever `GITHUB_ACTIONS` is set, so PDF
+generation is not exercised by any workflow. The former separate PDF
+step in the install job only rebuilt the test project to report that
+skip, and was removed.
+
+No workflow uses a dependency cache: `sonarcloud-pr.yml` builds pull
+request code in the privileged `pull_request_target` context, and
+`scripts/ci/test_workflow_security_policy.py` forbids caches in every
+workflow while that is the case (GHSA-3cwm-h5cm-r3f8).
 
 ## Release build
 
