@@ -1,6 +1,12 @@
 # Firewall Orchestrator Revision History
 
-## 9.9.2 - 11.11.2026
+## 9.9.3 - 11.11.2026
+- middleware REST API: `getAddressGroups` and `getServiceGroups` accept `filter.includeTechnicalDetails=true` to include each member's standalone address or service object fields; omitted, null or false keep the existing compact id/name response, and address details can be combined with separated zone groups
+
+
+## 9.9.2 - 10.11.2026
+- dependencies: update NuGet packages (AngleSharp 1.10.1, bunit 2.15.2, IPNetwork2 5.0.1, Microsoft.AspNetCore.Http 2.3.14, Microsoft.NET.Test.Sdk 18.11.1, Quartz 4.7.3, Scalar.AspNetCore 2.20.0, SoPro.FancyTable 1.5.0)
+- dependencies: update ASP.NET Core packages to 10.0.15 (Microsoft.AspNetCore.Authentication.JwtBearer, Microsoft.AspNetCore.Components, Microsoft.AspNetCore.Mvc.Testing, Microsoft.AspNetCore.OpenApi), .NET 10.0.15 security release
 - dependencies: update the graphql-core Python package of the importer and customizing scripts to 3.3.1 (security fix, FWO not exploitable).
 - CI: the version gate no longer loses its result when a pull request is pushed while the version gate refresh runs (#5674)
   - version-gate.yml has no concurrency group anymore, so a refresh re-run of an older head cannot cancel the gate of the current head
@@ -12,6 +18,8 @@
   - the full install matrix runs at most 5 jobs at once and is no longer cancelled by later pushes to develop or main
   - Python dependency updates get a Python 3.10-3.14 unit test matrix instead of the full install matrix
   - Dependabot groups minor and patch updates per directory into one pull request
+- dependencies: update the graphql-core Python package of the importer and customizing scripts to 3.3.2 (denial-of-service fixes in validator and parser).
+
 
 ## 9.9.1 - 05.11.2026
 - request workflow: access-task elements reference their ticket-local object-create task, so updates to the defining task remain consistent
