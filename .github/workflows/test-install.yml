@@ -1,13 +1,21 @@
 name: FWO Test Install
-# NOTE: this workflow's behavior (trigger/matrix logic) is documented in
-# documentation/developer-docs/github/test-install-workflow.md - please
-# keep that doc in sync when changing triggers, matrix, or job logic here.
+# NOTE: this workflow's behavior (triggers, test plan, job contents) is documented in
+# documentation/developer-docs/github/test-install-workflow.md - please keep that doc in
+# sync when changing triggers, the plan or job logic here.
+#
+# A pull request installs on Ubuntu 24.04 and runs the Python unit tests on Python 3.11. The
+# installs on every supported Ubuntu version and the Python unit tests on every supported
+# Python version run after the merge into develop, and on the pull requests they exist for:
+# Ansible changes also install on Ubuntu 22.04 (ansible-core 2.18), Dependabot pip updates run
+# every Python version. scripts/ci/install_plan.py makes that choice. A failure after the merge
+# is reported to the merged pull request. The C# unit tests run in the Sonar workflows, which
+# need them for coverage.
 
 on:
   workflow_dispatch:
     inputs:
       full:
-        description: Run Full Test Matrix
+        description: Run every install and Python version, as after a merge
         type: boolean
         default: false
         required: true
@@ -17,25 +25,36 @@ on:
       - develop
   pull_request:
 
-# A newer push to a pull request cancels its running checks. On main and develop a running full
-# matrix is allowed to finish instead: with max-parallel below it takes long enough that frequent
-# merges would otherwise cancel every run before it completes. GitHub keeps at most one pending
-# run per group and replaces it with the newest, so only the latest commit waits.
+# A newer push to a pull request cancels its running checks. On main and develop every commit
+# gets a run of its own instead, so that a failure after a merge points at the pull request
+# whose merge caused it: in one shared group GitHub would replace a waiting run by the next
+# merge, and the commits in between would never be tested.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.ref, github.sha) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  setup:
-    name: Determine test matrix
+  plan:
+    name: Determine test plan
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-      max_parallel: ${{ steps.set-matrix.outputs.max_parallel }}
-      python_versions: ${{ steps.set-matrix.outputs.python_versions }}
+      install_matrix: ${{ steps.plan.outputs.install_matrix }}
+      python_versions: ${{ steps.plan.outputs.python_versions }}
+      version_ok: ${{ steps.version.outputs.ok || 'true' }}
     steps:
-      - name: Select matrix based on event
-        id: set-matrix
+      # A pull request checks out its merge commit; depth 2 adds its first parent, the base
+      # branch, which the changed files are listed against.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: List the files the pull request changes
+        if: ${{ github.event_name == 'pull_request' }}
+        run: git diff --no-renames --name-only -z HEAD^1 HEAD >"$RUNNER_TEMP/changed-files"
+
+      - name: Select installs and Python versions
+        id: plan
         env:
           EVENT_NAME: ${{ github.event_name }}
           REF: ${{ github.ref }}
@@ -43,83 +62,41 @@ jobs:
           INPUT_FULL: ${{ inputs.full }}
         run: |
           set -euo pipefail
-
-          # Runners are shared by every workflow and pull request, and GitHub has no job
-          # priority. Capping the full matrix leaves the rest of the pool to pull requests.
-          kFullMatrixMaxParallel=5
-
-          full=false
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            full="$INPUT_FULL"
-          elif [ "$EVENT_NAME" = "push" ] && [[ "$REF" =~ ^refs/heads/(main|develop)$ ]]; then
-            full=true
+          changed_files=()
+          if [[ -f "$RUNNER_TEMP/changed-files" ]]; then
+            changed_files=(--changed-files "$RUNNER_TEMP/changed-files")
           fi
+          python3 scripts/ci/install_plan.py \
+            --event-name "$EVENT_NAME" \
+            --ref "$REF" \
+            --head-ref "$HEAD_REF" \
+            --full "${INPUT_FULL:-false}" \
+            "${changed_files[@]}" \
+            --output "$GITHUB_OUTPUT" \
+            --summary "$GITHUB_STEP_SUMMARY"
 
-          # Python dependency updates get the Python version matrix of the unit tests instead of
-          # the 15 job install matrix; the install itself is covered by the minimal matrix here
-          # and by the full matrix once the update is merged.
-          python_versions="$full"
-          if [ "$EVENT_NAME" = "pull_request" ] && [[ "$HEAD_REF" == dependabot/pip/* ]]; then
-            python_versions=true
-          fi
-
-          if [ "$full" = "true" ]; then
-            matrix='{"include":[
-              {"os":"ubuntu-26.04","python":"3.10","integration":false,"label":"Test install on ubuntu-26.04 with Python 3.10"},
-              {"os":"ubuntu-26.04","python":"3.11","integration":false,"label":"Test install on ubuntu-26.04 with Python 3.11"},
-              {"os":"ubuntu-26.04","python":"3.12","integration":false,"label":"Test install on ubuntu-26.04 with Python 3.12"},
-              {"os":"ubuntu-26.04","python":"3.13","integration":false,"label":"Test install on ubuntu-26.04 with Python 3.13"},
-              {"os":"ubuntu-26.04","python":"3.14","integration":false,"label":"Test install on ubuntu-26.04 with Python 3.14"},
-              {"os":"ubuntu-24.04","python":"3.10","integration":true,"label":"Test install on ubuntu-24.04 with Python 3.10"},
-              {"os":"ubuntu-24.04","python":"3.11","integration":true,"label":"Test install on ubuntu-latest"},
-              {"os":"ubuntu-24.04","python":"3.12","integration":false,"label":"Test install on ubuntu-24.04 with Python 3.12"},
-              {"os":"ubuntu-24.04","python":"3.13","integration":false,"label":"Test install on ubuntu-24.04 with Python 3.13"},
-              {"os":"ubuntu-24.04","python":"3.14","integration":false,"label":"Test install on ubuntu-24.04 with Python 3.14"},
-              {"os":"ubuntu-22.04","python":"3.10","integration":false,"label":"Test install on ubuntu-22.04 with Python 3.10"},
-              {"os":"ubuntu-22.04","python":"3.11","integration":false,"label":"Test install on ubuntu-22.04 with Python 3.11"},
-              {"os":"ubuntu-22.04","python":"3.12","integration":false,"label":"Test install on ubuntu-22.04 with Python 3.12"},
-              {"os":"ubuntu-22.04","python":"3.13","integration":false,"label":"Test install on ubuntu-22.04 with Python 3.13"},
-              {"os":"ubuntu-22.04","python":"3.14","integration":false,"label":"Test install on ubuntu-22.04 with Python 3.14"}
-            ]}'
+      # The same evaluation as the required "Gate pull request version" check, run as the first
+      # job of the pull request's own run, so that a pull request that needs a version bump
+      # learns it before its installs run. This copy runs the pull request's own script and is
+      # only an early signal; the binding gate runs in version-gate.yml from the base branch.
+      - name: Check the version early
+        id: version
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if scripts/ci/evaluate_version_gate.sh "$PR_NUMBER" "$PR_BASE_REF"; then
+            echo "ok=true" >>"$GITHUB_OUTPUT"
           else
-            # Both pinned ansible generations, and both with the integration tests, because
-            # requirements.txt installs ansible 10.7.0 (ansible-core 2.18) below python 3.11
-            # and 12.3.0 (core 2.19) from 3.11 up, and the two do not evaluate a "when" or
-            # "assert.that" the same way: core 2.18 wraps the expression as
-            # "{% if <expr> %}", where Jinja's if-statement parser rejects a bare
-            # conditional expression that core 2.19 accepts as an expression. A matrix that
-            # runs the roles/tests-integration suite on one generation only cannot see that
-            # class of defect at all - it reached a customer installation once already.
-            # Keep an integration run on each generation, or the older one is untested.
-            matrix='{"include":[
-              {"os":"ubuntu-24.04","python":"3.11","integration":true,"label":"Test install on ubuntu-latest"},
-              {"os":"ubuntu-24.04","python":"3.10","integration":true,"label":"Test install on ubuntu-latest with ansible-core 2.18"}
-            ]}'
+            echo "ok=false" >>"$GITHUB_OUTPUT"
+            echo "::error title=Version gate::The version of this pull request cannot be merged as it is, see the log of this step. The installs stop right away."
           fi
-
-          # Collapse to a single line for the step output.
-          matrix="$(echo "$matrix" | tr -d '\n' | tr -s ' ')"
-
-          if ! echo "$matrix" | jq empty; then
-            echo "::error::Generated matrix is not valid JSON: $matrix"
-            exit 1
-          fi
-
-          combos=$(echo "$matrix" | jq '.include | length')
-          max_parallel="$combos"
-          if [ "$full" = "true" ]; then
-            max_parallel="$kFullMatrixMaxParallel"
-          fi
-          echo "::notice::full=$full, selected $combos matrix combo(s), at most $max_parallel at once, python_versions=$python_versions"
-
-          {
-            echo "matrix=$matrix"
-            echo "max_parallel=$max_parallel"
-            echo "python_versions=$python_versions"
-          } >> "$GITHUB_OUTPUT"
 
   test-install:
-    needs: setup
+    needs: plan
     name: ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     env:
@@ -129,55 +106,46 @@ jobs:
       FWO_TEST_PASSWORD: "testpassword"
     strategy:
       fail-fast: false
-      max-parallel: ${{ fromJSON(needs.setup.outputs.max_parallel) }}
-      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.plan.outputs.install_matrix) }}
     steps:
+      # Fails rather than skips: GitHub counts a skipped required check as passed, so a skipped
+      # "Test install on ubuntu-latest" would let a pull request merge without an install.
+      - name: Stop when the version gate fails
+        if: ${{ needs.plan.outputs.version_ok != 'true' }}
+        run: |
+          echo "::error title=Version gate::The version of this pull request cannot be merged as it is, see the 'Check the version early' step of 'Determine test plan'."
+          exit 1
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: ${{ matrix.python }}
-
-      - name: Install dependencies
+      # The installer environment of a real installation: a venv of the system's own python3
+      # (3.10 on Ubuntu 22.04, 3.12 on 24.04, 3.14 on 26.04), which also decides the pinned
+      # Ansible version, see requirements.txt. The importer venv uses the same interpreter.
+      - name: Set up the installer environment
         run: |
-          sudo apt update
-          sudo DEBIAN_FRONTEND=noninteractive apt install build-essential ldap-utils libldap2-dev libsasl2-dev -y
-          python -m pip install -r requirements.txt
-
-      - name: Install Ansible collections
-        run: |
-          cd ${{ github.workspace }}
-          ansible-galaxy collection install -r collections/requirements.yml -p collections --force
+          source scripts/install-ansible-from-venv.sh
+          echo "$VIRTUAL_ENV/bin" >>"$GITHUB_PATH"
+          ansible --version
 
       - name: Run sample LDAP seeding regression tests
-        if: ${{ matrix.integration }}
         run: bash scripts/tests/test-sample-auth-data.sh
 
       # Demo data is off by default since GHSA-3v53-q5h9-pvfh, but the tests rely on it: sample-auth-data
       # creates the LDAP user of the JWT integration tests (integration_user_jwt_refresh_test), and the
       # integration tests use the sample devices, tenants and users. So every run requests it explicitly.
       #
-      # unittests_run is skipped in the integration flow: the csharp-unit-tests and python-code-check
-      # jobs run the same suites in parallel, and running them inside both playbook runs below cost
-      # about 8 minutes per job. The test project is still deployed, the JWT step runs from it. The
-      # plain installs of the full matrix keep running the unit tests on the installed system.
-      - name: Run Ansible test install without integration cleanup
-        if: ${{ matrix.integration }}
+      # unittests_run is skipped in both playbook runs: the C# unit tests run in the Sonar workflows and
+      # the Python unit tests in python-unit-tests. The test project is still deployed, the JWT step
+      # runs from it.
+      - name: Run Ansible test install
         run: |
           cd ${{ github.workspace }}
           ./scripts/run-playbook-with-sudo.sh site.yml -e force_install=true -e add_demo_data=yes --skip-tags integrationtests,unittests_run
 
-      - name: Run Ansible test install
-        if: ${{ !matrix.integration }}
-        run: |
-          cd ${{ github.workspace }}
-          ./scripts/run-playbook-with-sudo.sh site.yml -e force_install=true -e add_demo_data=yes -e "ansible_python_interpreter=$(which python)"
-
       - name: Run JWT refresh integration tests
-        if: ${{ matrix.integration }}
         run: |
           sudo -u fworch env \
             RUNNING_ON_GITHUB_ACTIONS=true \
@@ -187,7 +155,7 @@ jobs:
             dotnet test /usr/local/fworch/test/csharp/FWO.Test/FWO.Test.csproj --filter "FullyQualifiedName~AuthenticationTokenIntegrationTest" --blame-hang-timeout 5m --blame-hang-dump-type none
 
       - name: Collect middleware diagnostics after JWT test failure
-        if: ${{ matrix.integration && failure() }}
+        if: ${{ failure() && needs.plan.outputs.version_ok == 'true' }}
         run: |
           sudo systemctl status fworch-middleware --no-pager || true
           sudo journalctl -u fworch-middleware --no-pager -n 200 || true
@@ -195,7 +163,7 @@ jobs:
           sudo tail -n 200 /var/log/apache2/error.log || true
 
       - name: Run Ansible integration tests with cleanup
-        if: ${{ matrix.integration && success() }}
+        if: ${{ success() }}
         run: |
           cd ${{ github.workspace }}
           ./scripts/run-playbook-with-sudo.sh site.yml -e force_install=true -e add_demo_data=yes --tags integrationtests
@@ -206,9 +174,9 @@ jobs:
       # only inside the invocation that performed the rotation. This is also the only run
       # that exercises the force-regeneration paths in create-ca.yml and
       # issue-certificates.yml, and that proves every service still comes up against a CA
-      # anchor that changed underneath it. Only unittests_run is skipped, see the first install step.
+      # anchor that changed underneath it. Only unittests_run is skipped, see the install step.
       - name: Run Ansible certificate reset upgrade with integration tests
-        if: ${{ matrix.integration && success() }}
+        if: ${{ success() }}
         run: |
           cd ${{ github.workspace }}
           ./scripts/run-playbook-with-sudo.sh site.yml \
@@ -218,14 +186,13 @@ jobs:
             --skip-tags unittests_run
 
       - name: Collect certificate diagnostics after a failed reset upgrade
-        if: ${{ matrix.integration && failure() }}
+        if: ${{ failure() && needs.plan.outputs.version_ok == 'true' }}
         run: |
           sudo ls -la /usr/local/fworch/etc/secrets/ca/ || true
           sudo cat /usr/local/fworch/etc/secrets/ca/retired-ca-names || true
           sudo openssl x509 -in /usr/local/fworch/etc/fworch-internal-ca.crt -noout -subject -dates || true
           sudo apachectl configtest || true
           sudo tail -n 100 /var/log/apache2/error.log || true
-
 
   launcher-guard-tests:
     name: Launcher guard regression tests
@@ -236,32 +203,17 @@ jobs:
       - name: Run run-playbook-with-sudo.sh guard tests
         run: ./scripts/tests/test-run-playbook-with-sudo.sh
 
-  # The C# unit tests on the runner itself, in parallel with the installs. They need no
-  # installation; the default runsettings turn the integration tests off, and HtmlToPdfTest skips
-  # itself on GitHub Actions. They stay in Debug: in Release, ConfigFile exits the process on an
-  # unreadable config file (#if RELEASE), which ends the test host in IncorrectSyntaxConfigFile.
-  csharp-unit-tests:
-    name: C# unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: '10.0.x'
-      - name: Run C# unit tests
-        run: dotnet test roles/tests-unit/files/FWO.Test/FWO.Test.csproj --configuration Debug --settings FWO.default.runsettings
-
-  # Python dependency updates and the full matrix only: the importer and customizing code
-  # supports Python 3.10 and newer, the PR set tests 3.11 in python-code-check.
+  # Python 3.11 on a pull request, every supported version after a merge and on Dependabot pip
+  # updates. Pyright in python-code-check reports APIs the oldest and the newest supported
+  # Python lack on every pull request already.
   python-unit-tests:
-    needs: setup
-    if: ${{ needs.setup.outputs.python_versions == 'true' }}
+    needs: plan
     name: Python unit tests on Python ${{ matrix.python }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        python: ${{ fromJSON(needs.plan.outputs.python_versions) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -269,7 +221,8 @@ jobs:
           python-version: ${{ matrix.python }}
 
       # Each requirements file goes into an environment of its own, as on an installed system:
-      # the installer requirements run Ansible, the importer ones the importer venv.
+      # the installer requirements run Ansible, the importer ones the importer venv. Installing the
+      # installer requirements proves that the pinned Ansible still installs on this version.
       - name: Install the installer requirements
         run: |
           sudo apt-get update
@@ -282,8 +235,10 @@ jobs:
           python -m venv .venv
           .venv/bin/python -m pip install --only-binary=cryptography --prefer-binary -r roles/importer/files/importer/requirements.txt -r scripts/requirements.txt
 
-      - name: Run importer and customizing unit tests
-        run: .venv/bin/python -m pytest -q roles/importer/files/importer/test scripts/customizing
+      # The scripts tests include the customizing scripts, the version gate and the workflow
+      # policy tests in scripts/ci.
+      - name: Run importer and scripts unit tests
+        run: .venv/bin/python -m pytest -q roles/importer/files/importer/test scripts
 
   release-build:
     name: Release build
@@ -318,16 +273,47 @@ jobs:
         with:
           version-file: "roles/importer/files/importer/requirements.txt"
 
+      # pyproject.toml sets the oldest supported Python (3.10), which reports APIs only newer
+      # versions provide; the second pass with the newest one reports what newer versions removed.
       - name: pyright
         run: |
           .venv/bin/pyright --version
           .venv/bin/pyright
+          .venv/bin/pyright --pythonversion 3.14
 
       - run: ruff check
 
       - run: ruff format --exit-non-zero-on-format
 
-      # The importer tests ran inside the install before; the scripts tests include the version
-      # gate and workflow policy tests in scripts/ci.
-      - name: Python unit tests
-        run: ".venv/bin/python -m pytest -q roles/importer/files/importer/test scripts"
+  # Most of these checks run only after a merge, so their failure would otherwise only show in
+  # the commit history of develop. This comments on the pull request whose merge produced the
+  # commit, which notifies its author and reviewers.
+  report-merge-failure:
+    name: Report failed checks to the merged pull request
+    needs: [plan, test-install, python-unit-tests]
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/develop' && contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Comment on the merged pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          SERVER_URL: ${{ github.server_url }}
+        run: |
+          python3 scripts/ci/report_merge_failure.py \
+            --repository "$REPOSITORY" \
+            --commit-sha "$COMMIT_SHA" \
+            --run-id "$RUN_ID" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --server-url "$SERVER_URL"

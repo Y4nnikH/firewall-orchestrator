@@ -28,6 +28,13 @@ It contains exactly one job, **`Gate pull request version`**, and that job's che
 the gate result. There is no commit status and no second job, so a pull request shows one
 gate entry and nothing else. That single check run is what branch protection must require.
 
+The **FWO Test Install** workflow runs the same evaluation (`scripts/ci/evaluate_version_gate.sh`)
+early, in the first job of a pull request's own run, and stops its installs when it fails, so that
+a pull request that needs a version bump learns it without waiting for its installs. That copy
+runs the pull request's own script under `pull_request`, so it is only an early signal; this
+workflow stays the binding gate. See
+[test-install-workflow.md](test-install-workflow.md#version-check-before-the-installs).
+
 ### What is compared
 
 [`scripts/ci/evaluate_version_gate.sh`](../../../scripts/ci/evaluate_version_gate.sh) resolves

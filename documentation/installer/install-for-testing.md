@@ -66,7 +66,7 @@ To only run integration tests (for an existing installation only to be used in c
 
 ## Deploying the unit test project without running it
 
-`--skip-tags unittests_run` still copies the C# test project to `/usr/local/fworch/test/csharp`, but does not run the C# and importer unit tests. The CI test install uses this, because it runs the unit tests in a separate job and runs single tests (e.g. the JWT integration test) from the deployed project.
+`--skip-tags unittests_run` still copies the C# test project to `/usr/local/fworch/test/csharp`, but does not run the C# and importer unit tests. The CI test install uses this, because it runs the unit tests in separate jobs and runs single tests (e.g. the JWT integration test) from the deployed project.
 
 ```console
 ./scripts/run-playbook-with-sudo.sh site.yml --skip-tags unittests_run

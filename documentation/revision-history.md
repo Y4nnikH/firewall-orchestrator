@@ -2,22 +2,26 @@
 
 ## 9.9.3 - 11.11.2026
 - middleware REST API: `getAddressGroups` and `getServiceGroups` accept `filter.includeTechnicalDetails=true` to include each member's standalone address or service object fields; omitted, null or false keep the existing compact id/name response, and address details can be combined with separated zone groups
+- CI: the version gate no longer loses its result when a pull request is pushed while the version gate refresh runs (#5674)
+  - version-gate.yml has no concurrency group anymore, so a refresh re-run of an older head cannot cancel the gate of the current head
+  - the refresh skips a pull request whose head moved since it read the pull request list
+- CI: shorter pull request checks and less queueing on the shared runners (#5674), see documentation/developer-docs/github/test-install-workflow.md
+  - a pull request installs on Ubuntu 24.04 only; Ubuntu 22.04 (ansible-core 2.18) is added when it changes Ansible files; every merge into develop or main installs on Ubuntu 22.04, 24.04 and 26.04
+  - each install uses the system's own Python and the installer environment script like an installation, instead of a 15 job OS x Python matrix
+  - Python unit tests run on Python 3.11 on a pull request, and on 3.10 - 3.14 after a merge and on Dependabot pip updates; pyright checks against Python 3.10 and 3.14 on every pull request
+  - the installs no longer run the unit tests (new tag `unittests_run`); the C# unit tests run in the Sonar workflows only
+  - the first job of a pull request's run checks the version early and stops the installs when it needs a bump
+  - every merge into develop gets its own run, and a failure is commented on the merged pull request
+  - removed the PDF test step of the install job, which only rebuilt the test project to skip the test on GitHub Actions
+  - importer unit tests: the autouse service provider fixture builds its test doubles on first use only (about 7 times faster)
+  - Dependabot groups minor and patch updates per directory into one pull request
+- customizing script tests and scripts/performance/create_large_ruleset.py run on Python 3.10 again (no `typing.Self` and `datetime.UTC` imports)
 
 
 ## 9.9.2 - 10.11.2026
 - dependencies: update NuGet packages (AngleSharp 1.10.1, bunit 2.15.2, IPNetwork2 5.0.1, Microsoft.AspNetCore.Http 2.3.14, Microsoft.NET.Test.Sdk 18.11.1, Quartz 4.7.3, Scalar.AspNetCore 2.20.0, SoPro.FancyTable 1.5.0)
 - dependencies: update ASP.NET Core packages to 10.0.15 (Microsoft.AspNetCore.Authentication.JwtBearer, Microsoft.AspNetCore.Components, Microsoft.AspNetCore.Mvc.Testing, Microsoft.AspNetCore.OpenApi), .NET 10.0.15 security release
 - dependencies: update the graphql-core Python package of the importer and customizing scripts to 3.3.1 (security fix, FWO not exploitable).
-- CI: the version gate no longer loses its result when a pull request is pushed while the version gate refresh runs (#5674)
-  - version-gate.yml has no concurrency group anymore, so a refresh re-run of an older head cannot cancel the gate of the current head
-  - the refresh skips a pull request whose head moved since it read the pull request list
-- CI: shorter pull request checks and less queueing on the shared runners (#5674)
-  - the install runs of the integration flow skip running the unit tests (new tag `unittests_run`); C# and importer unit tests run in parallel jobs instead
-  - removed the PDF test step of the install job, which only rebuilt the test project to skip the test on GitHub Actions
-  - importer unit tests: the autouse service provider fixture builds its test doubles on first use only (about 7 times faster)
-  - the full install matrix runs at most 5 jobs at once and is no longer cancelled by later pushes to develop or main
-  - Python dependency updates get a Python 3.10-3.14 unit test matrix instead of the full install matrix
-  - Dependabot groups minor and patch updates per directory into one pull request
 - dependencies: update the graphql-core Python package of the importer and customizing scripts to 3.3.2 (denial-of-service fixes in validator and parser).
 
 

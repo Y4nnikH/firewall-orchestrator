@@ -1,164 +1,228 @@
 # CI: FWO Test Install workflow
 
-This describes the behavior of [`.github/workflows/test-install.yml`](../../../.github/workflows/test-install.yml),
-which runs the Ansible test install against either a single default
-combination or a full OS x Python matrix, depending on the triggering
-event.
+This describes [`.github/workflows/test-install.yml`](../../../.github/workflows/test-install.yml):
+what it tests on a pull request, what it tests after a merge, and why. The other pull request
+checks live in their own workflows: the SonarCloud analysis, which also runs the C# unit tests
+(see [sonarcloud-workflow.md](sonarcloud-workflow.md)), CodeQL, and the version gate (see
+[version-gate-workflow.md](version-gate-workflow.md)).
 
-## Triggers
+## Overview: what runs when
 
-The workflow runs on:
+A pull request gets the checks that find most problems cheaply. The expensive checks that
+mostly find problems of one operating system or one Python version run after the merge into
+develop, and on the pull requests they exist for.
 
-- `workflow_dispatch` (manual run, with a `full` checkbox input)
-- `push` to `main` or `develop`
-- `pull_request` (any branch)
+| Job | Pull request | Pull request changing [Ansible files](#ansible-files) | Dependabot pip pull request | Merge into develop or main, manual full run |
+|---|---|---|---|---|
+| Determine test plan | ✓ | ✓ | ✓ | ✓ |
+| Test install on ubuntu-latest (Ubuntu 24.04, ansible-core 2.19, **required**) | ✓ | ✓ | ✓ | ✓ |
+| Test install on ubuntu-22.04 (ansible-core 2.18) | – | ✓ | ✓ if it changes `requirements.txt` | ✓ |
+| Test install on ubuntu-26.04 | – | – | – | ✓ |
+| Python unit tests | 3.11 | 3.11 | 3.10 - 3.14 | 3.10 - 3.14 |
+| Python Code Check | ✓ | ✓ | ✓ | ✓ |
+| Release build | ✓ | ✓ | ✓ | ✓ |
+| Launcher guard regression tests | ✓ | ✓ | ✓ | ✓ |
+| Report failed checks to the merged pull request | – | – | – | only after a failed merge into develop |
 
-## Matrix selection
+The C# unit tests are not part of this workflow: the SonarCloud workflows run them on every
+pull request and every push to develop and main, because Sonar needs their coverage.
 
-A `setup` job inspects the triggering event and decides whether to run
-the **full matrix** or the **minimal matrix**. It emits the chosen
-matrix as JSON, which the `test-install` job consumes via `fromJSON()`.
+## What each job tests
 
-The full matrix is selected when any of the following is true:
+| Job | Contents |
+|---|---|
+| Determine test plan | lists the files the pull request changes, selects the installs and Python versions (`scripts/ci/install_plan.py`, the reasons are in the job summary), and checks the version early, see [Version check before the installs](#version-check-before-the-installs) |
+| Test install on ... | sets up the installer environment like an installation does, runs the sample LDAP seeding tests, installs FWO with demo data, runs the JWT refresh integration test, the Ansible integration tests, and a certificate reset upgrade with the integration tests, see [Install jobs](#install-jobs) |
+| Python unit tests on Python X | installs the installer requirements (proves that the pinned Ansible installs on X) and the importer and scripts requirements, then runs the importer tests and all tests under `scripts` (customizing scripts, version gate, workflow policy) |
+| Python Code Check | ruff, ruff format, pyright for the oldest (3.10) and the newest (3.14) supported Python, see [Python versions](#python-versions) |
+| Release build | builds `roles/FWO.sln` in `Release`, see [Release build](#release-build) |
+| Launcher guard regression tests | tests `scripts/run-playbook-with-sudo.sh` against a stubbed Ansible |
+| Report failed checks to the merged pull request | comments on the merged pull request, see [Checks after a merge](#checks-after-a-merge) |
 
-- the event is `workflow_dispatch` and the `full` input was checked
-- the event is `push` to `main` or `develop`
+## Where each kind of test runs
 
-Otherwise the minimal matrix is used. This covers `workflow_dispatch`
-with `full` unchecked (the default), and every `pull_request`,
-including Dependabot pull requests.
+| Test | Where | When |
+|---|---|---|
+| C# unit tests (`FWO.Test`, Debug) | SonarCloud PR, SonarCloud | every pull request, every push to develop and main |
+| Importer and scripts unit tests | Python unit tests; also SonarCloud PR for coverage | Python 3.11 on every pull request, every supported version after a merge |
+| Python API availability per version | pyright in Python Code Check | every pull request, 3.10 and 3.14 |
+| Fresh install, JWT, integration tests, certificate reset upgrade | Test install on ... | Ubuntu 24.04 always, 22.04 and 26.04 as in the overview |
+| Release configuration compiles | Release build | every run |
+| Version gate | early: Determine test plan; binding: Version gate workflow | every pull request |
+| Static analysis | SonarCloud PR, CodeQL | every pull request |
 
-| Matrix  | Combinations | Notes |
-|---------|--------------|-------|
-| Full    | `ubuntu-26.04`, `ubuntu-24.04`, `ubuntu-22.04` x Python `3.10`-`3.14` (15 combos) | `fail-fast: false`, so one failing combo does not cancel the rest; at most 5 run at once |
-| Minimal | `ubuntu-24.04` / Python `3.10` and `3.11` (2 combos) | one per pinned Ansible generation, see below |
+The unit tests are not run inside the installs any more (see [Install jobs](#install-jobs)).
+`HtmlToPdfTest` skips itself whenever `GITHUB_ACTIONS` is set, so PDF generation is not exercised
+by any workflow.
 
-### Sharing the runner pool
+## The test plan
 
-GitHub-hosted runners are shared by every workflow and pull request of
-the organization, and GitHub has no job priority. Two settings keep the
-full matrix from occupying the whole pool:
+`scripts/ci/install_plan.py` decides, from the event and the changed files:
 
-- `max-parallel` caps the full matrix at 5 concurrent jobs
-  (`kFullMatrixMaxParallel` in the `setup` job), so pull request checks
-  still find free runners while it runs.
-- `cancel-in-progress` applies to pull requests only. On `main` and
-  `develop` a running full matrix finishes, because with the cap it
-  takes long enough that frequent merges would otherwise cancel every
-  run. GitHub keeps one pending run per branch and replaces it with the
-  newest push, so only the latest commit waits.
+- **Merge into develop or main** (a `push`), or a manual run with **full** checked: every
+  install, every Python version.
+- **Pull request**: the Ubuntu 24.04 install and Python 3.11, plus
+  - the Ubuntu 22.04 install when the pull request changes [Ansible files](#ansible-files),
+  - every Python version when it comes from a `dependabot/pip/*` branch.
+- **Manual run** without full: like a pull request without Ansible changes.
 
-Dependabot pull requests are grouped (see `.github/dependabot.yml`):
-minor and patch updates of one directory arrive as one pull request,
-major updates keep a pull request of their own.
+### Operating systems, Python and Ansible
 
-### Python version matrix
+The installer creates its environment with the system's own `python3`
+(`scripts/install-ansible-from-venv.sh`; RHEL and Rocky use `python3.11`), and that Python
+decides the pinned Ansible version in `requirements.txt`: ansible 10.7 (ansible-core 2.18) below
+Python 3.11, ansible 12.3 (ansible-core 2.19) from 3.11 on. The importer and customizing venvs
+use the same interpreter. The install jobs set up their environment the same way, so each one
+tests what an installation on that system gets:
 
-The `python-unit-tests` job runs the importer and customizing unit
-tests on Python `3.10`-`3.14`, and installs the installer's
-`requirements.txt` on each version. It runs with the full matrix and on
-pull requests from a `dependabot/pip/*` branch. Such a pull request
-used to get the full 15 job install matrix; the version matrix covers
-what a Python dependency update can break at a fraction of the cost,
-and the full matrix after the merge covers the rest.
+| Install job | Python | ansible-core | Customer systems with the same combination |
+|---|---|---|---|
+| ubuntu-22.04 | 3.10 | 2.18 | Ubuntu 22.04, the only supported system on ansible-core 2.18 |
+| ubuntu-24.04 (`ubuntu-latest`) | 3.12 | 2.19 | Ubuntu 24.04 |
+| ubuntu-26.04 | 3.14 | 2.19 | Ubuntu 26.04 |
 
-Both matrices pin an explicit Ubuntu version (`ubuntu-24.04`) rather
-than `ubuntu-latest`, so a future change to what `ubuntu-latest` points
-to on GitHub-hosted runners can't silently change which OS versions
-this workflow actually tests.
+Debian and RHEL/Rocky have no GitHub-hosted runners and are not installed in CI. Their Python
+versions (3.11 on Debian 12, RHEL and Rocky, 3.13 on Debian 13) are covered by the Python unit
+tests.
 
-## Integration tests
+ansible-core 2.18 and 2.19 do not evaluate every `when` or `assert.that` the same way: 2.18 wraps
+the expression as `{% if <expr> %}`, where Jinja's if-statement parser rejects a bare conditional
+expression that 2.19 accepts. Such a defect reached a customer installation once. The Ubuntu
+22.04 install with its integration tests is the only check that sees it, which is why it runs
+on every pull request that changes Ansible files.
 
-Each matrix entry carries an `integration` flag:
+### Ansible files
 
-- in the full matrix, the `ubuntu-24.04` / Python `3.10` and `3.11`
-  entries
-- in the minimal matrix, both of its entries
+A pull request changing one of these paths also installs on Ubuntu 22.04:
 
-The minimal matrix runs two, one per pinned Ansible generation, because
-`requirements.txt` installs ansible-core 2.18 below Python 3.11 and 2.19
-from 3.11 up, and the two do not evaluate a `when` or `assert.that` the
-same way. Running `roles/tests-integration` on one generation only
-cannot see that class of defect at all.
+| Path | Why |
+|---|---|
+| `site.yml`, `ansible.cfg`, `scripts/*.yml` | playbooks and Ansible configuration |
+| `roles/*/tasks/`, `handlers/`, `templates/`, `defaults/`, `vars/`, `meta/` | everything Ansible evaluates in a role |
+| `inventory/` | variables and their templated defaults |
+| `requirements.txt`, `collections/` | the pinned Ansible and collection versions |
+| `callback_plugins/` | runs inside Ansible, on the installer's Python |
+| `scripts/*.sh` | the launcher and installer environment scripts |
+| `.github/workflows/test-install.yml`, `scripts/ci/install_plan.py` | this workflow and its plan |
 
-Only entries with the flag run the heavier flow; every other entry runs
-a plain install, which keeps that flow off all 15 full-matrix combos.
-The flagged entries run, in order:
+`roles/*/files/` is left out: it holds the application code and files the installer only copies.
+`scripts/ci/test_install_plan.py` checks every role directory of the repository against this list.
 
-1. the sample LDAP seeding regression tests
-   (`scripts/tests/test-sample-auth-data.sh`), which stub `ldapmodify`
-   and therefore need neither an installation nor an LDAP server
-2. an install with `--skip-tags integrationtests,unittests_run`
-3. the JWT refresh integration test
-4. the Ansible `--tags integrationtests` cleanup step
-5. a certificate reset upgrade,
-   `-e "installation_mode=upgrade internalca_reset_certificates=true"`,
-   with `--skip-tags unittests_run`
+### Python versions
 
-`unittests_run` tags only the tasks of `roles/tests-unit` that run the
-C# and importer unit tests. Skipping it still deploys the test project,
-which the JWT step runs from. The unit tests themselves run in the
-parallel `csharp-unit-tests` and `python-code-check` jobs instead;
-inside both playbook runs they cost about 8 minutes per job. The plain
-installs of the full matrix do not skip the tag, so running the unit
-tests on an installed system stays covered there.
+The supported versions are 3.10 - 3.14. A pull request runs the unit tests on 3.11 (the Python of
+Debian 12, RHEL and Rocky installations) only, because the most common version problem is an API
+that one version lacks, and pyright finds that on every pull request without running anything:
 
-Step 5 is a full run rather than a tag-limited one on purpose:
-`roles/tests-integration` asserts on facts the reset itself produces —
-which CA was retired, which identities were reissued, which
-customer-managed pairs were left untouched — and those exist only inside
-the invocation that performed the rotation. It is also what exercises
-the force-regeneration paths in `roles/internalCA`, and it proves every
-service still comes up against a CA anchor that changed underneath it.
-A failure there is followed by a certificate diagnostics step.
+- `pyproject.toml` sets `pythonVersion = "3.10"`, the oldest supported version, so pyright
+  reports an API that only newer versions provide (for example `datetime.UTC` or `typing.Self`,
+  both 3.11).
+- Python Code Check runs pyright a second time with `--pythonversion 3.14`, which reports
+  modules and functions that newer versions removed.
 
-## Unit tests
+The other differences, behavior of the standard library and wheels of dependencies, show in the
+Python unit tests on every version, after the merge and on Dependabot pip pull requests.
 
-- `csharp-unit-tests` runs `FWO.Test` on the runner with
-  `FWO.default.runsettings`, which turns the integration tests off.
-  It builds in `Debug`: in `Release`, `ConfigFile` exits the process on
-  an unreadable config file (`#if RELEASE`), which ends the test host in
-  `ConfigFileTest.IncorrectSyntaxConfigFile`.
-- `python-code-check` runs the importer tests and the tests under
-  `scripts` (including the version gate and workflow policy tests in
-  `scripts/ci`) on Python `3.11`.
+## Version check before the installs
 
-`HtmlToPdfTest` skips itself whenever `GITHUB_ACTIONS` is set, so PDF
-generation is not exercised by any workflow. The former separate PDF
-step in the install job only rebuilt the test project to report that
-skip, and was removed.
+The `Determine test plan` job of a pull request runs `scripts/ci/evaluate_version_gate.sh`, the
+same evaluation as the required `Gate pull request version` check. If the version cannot be
+merged as it is, the install jobs fail in their first step instead of spending half an hour on
+an install, and the pull request learns it from its own run. The installs fail rather than skip,
+because GitHub counts a skipped required check as passed.
 
-No workflow uses a dependency cache: `sonarcloud-pr.yml` builds pull
-request code in the privileged `pull_request_target` context, and
-`scripts/ci/test_workflow_security_policy.py` forbids caches in every
-workflow while that is the case (GHSA-3cwm-h5cm-r3f8).
+This copy runs the pull request's own script and is only an early signal. The binding gate runs
+in [version-gate.yml](version-gate-workflow.md) from the base branch. The Python unit tests and
+the other jobs run regardless.
+
+## Checks after a merge
+
+Every commit on develop and main gets a run of its own; nothing is skipped when merges follow
+each other quickly. A failure therefore belongs to exactly one merge.
+
+When a run of a push to develop fails in `Determine test plan`, an install or the Python unit
+tests, the job `Report failed checks to the merged pull request`
+(`scripts/ci/report_merge_failure.py`) comments on the pull request whose merge produced the
+commit. The comment lists the failed jobs with links to their logs; the pull request's author
+and reviewers get notified because they are subscribed to it. A commit that no pull request
+merged, such as a direct push, gets a warning in the run instead.
+
+Receiving such a comment means develop is red from that merge on:
+
+1. Open the failed job from the comment and find the cause. Most failures after a merge are an
+   operating system or Python version difference the pull request checks do not cover, see the
+   [overview](#overview-what-runs-when).
+2. Fix it in a new pull request. If the fix is not quick, revert the merge.
+3. To run the failing checks on the fix before merging it, start the workflow manually on its
+   branch (Actions, FWO Test Install, Run workflow) with **full** checked.
+
+The job needs `pull-requests: write` for the comment and `actions: read` for the job list; it only
+runs for pushes, so it never runs with pull request code.
+
+## Install jobs
+
+Each install job runs, in order:
+
+1. the installer environment setup, `source scripts/install-ansible-from-venv.sh`, as an
+   installation does it (see [Operating systems, Python and Ansible](#operating-systems-python-and-ansible))
+2. the sample LDAP seeding regression tests (`scripts/tests/test-sample-auth-data.sh`), which stub
+   `ldapmodify` and therefore need neither an installation nor an LDAP server
+3. an install with `--skip-tags integrationtests,unittests_run`
+4. the JWT refresh integration test
+5. the Ansible `--tags integrationtests` cleanup step
+6. a certificate reset upgrade,
+   `-e "installation_mode=upgrade internalca_reset_certificates=true"`, with
+   `--skip-tags unittests_run`
+
+`unittests_run` tags only the tasks of `roles/tests-unit` that run the C# and importer unit tests;
+those run in their own jobs instead (see [Where each kind of test runs](#where-each-kind-of-test-runs)).
+Skipping the tag still deploys the test project, which step 4 runs from. To run the unit tests on
+an installed system, use `--tags unittests`, see
+[install-for-testing.md](../../installer/install-for-testing.md).
+
+Step 6 is a full run rather than a tag-limited one on purpose: `roles/tests-integration` asserts on
+facts the reset itself produces - which CA was retired, which identities were reissued, which
+customer-managed pairs were left untouched - and those exist only inside the invocation that
+performed the rotation. It is also what exercises the force-regeneration paths in
+`roles/internalCA`, and it proves every service still comes up against a CA anchor that changed
+underneath it. A failure is followed by a certificate diagnostics step, a failure of the JWT test
+by a middleware diagnostics step.
+
+Demo data is off by default since GHSA-3v53-q5h9-pvfh, but the tests rely on it, so every install
+requests it with `-e add_demo_data=yes`.
 
 ## Release build
 
-The `release-build` job builds `roles/FWO.sln` in the `Release`
-configuration on every run. The installer publishes the middleware and the
-UI in `Release` (`dotnet_mode`), while the SonarCloud workflows build
-`Debug`. As warnings are treated as errors, a warning that only occurs in
-`Release` - for example a variable whose only use is inside `#if DEBUG` -
-would otherwise only surface when an installation fails. The job needs no
-installation and reports such a break within minutes.
+The `release-build` job builds `roles/FWO.sln` in the `Release` configuration on every run. The
+installer publishes the middleware and the UI in `Release` (`dotnet_mode`), while the SonarCloud
+workflows build `Debug`. As warnings are treated as errors, a warning that only occurs in
+`Release` - for example a variable whose only use is inside `#if DEBUG` - would otherwise only
+surface when an installation fails. The job needs no installation and reports such a break within
+minutes.
 
-## Job names
+## Job names and required checks
 
-Each matrix entry also carries a `label`, used as the job's display
-name. Both the minimal matrix's single job and the full matrix's
-designated integration entry are labeled `Test install on
-ubuntu-latest`, even though they run on the pinned `ubuntu-24.04`
-runner — preserving the job name from the previous, separate
-`test-install.yml` workflow, since branch protection requires a check
-with that exact name to exist on every run, including full-matrix
-runs. Other full matrix jobs are labeled with their OS and Python
-version, e.g. `Test install on ubuntu-26.04 with Python 3.10`.
+Branch protection requires a check named `Test install on ubuntu-latest`, so the Ubuntu 24.04
+install keeps that name although it runs on the pinned `ubuntu-24.04` runner. Every plan contains
+it. The other install jobs are not required. Renaming a required job needs the ruleset changed at
+the same time, or every open pull request waits for a check that never reports.
 
-## Error handling in the matrix-selection script
+All install jobs pin an explicit Ubuntu version rather than `ubuntu-latest`, so a change of what
+`ubuntu-latest` points to on GitHub-hosted runners cannot silently change which versions are
+tested.
 
-The script sets `set -euo pipefail` and validates the generated matrix
-JSON with `jq empty` before writing it to `GITHUB_OUTPUT`, failing the
-step with a clear `::error::` message if the JSON is malformed. It also
-logs an `::notice::` summarizing which matrix was selected and how many
-combinations it contains.
+## Runners and queueing
+
+GitHub-hosted runners are shared by every workflow and pull request of the organization, and
+GitHub has no job priority. A pull request run takes one install runner and a few short jobs; a
+run after a merge takes three install runners and five short Python jobs.
+
+- On pull requests a newer push cancels the running checks.
+- On develop and main every commit gets its own run (see [Checks after a merge](#checks-after-a-merge)).
+
+Dependabot pull requests are grouped (see `.github/dependabot.yml`): minor and patch updates of
+one directory arrive as one pull request, major updates keep a pull request of their own.
+
+No workflow uses a dependency cache: `sonarcloud-pr.yml` builds pull request code in the
+privileged `pull_request_target` context, and `scripts/ci/test_workflow_security_policy.py`
+forbids caches in every workflow while that is the case (GHSA-3cwm-h5cm-r3f8).

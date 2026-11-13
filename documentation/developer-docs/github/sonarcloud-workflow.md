@@ -13,6 +13,12 @@ The role-duration callback tests stub Ansible's callback base class, so they run
 Do not add Ansible to `scripts/requirements.txt`: the installer deploys that file into the
 customizing venv on every middleware host.
 
+Both workflows are the only place in CI where the C# unit tests (`FWO.Test`, `Debug`) run: Sonar
+needs their coverage, so the FWO Test Install workflow does not run them a second time (see
+[test-install-workflow.md](test-install-workflow.md#where-each-kind-of-test-runs)). A failing test
+fails the job before the analysis ends, so a red **SonarQube Analyze PR** is either a failed test or
+a failed quality gate; the log of the "Build and analyze pull request" step shows which.
+
 ## Branch analysis (`sonarcloud.yml`)
 
 Runs on pushes to `main` and `develop` and on manual dispatch. It analyzes the pushed branch and
